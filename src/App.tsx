@@ -7,6 +7,7 @@ import Index from "./pages/Index.tsx";
 import Clients from "./pages/Clients.tsx";
 import Tasks from "./pages/Tasks.tsx";
 import Documents from "./pages/Documents.tsx";
+import WhatsApp from "./pages/WhatsApp.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
