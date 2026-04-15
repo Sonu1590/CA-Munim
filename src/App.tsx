@@ -9,6 +9,7 @@ import Tasks from "./pages/Tasks.tsx";
 import Documents from "./pages/Documents.tsx";
 import WhatsApp from "./pages/WhatsApp.tsx";
 import Billing from "./pages/Billing.tsx";
+import Reports from "./pages/Reports.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/documents" element={<Documents />} />
           <Route path="/whatsapp" element={<WhatsApp />} />
           <Route path="/billing" element={<Billing />} />
+          <Route path="/reports" element={<Reports />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
