@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { DesktopSidebar } from "./DesktopSidebar";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { MobileFAB } from "./MobileFAB";
 
 export function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -9,7 +10,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <main className="flex-1 pb-20 md:pb-0 overflow-auto">
         {children}
       </main>
+      <MobileFAB />
       <MobileBottomNav />
     </div>
   );
 }
+

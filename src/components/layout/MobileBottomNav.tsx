@@ -1,4 +1,4 @@
-import { Home, Users, ClipboardList, Receipt, Settings } from "lucide-react";
+import { Home, Users, ClipboardList, MessageCircle, MoreHorizontal } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -6,8 +6,8 @@ const tabs = [
   { label: "Home", icon: Home, path: "/" },
   { label: "Clients", icon: Users, path: "/clients" },
   { label: "Tasks", icon: ClipboardList, path: "/tasks" },
-  { label: "Billing", icon: Receipt, path: "/billing" },
-  { label: "More", icon: Settings, path: "/settings" },
+  { label: "WhatsApp", icon: MessageCircle, path: "/whatsapp" },
+  { label: "More", icon: MoreHorizontal, path: "/settings" },
 ];
 
 export function MobileBottomNav() {
