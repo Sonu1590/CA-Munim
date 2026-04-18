@@ -20,6 +20,9 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { ClientType } from "@/data/mockClients";
+import { validatePAN, validateGSTIN } from "@/lib/indianTaxUtils";
+import { FYHint } from "@/components/common/FYHint";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 interface AddClientModalProps {
   open: boolean;
@@ -69,9 +72,14 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedMcaFilings, setSelectedMcaFilings] = useState<string[]>([]);
   const [panValue, setPanValue] = useState("");
+  const [gstinValue, setGstinValue] = useState("");
+  const [dob, setDob] = useState("");
+  const [gstRegDate, setGstRegDate] = useState("");
+  const [compRegDate, setCompRegDate] = useState("");
 
   const isCompanyType = ["Private Ltd", "LLP", "Public Ltd"].includes(clientType);
-  const panValid = /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(panValue.toUpperCase());
+  const panCheck = validatePAN(panValue);
+  const gstinCheck = validateGSTIN(gstinValue);
 
   const toggleService = (service: string) => {
     setSelectedServices((prev) =>
@@ -120,25 +128,36 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="dob">Date of Birth / Incorporation</Label>
-                  <Input id="dob" type="date" />
+                  <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+                  <FYHint date={dob} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="pan">PAN Number *</Label>
                   <div className="relative">
                     <Input
                       id="pan"
-                      className="font-mono uppercase tracking-wider pr-8"
+                      className="font-mono uppercase tracking-wider pr-9"
                       placeholder="ABCDE1234F"
                       maxLength={10}
                       value={panValue}
                       onChange={(e) => setPanValue(e.target.value.toUpperCase())}
                     />
-                    {panValue.length === 10 && (
-                      <span className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-sm ${panValid ? "text-[hsl(var(--success))]" : "text-destructive"}`}>
-                        {panValid ? "✓" : "✗"}
-                      </span>
+                    {panValue.length > 0 && (
+                      panCheck.isValid ? (
+                        <CheckCircle2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--success))]" />
+                      ) : (
+                        <XCircle className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-destructive" />
+                      )
                     )}
                   </div>
+                  {panCheck.isValid && panCheck.entityType && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Entity type: <span className="font-medium text-primary">{panCheck.entityType}</span>
+                    </p>
+                  )}
+                  {!panCheck.isValid && panValue.length === 10 && (
+                    <p className="text-[11px] text-destructive mt-1">Invalid PAN format</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="aadhaar">Aadhaar Number</Label>
