@@ -211,11 +211,36 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="gstin">GSTIN</Label>
-                  <Input id="gstin" className="font-mono uppercase tracking-wider" placeholder="22AAAAA0000A1Z5" maxLength={15} />
+                  <div className="relative">
+                    <Input
+                      id="gstin"
+                      className="font-mono uppercase tracking-wider pr-9"
+                      placeholder="22AAAAA0000A1Z5"
+                      maxLength={15}
+                      value={gstinValue}
+                      onChange={(e) => setGstinValue(e.target.value.toUpperCase())}
+                    />
+                    {gstinValue.length > 0 && (
+                      gstinCheck.isValid ? (
+                        <CheckCircle2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--success))]" />
+                      ) : (
+                        <XCircle className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-destructive" />
+                      )
+                    )}
+                  </div>
+                  {gstinValue.length >= 2 && gstinCheck.stateName && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      State: <span className="font-medium text-primary">{gstinCheck.stateName}</span>
+                      {!gstinCheck.isValid && gstinValue.length === 15 && (
+                        <span className="text-destructive ml-2">· Invalid GSTIN format</span>
+                      )}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="gstRegDate">GST Registration Date</Label>
-                  <Input id="gstRegDate" type="date" />
+                  <Input id="gstRegDate" type="date" value={gstRegDate} onChange={(e) => setGstRegDate(e.target.value)} />
+                  <FYHint date={gstRegDate} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>GST Turnover Category</Label>
@@ -296,7 +321,8 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="compRegDate">Registration Date</Label>
-                      <Input id="compRegDate" type="date" />
+                      <Input id="compRegDate" type="date" value={compRegDate} onChange={(e) => setCompRegDate(e.target.value)} />
+                      <FYHint date={compRegDate} />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="authCap">Authorized Capital (₹)</Label>
