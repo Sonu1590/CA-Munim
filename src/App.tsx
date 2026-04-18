@@ -11,7 +11,9 @@ import WhatsApp from "./pages/WhatsApp.tsx";
 import Billing from "./pages/Billing.tsx";
 import Reports from "./pages/Reports.tsx";
 import Settings from "./pages/Settings.tsx";
+import PenaltyCalculator from "./pages/PenaltyCalculator.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import { GlobalSearch } from "./components/common/GlobalSearch";
 
 const queryClient = new QueryClient();
 
@@ -21,8 +23,10 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <GlobalSearch />
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/penalty-calculator" element={<PenaltyCalculator />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/documents" element={<Documents />} />

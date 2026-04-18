@@ -1,4 +1,4 @@
-import { Home, Users, ClipboardList, FolderOpen, MessageCircle, Receipt, BarChart3, Settings } from "lucide-react";
+import { Home, Users, ClipboardList, FolderOpen, MessageCircle, Receipt, BarChart3, Settings, Calculator } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -10,8 +10,12 @@ const navItems = [
   { label: "WhatsApp Center", icon: MessageCircle, path: "/whatsapp" },
   { label: "Billing & Fees", icon: Receipt, path: "/billing" },
   { label: "Reports", icon: BarChart3, path: "/reports" },
+  { label: "Penalty Calculator", icon: Calculator, path: "/penalty-calculator" },
   { label: "Settings", icon: Settings, path: "/settings" },
 ];
+
+// Tip: Press ⌘K (Ctrl+K) to open global search
+
 
 export function DesktopSidebar() {
   return (

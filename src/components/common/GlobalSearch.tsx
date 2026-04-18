@@ -54,17 +54,20 @@ export function GlobalSearch() {
         </CommandGroup>
 
         <CommandGroup heading="Tasks">
-          {mockTasks.slice(0, 20).map((t) => (
-            <CommandItem
-              key={`t-${t.id}`}
-              value={`task ${t.taskName} ${t.clientName}`}
-              onSelect={() => go("/tasks")}
-            >
-              <ClipboardList className="mr-2 h-4 w-4 text-primary" />
-              <span className="flex-1">{t.taskName}</span>
-              <span className="text-xs text-muted-foreground">{t.clientName}</span>
-            </CommandItem>
-          ))}
+          {mockTasks.slice(0, 20).map((t) => {
+            const name = t.customTaskName || t.taskType;
+            return (
+              <CommandItem
+                key={`t-${t.id}`}
+                value={`task ${name} ${t.clientName}`}
+                onSelect={() => go("/tasks")}
+              >
+                <ClipboardList className="mr-2 h-4 w-4 text-primary" />
+                <span className="flex-1">{name}</span>
+                <span className="text-xs text-muted-foreground">{t.clientName}</span>
+              </CommandItem>
+            );
+          })}
         </CommandGroup>
 
         <CommandGroup heading="Invoices">
