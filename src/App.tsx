@@ -12,6 +12,7 @@ import Billing from "./pages/Billing.tsx";
 import Reports from "./pages/Reports.tsx";
 import Settings from "./pages/Settings.tsx";
 import PenaltyCalculator from "./pages/PenaltyCalculator.tsx";
+import UploadPortal from "./pages/UploadPortal.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { GlobalSearch } from "./components/common/GlobalSearch";
 
@@ -27,6 +28,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/penalty-calculator" element={<PenaltyCalculator />} />
+          <Route path="/upload/:token" element={<UploadPortal />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/documents" element={<Documents />} />
