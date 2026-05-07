@@ -42,7 +42,10 @@ export function TaskCard({ task, onStatusChange }: Props) {
   const priority = getPriorityBadge(task.priority);
   const [openChecklist, setOpenChecklist] = useState(false);
   const [checklistVersion, setChecklistVersion] = useState(0);
-  useEffect(() => taskChecklistStore.subscribe(() => setChecklistVersion((v) => v + 1)), []);
+  useEffect(() => {
+    const unsub = taskChecklistStore.subscribe(() => setChecklistVersion((v) => v + 1));
+    return () => { unsub(); };
+  }, []);
   const items = taskChecklistStore.get(task.id);
   const received = items.filter((i) => i.received).length;
   const total = items.length || task.docsTotal;
