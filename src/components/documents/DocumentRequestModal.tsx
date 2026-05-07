@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { mockClients } from "@/data/mockClients";
 import { documentRequestTypes } from "@/data/mockDocuments";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Link2, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
@@ -24,22 +24,32 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
   const isCustom = docType === "Custom";
   const client = mockClients.find((c) => c.id === clientId);
 
+  // Generate a deterministic upload token preview
+  const token = clientId && docType
+    ? btoa(`${clientId}-${docType}-${dueDate}`).replace(/=/g, "").slice(0, 16)
+    : "";
+  const uploadLink = token ? `${window.location.origin}/upload/${token}` : "";
+
   const handleSend = () => {
     if (!clientId || !docType || !dueDate) {
       toast.error("Please fill all required fields");
       return;
     }
     const docName = isCustom ? customLabel : docType;
-    const message = `Hello ${client?.name}, Sharma & Associates requires your ${docName} by ${new Date(dueDate).toLocaleDateString("en-IN")}. Please upload it using the link we've shared.`;
-    
-    toast.success("Document request sent via WhatsApp!", {
-      description: message.substring(0, 100) + "...",
+    toast.success("Document request sent via WhatsApp", {
+      description: `${client?.name} received the upload link. Task checklist will auto-update on submit.`,
     });
     onOpenChange(false);
     setClientId("");
     setDocType("");
     setCustomLabel("");
     setDueDate("");
+    void docName;
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(uploadLink);
+    toast.success("Upload link copied");
   };
 
   return (
