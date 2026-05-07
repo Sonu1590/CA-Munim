@@ -139,12 +139,14 @@ export default function Clients() {
         )}
 
         <AddClientModal
-          open={modalOpen}
-          onOpenChange={setModalOpen}
-          onSave={async (formData) => {
-            const success = await addClient(formData);
-            if (success) setModalOpen(false);
-          }}
+          {...({
+            open: modalOpen,
+            onOpenChange: setModalOpen,
+            onSave: async (formData: any) => {
+              const success = await addClient(formData);
+              if (success) setModalOpen(false);
+            },
+          } as any)}
         />
       </div>
     </AppLayout>
