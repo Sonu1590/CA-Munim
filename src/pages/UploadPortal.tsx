@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { UploadCloud, FileText, CheckCircle2, X, Calendar, Building2 } from "lucide-react";
 import { mockFirmProfile } from "@/data/mockSettings";
+import { taskChecklistStore } from "@/lib/taskChecklistStore";
 import { toast } from "sonner";
 
 interface UploadedFile {
@@ -17,6 +18,7 @@ interface UploadedFile {
 const mockRequest = {
   documentName: "Form 16 (FY 2024-25)",
   clientName: "Ramesh Kumar Gupta",
+  clientId: "1",
   dueDate: "2025-04-25",
 };
 
@@ -70,6 +72,8 @@ export default function UploadPortal() {
       toast.error("Please wait for uploads to finish");
       return;
     }
+    // Auto-update the related task's document checklist
+    taskChecklistStore.markReceivedByLabel(mockRequest.clientId, mockRequest.documentName);
     setSubmitted(true);
   };
 
