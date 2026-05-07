@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Task, taskTypeIcons } from "@/data/mockTasks";
 import { Badge } from "@/components/ui/badge";
 import { format, differenceInDays, parseISO } from "date-fns";
@@ -7,8 +8,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TaskChecklistDrawer } from "./TaskChecklistDrawer";
+import { taskChecklistStore } from "@/lib/taskChecklistStore";
 
 interface Props {
   task: Task;
@@ -37,6 +40,14 @@ export function TaskCard({ task, onStatusChange }: Props) {
   const icon = taskTypeIcons[task.taskType] || "⚡";
   const dateColor = getDueDateColor(task.dueDate, task.status);
   const priority = getPriorityBadge(task.priority);
+  const [openChecklist, setOpenChecklist] = useState(false);
+  const [checklistVersion, setChecklistVersion] = useState(0);
+  useEffect(() => taskChecklistStore.subscribe(() => setChecklistVersion((v) => v + 1)), []);
+  const items = taskChecklistStore.get(task.id);
+  const received = items.filter((i) => i.received).length;
+  const total = items.length || task.docsTotal;
+  const docsReceived = items.length ? received : task.docsReceived;
+  void checklistVersion;
 
   return (
     <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm hover:shadow-md transition-shadow">
@@ -91,10 +102,23 @@ export function TaskCard({ task, onStatusChange }: Props) {
           </div>
           <span className="text-xs text-muted-foreground">{task.assignedTo.split(" ")[0]}</span>
         </div>
-        <span className="text-xs text-muted-foreground">
-          📎 {task.docsReceived}/{task.docsTotal} docs
-        </span>
+        <button
+          onClick={() => items.length > 0 && setOpenChecklist(true)}
+          className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-primary transition-colors"
+          disabled={items.length === 0}
+        >
+          <ListChecks className="h-3 w-3" /> {docsReceived}/{total} docs
+        </button>
       </div>
+      {items.length > 0 && (
+        <TaskChecklistDrawer
+          open={openChecklist}
+          onOpenChange={setOpenChecklist}
+          taskId={task.id}
+          taskName={task.customTaskName || task.taskType}
+          clientName={task.clientName}
+        />
+      )}
     </div>
   );
 }
