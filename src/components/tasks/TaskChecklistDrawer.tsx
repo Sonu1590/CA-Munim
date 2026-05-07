@@ -24,7 +24,8 @@ export function TaskChecklistDrawer({ open, onOpenChange, taskId, taskName, clie
   useEffect(() => {
     if (!open) return;
     setItems(taskChecklistStore.get(taskId));
-    return taskChecklistStore.subscribe(() => setItems(taskChecklistStore.get(taskId)));
+    const unsub = taskChecklistStore.subscribe(() => setItems(taskChecklistStore.get(taskId)));
+    return () => { unsub(); };
   }, [open, taskId]);
 
   const received = items.filter((i) => i.received).length;
