@@ -8,6 +8,14 @@ export type TaskType =
   | "MGT-7" | "AOC-4" | "DIR-3 KYC" | "ADT-1" | "INC-20A" | "PAS-3"
   | "Bookkeeping" | "Payroll" | "GST Registration" | "Company Incorporation" | "Custom";
 
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  received: boolean;
+  receivedAt?: string;
+  source?: "client_upload" | "manual";
+}
+
 export interface Task {
   id: string;
   clientName: string;
@@ -25,6 +33,36 @@ export interface Task {
   docsReceived: number;
   docsTotal: number;
   notes?: string;
+  documentChecklist?: ChecklistItem[];
+}
+
+const sampleChecklists: Record<string, ChecklistItem[]> = {
+  "GSTR-3B": [
+    { id: "1", label: "Sale invoices for the month", received: true, source: "client_upload", receivedAt: "2026-04-02" },
+    { id: "2", label: "Purchase invoices for the month", received: true, source: "client_upload", receivedAt: "2026-04-02" },
+    { id: "3", label: "Bank statement", received: false },
+    { id: "4", label: "Expense bills", received: false },
+    { id: "5", label: "TDS / TCS certificates", received: false },
+  ],
+  "ITR Filing": [
+    { id: "1", label: "Form 16", received: false },
+    { id: "2", label: "Bank statements (Apr–Mar)", received: false },
+    { id: "3", label: "Investment proofs (LIC/PPF/ELSS)", received: false },
+    { id: "4", label: "Home loan interest certificate", received: false },
+    { id: "5", label: "Capital gains statement", received: false },
+    { id: "6", label: "Last year's ITR", received: false },
+  ],
+  "GSTR-1": [
+    { id: "1", label: "Tax invoices", received: true, source: "client_upload", receivedAt: "2026-03-30" },
+    { id: "2", label: "Credit / debit notes", received: true, source: "manual" },
+    { id: "3", label: "Export invoices", received: true, source: "manual" },
+    { id: "4", label: "B2C summary", received: true, source: "client_upload", receivedAt: "2026-04-01" },
+  ],
+};
+
+function attachChecklist(task: Omit<Task, "documentChecklist">): Task {
+  const items = sampleChecklists[task.taskType];
+  return { ...task, documentChecklist: items ? items.map((i) => ({ ...i })) : undefined };
 }
 
 export const taskTypeGroups = {
