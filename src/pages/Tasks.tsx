@@ -4,24 +4,56 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, LayoutGrid, List, CalendarDays, Zap, Search } from "lucide-react";
-import { mockTasks, Task } from "@/data/mockTasks";
+import { Plus, LayoutGrid, List, CalendarDays, Zap, Search, Loader2, AlertCircle } from "lucide-react";
 import { TaskKanbanBoard } from "@/components/tasks/TaskKanbanBoard";
 import { TaskListView } from "@/components/tasks/TaskListView";
 import { TaskCalendarView } from "@/components/tasks/TaskCalendarView";
 import { AddTaskModal } from "@/components/tasks/AddTaskModal";
 import { BulkTaskGenerator } from "@/components/tasks/BulkTaskGenerator";
+import { useTasks } from "@/hooks/useTasks"; // ← CHANGED from mockTasks
+
+// Keep these exports here so child components (AddTaskModal etc.) 
+// can still import them from this file if needed
+export { taskTypeGroups, taskTypeIcons, dueDateRules, staffMembers, financialYears, quarters, months } from "@/data/mockTasks";
+export type { Task, TaskType, TaskStatus, TaskPriority, ChecklistItem } from "@/data/mockTasks";
 
 export default function Tasks() {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [view, setView] = useState<"kanban" | "list" | "calendar">("kanban");
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
 
+  // ── Real data from Supabase ──────────────────────────────────────────────
+  const { tasks, loading, error, updateTaskStatus, refetch } = useTasks();
+
+  // ── Map Supabase task shape → shape that child components expect ─────────
+  // useTasks returns a slightly different shape than mockTasks.
+  // We normalise here so TaskKanbanBoard / TaskListView need zero changes.
+  const normalisedTasks = useMemo(() => {
+    return tasks.map((t) => ({
+      id: t.id,
+      clientName: t.clientName,
+      clientId: t.clientId,
+      taskType: t.taskType as any,
+      customTaskName: t.customName,
+      financialYear: t.financialYear,
+      dueDate: t.dueDate,
+      priority: t.priority,
+      status: t.status,
+      assignedTo: t.assignedToName ?? "Unassigned",
+      assignedInitials: t.assignedToName
+        ? t.assignedToName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
+        : "?",
+      docsReceived: (t.documentChecklist ?? []).filter((d: any) => d.received || d.checked).length,
+      docsTotal: (t.documentChecklist ?? []).length,
+      notes: t.notes,
+      documentChecklist: t.documentChecklist,
+    }));
+  }, [tasks]);
+
   const filteredTasks = useMemo(() => {
-    return tasks.filter((t) => {
+    return normalisedTasks.filter((t) => {
       const matchSearch =
         !search ||
         t.clientName.toLowerCase().includes(search.toLowerCase()) ||
@@ -29,22 +61,46 @@ export default function Tasks() {
       const matchPriority = priorityFilter === "all" || t.priority === priorityFilter;
       return matchSearch && matchPriority;
     });
-  }, [tasks, search, priorityFilter]);
+  }, [normalisedTasks, search, priorityFilter]);
 
-  const handleStatusChange = (taskId: string, status: Task["status"]) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status } : t))
-    );
+  // Status change — writes to Supabase, then optimistically updates UI
+  const handleStatusChange = async (taskId: string, status: "pending" | "in_progress" | "completed") => {
+    await updateTaskStatus(taskId, status);
   };
 
   const stats = {
-    total: tasks.length,
-    pending: tasks.filter((t) => t.status === "pending").length,
-    overdue: tasks.filter((t) => {
+    total: normalisedTasks.length,
+    pending: normalisedTasks.filter((t) => t.status === "pending").length,
+    overdue: normalisedTasks.filter((t) => {
       const days = (new Date(t.dueDate).getTime() - Date.now()) / 86400000;
       return days < 0 && t.status !== "completed";
     }).length,
   };
+
+  // ── Loading state ────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-3 text-muted-foreground">Loading tasks...</span>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // ── Error state ──────────────────────────────────────────────────────────
+  if (error) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
+          <AlertCircle className="h-10 w-10 text-destructive" />
+          <p className="text-muted-foreground">{error}</p>
+          <Button variant="outline" onClick={refetch}>Try Again</Button>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -56,14 +112,19 @@ export default function Tasks() {
               Tasks & Deadlines
             </h1>
             <p className="text-sm text-muted-foreground">
-              {stats.total} total · {stats.pending} pending · <span className="text-red-600">{stats.overdue} overdue</span>
+              {stats.total} total · {stats.pending} pending ·{" "}
+              <span className="text-red-600">{stats.overdue} overdue</span>
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={() => setBulkOpen(true)} variant="outline" size="sm" className="gap-1.5">
               <Zap className="h-4 w-4" /> Bulk Generate
             </Button>
-            <Button onClick={() => setAddOpen(true)} size="sm" className="gap-1.5 bg-accent hover:bg-accent/90 text-white">
+            <Button
+              onClick={() => setAddOpen(true)}
+              size="sm"
+              className="gap-1.5 bg-accent hover:bg-accent/90 text-white"
+            >
               <Plus className="h-4 w-4" /> Add Task
             </Button>
           </div>
@@ -94,21 +155,63 @@ export default function Tasks() {
           </Select>
           <Tabs value={view} onValueChange={(v) => setView(v as typeof view)} className="ml-auto">
             <TabsList>
-              <TabsTrigger value="kanban" className="gap-1.5"><LayoutGrid className="h-4 w-4" /> <span className="hidden md:inline">Kanban</span></TabsTrigger>
-              <TabsTrigger value="list" className="gap-1.5"><List className="h-4 w-4" /> <span className="hidden md:inline">List</span></TabsTrigger>
-              <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="h-4 w-4" /> <span className="hidden md:inline">Calendar</span></TabsTrigger>
+              <TabsTrigger value="kanban" className="gap-1.5">
+                <LayoutGrid className="h-4 w-4" />
+                <span className="hidden md:inline">Kanban</span>
+              </TabsTrigger>
+              <TabsTrigger value="list" className="gap-1.5">
+                <List className="h-4 w-4" />
+                <span className="hidden md:inline">List</span>
+              </TabsTrigger>
+              <TabsTrigger value="calendar" className="gap-1.5">
+                <CalendarDays className="h-4 w-4" />
+                <span className="hidden md:inline">Calendar</span>
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
 
+        {/* Empty state */}
+        {normalisedTasks.length === 0 && (
+          <div className="text-center py-16 text-muted-foreground space-y-3">
+            <p className="text-lg font-medium">No tasks yet</p>
+            <p className="text-sm">Add your first task to get started.</p>
+            <Button
+              className="bg-accent text-white hover:bg-accent/90 mt-2"
+              onClick={() => setAddOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-1" /> Add First Task
+            </Button>
+          </div>
+        )}
+
         {/* Content */}
-        {view === "kanban" && <TaskKanbanBoard tasks={filteredTasks} onStatusChange={handleStatusChange} />}
-        {view === "list" && <TaskListView tasks={filteredTasks} onStatusChange={handleStatusChange} />}
-        {view === "calendar" && <TaskCalendarView tasks={filteredTasks} />}
+        {normalisedTasks.length > 0 && (
+          <>
+            {view === "kanban" && (
+              <TaskKanbanBoard tasks={filteredTasks} onStatusChange={handleStatusChange} />
+            )}
+            {view === "list" && (
+              <TaskListView tasks={filteredTasks} onStatusChange={handleStatusChange} />
+            )}
+            {view === "calendar" && <TaskCalendarView tasks={filteredTasks} />}
+          </>
+        )}
 
         {/* Modals */}
-        <AddTaskModal open={addOpen} onOpenChange={setAddOpen} />
-        <BulkTaskGenerator open={bulkOpen} onOpenChange={setBulkOpen} />
+        <AddTaskModal
+          open={addOpen}
+          onOpenChange={setAddOpen}
+          onSave={async () => {
+            await refetch(); // refresh after new task added
+            setAddOpen(false);
+          }}
+        />
+        <BulkTaskGenerator
+          open={bulkOpen}
+          onOpenChange={setBulkOpen}
+          onGenerated={refetch} // refresh after bulk create
+        />
       </div>
     </AppLayout>
   );
