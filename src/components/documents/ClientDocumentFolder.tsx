@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
-import { mockDocuments, documentCategories, type DocumentCategory } from "@/data/mockDocuments";
-import { mockClients } from "@/data/mockClients";
+import { useState, useEffect, useMemo } from "react";
+import { fetchDocumentsFromSupabase, documentCategories, type DocumentCategory } from "@/data/Documents";
+import { fetchClientsFromSupabase } from "@/data/Clients";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileText, Image, FileSpreadsheet, Download, Eye, Trash2, Share2, FolderOpen } from "lucide-react";
+import { ArrowLeft, FileText, Image, FileSpreadsheet, Download, Eye, Trash2, Share2, FolderOpen, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
@@ -24,24 +24,64 @@ const fileIconMap: Record<string, typeof FileText> = {
 
 export function ClientDocumentFolder({ clientId, onBack }: Props) {
   const [selectedCategory, setSelectedCategory] = useState<DocumentCategory | null>(null);
-  const client = mockClients.find((c) => c.id === clientId);
-  const clientDocs = mockDocuments.filter((d) => d.clientId === clientId);
+  const [client, setClient] = useState<any>(null);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [clientsData, documentsData] = await Promise.all([
+          fetchClientsFromSupabase(),
+          fetchDocumentsFromSupabase(),
+        ]);
+        const foundClient = clientsData.find((c) => c.id === clientId);
+        setClient(foundClient);
+        setDocuments(documentsData.filter((d) => d.clientId === clientId));
+      } catch (err: any) {
+        setError(err?.message ?? "Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [clientId]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     documentCategories.forEach((cat) => {
-      counts[cat] = clientDocs.filter((d) => d.category === cat).length;
+      counts[cat] = documents.filter((d) => d.category === cat).length;
     });
     return counts;
-  }, [clientDocs]);
+  }, [documents]);
 
   const visibleDocs = selectedCategory
-    ? clientDocs.filter((d) => d.category === selectedCategory)
-    : clientDocs;
+    ? documents.filter((d) => d.category === selectedCategory)
+    : documents;
 
   const handleAction = (action: string, fileName: string) => {
     toast.success(`${action}: ${fileName}`);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin" />
+        <span className="ml-2">Loading documents...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8 text-red-600">
+        Error: {error}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -51,7 +91,7 @@ export function ClientDocumentFolder({ clientId, onBack }: Props) {
         </Button>
         <div>
           <h2 className="font-heading font-semibold text-lg">{client?.name}</h2>
-          <p className="text-xs text-muted-foreground">{clientDocs.length} documents</p>
+          <p className="text-xs text-muted-foreground">{documents.length} documents</p>
         </div>
       </div>
 
@@ -62,7 +102,7 @@ export function ClientDocumentFolder({ clientId, onBack }: Props) {
           className="cursor-pointer"
           onClick={() => setSelectedCategory(null)}
         >
-          All ({clientDocs.length})
+          All ({documents.length})
         </Badge>
         {documentCategories.map((cat) => (
           <Badge

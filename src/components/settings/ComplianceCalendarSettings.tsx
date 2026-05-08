@@ -1,20 +1,37 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarClock, Save } from "lucide-react";
-import { filingCategories } from "@/data/mockSettings";
+import { CalendarClock, Save, Loader2 } from "lucide-react";
+import { fetchFilingCategoriesFromSupabase, saveFilingCategoriesToSupabase, type FilingCategory } from "@/data/Settings";
 import { toast } from "sonner";
 
 export function ComplianceCalendarSettings() {
-  const [categories, setCategories] = useState(filingCategories);
+  const [categories, setCategories] = useState<FilingCategory[]>([]);
   const [autoGenerate, setAutoGenerate] = useState(true);
-  const [reminderDays, setReminderDays] = useState<Record<string, string>>(
-    Object.fromEntries(filingCategories.map((c) => [c.id, "7"]))
-  );
+  const [reminderDays, setReminderDays] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchFilingCategoriesFromSupabase();
+        setCategories(data);
+        setReminderDays(Object.fromEntries(data.map((c) => [c.id, "7"])));
+      } catch (err: any) {
+        setError(err.message ?? "Unable to load filing categories");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadCategories();
+  }, []);
 
   const toggleCategory = (id: string) => {
     setCategories((prev) => prev.map((c) => c.id === id ? { ...c, enabled: !c.enabled } : c));
@@ -31,6 +48,11 @@ export function ComplianceCalendarSettings() {
           <CardDescription>Select which compliance filings to monitor and generate tasks for</CardDescription>
         </CardHeader>
         <CardContent>
+        {loading ? (
+          <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />Loading compliance settings...</div>
+        ) : error ? (
+          <div className="p-8 text-center text-destructive">{error}</div>
+        ) : (
           <div className="space-y-3">
             {categories.map((cat) => (
               <div key={cat.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
@@ -48,7 +70,8 @@ export function ComplianceCalendarSettings() {
               </div>
             ))}
           </div>
-        </CardContent>
+        )}
+      </CardContent>
       </Card>
 
       <Card>
@@ -68,7 +91,17 @@ export function ComplianceCalendarSettings() {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={() => toast.success("Compliance calendar settings saved")} className="gap-2"><Save className="h-4 w-4" />Save Settings</Button>
+        <Button
+          onClick={async () => {
+            try {
+              await saveFilingCategoriesToSupabase(categories);
+              toast.success("Compliance calendar settings saved");
+            } catch (err: any) {
+              toast.error(err.message ?? "Unable to save settings");
+            }
+          }}
+          className="gap-2"
+        ><Save className="h-4 w-4" />Save Settings</Button>
       </div>
     </div>
   );

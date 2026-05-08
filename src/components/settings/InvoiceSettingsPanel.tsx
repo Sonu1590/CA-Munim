@@ -1,20 +1,67 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Receipt, Save, Upload } from "lucide-react";
-import { mockInvoiceSettings } from "@/data/mockSettings";
+import { Receipt, Save, Upload, Loader2 } from "lucide-react";
+import { fetchInvoiceSettingsFromSupabase, saveInvoiceSettingsToSupabase, type InvoiceSettings } from "@/data/Settings";
 import { toast } from "sonner";
 
 export function InvoiceSettingsPanel() {
-  const [settings, setSettings] = useState(mockInvoiceSettings);
+  const [settings, setSettings] = useState<InvoiceSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const updateField = (field: string, value: string | number | boolean) => {
-    setSettings((prev) => ({ ...prev, [field]: value }));
+  useEffect(() => {
+    const loadSettings = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchInvoiceSettingsFromSupabase();
+        setSettings(data);
+      } catch (err: any) {
+        setError(err.message ?? "Unable to load invoice settings");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const updateField = (field: keyof InvoiceSettings, value: string | number | boolean) => {
+    if (!settings) return;
+    setSettings((prev) => (prev ? { ...prev, [field]: value } : prev));
   };
+
+  const handleSave = async () => {
+    if (!settings) return;
+    setSaving(true);
+    try {
+      await saveInvoiceSettingsToSupabase(settings);
+      toast.success("Invoice settings saved");
+    } catch (err: any) {
+      toast.error(err.message ?? "Unable to save invoice settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16 text-muted-foreground gap-2"><Loader2 className="h-5 w-5 animate-spin" />Loading invoice settings...</div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-center text-destructive py-16">{error}</div>;
+  }
+
+  if (!settings) {
+    return null;
+  }
 
   return (
     <div className="space-y-6">
@@ -72,7 +119,9 @@ export function InvoiceSettingsPanel() {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={() => toast.success("Invoice settings saved")} className="gap-2"><Save className="h-4 w-4" />Save Invoice Settings</Button>
+        <Button onClick={handleSave} disabled={saving} className="gap-2">
+          <Save className="h-4 w-4" />Save Invoice Settings
+        </Button>
       </div>
     </div>
   );

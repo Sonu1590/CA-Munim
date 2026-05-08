@@ -8,9 +8,9 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { mockClients } from "@/data/mockClients";
-import { mockTasks } from "@/data/mockTasks";
-import { mockInvoices } from "@/data/mockBilling";
+import { mockClients } from "@/data/Clients";
+import { mockTasks } from "@/data/Tasks";
+import { mockInvoices } from "@/data/Billing";
 import { Users, ClipboardList, Receipt } from "lucide-react";
 
 export function GlobalSearch() {

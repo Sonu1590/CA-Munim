@@ -1,4 +1,4 @@
-import { Client } from "@/data/mockClients";
+import { Client } from "@/data/Clients";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

@@ -1,7 +1,8 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Newspaper, AlertTriangle, Info, AlertCircle } from "lucide-react";
-import { mockComplianceUpdates } from "@/data/mockSettings";
+import { Newspaper, AlertTriangle, Info, AlertCircle, Loader2 } from "lucide-react";
+import { fetchComplianceUpdatesFromSupabase, type ComplianceUpdate } from "@/data/Settings";
 
 const severityConfig = {
   info: { icon: Info, color: "bg-blue-100 text-blue-700", label: "Info" },
@@ -10,6 +11,26 @@ const severityConfig = {
 };
 
 export function ComplianceUpdatesFeed() {
+  const [updates, setUpdates] = useState<ComplianceUpdate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadUpdates = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchComplianceUpdatesFromSupabase();
+        setUpdates(data);
+      } catch (err: any) {
+        setError(err.message ?? "Unable to load updates");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadUpdates();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
@@ -17,8 +38,13 @@ export function ComplianceUpdatesFeed() {
         <p className="text-sm text-muted-foreground">Recent regulatory changes and deadline updates from the CA Munim team</p>
       </div>
 
-      <div className="space-y-4">
-        {mockComplianceUpdates.map((update) => {
+      {loading ? (
+        <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />Loading updates...</div>
+      ) : error ? (
+        <div className="p-8 text-center text-destructive">{error}</div>
+      ) : (
+        <div className="space-y-4">
+          {updates.map((update) => {
           const config = severityConfig[update.severity];
           const Icon = config.icon;
           return (
@@ -41,7 +67,8 @@ export function ComplianceUpdatesFeed() {
             </Card>
           );
         })}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

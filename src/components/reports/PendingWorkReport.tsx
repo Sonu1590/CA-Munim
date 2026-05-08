@@ -1,31 +1,32 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Download, Clock, AlertTriangle } from "lucide-react";
-import { mockTasks } from "@/data/mockTasks";
+import { Download, Clock, AlertTriangle, Loader2 } from "lucide-react";
+import { getPendingWork, type PendingWorkFilter } from "@/data/Reports";
 
-type Filter = "all" | "this_week" | "this_month" | "overdue";
+type Filter = PendingWorkFilter;
 
 export function PendingWorkReport() {
   const [filter, setFilter] = useState<Filter>("all");
+  const [openTasks, setOpenTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const openTasks = useMemo(() => {
-    const now = new Date();
-    const weekEnd = new Date(now);
-    weekEnd.setDate(weekEnd.getDate() + 7);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    return mockTasks
-      .filter((t) => t.status !== "completed")
-      .filter((t) => {
-        const due = new Date(t.dueDate);
-        if (filter === "overdue") return due < now;
-        if (filter === "this_week") return due <= weekEnd;
-        if (filter === "this_month") return due <= monthEnd;
-        return true;
-      })
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  useEffect(() => {
+    const loadTasks = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const tasks = await getPendingWork(filter);
+        setOpenTasks(tasks);
+      } catch (err: any) {
+        setError(err?.message ?? "Failed to load pending tasks");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadTasks();
   }, [filter]);
 
   const isOverdue = (date: string) => new Date(date) < new Date();
@@ -61,7 +62,14 @@ export function PendingWorkReport() {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        {openTasks.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span>Loading tasks...</span>
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center text-destructive">{error}</div>
+        ) : openTasks.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">
             <Clock className="h-10 w-10 mx-auto mb-2 opacity-50" />
             <p>No pending tasks found for this filter.</p>

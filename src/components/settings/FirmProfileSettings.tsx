@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Save, Upload } from "lucide-react";
-import { mockFirmProfile } from "@/data/mockSettings";
+import { Building2, Save, Upload, Loader2 } from "lucide-react";
+import { fetchFirmProfileFromSupabase, saveFirmProfileToSupabase, type FirmProfile } from "@/data/Settings";
 import { toast } from "sonner";
 
 const indianStates = [
@@ -19,15 +19,61 @@ const indianStates = [
 ];
 
 export function FirmProfileSettings() {
-  const [profile, setProfile] = useState(mockFirmProfile);
+  const [profile, setProfile] = useState<FirmProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSave = () => {
-    toast.success("Firm profile updated successfully");
+  useEffect(() => {
+    const loadProfile = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchFirmProfileFromSupabase();
+        setProfile(data);
+      } catch (err: any) {
+        setError(err.message ?? "Unable to load firm profile");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, []);
+
+  const handleSave = async () => {
+    if (!profile) return;
+    setSaving(true);
+    try {
+      await saveFirmProfileToSupabase(profile);
+      toast.success("Firm profile updated successfully");
+    } catch (err: any) {
+      toast.error(err.message ?? "Unable to save firm profile");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const updateField = (field: string, value: string) => {
-    setProfile((prev) => ({ ...prev, [field]: value }));
+  const updateField = (field: keyof FirmProfile, value: string) => {
+    if (!profile) return;
+    setProfile((prev) => (prev ? { ...prev, [field]: value } : prev));
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />Loading firm profile...
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-center text-destructive py-16">{error}</div>;
+  }
+
+  if (!profile) {
+    return null;
+  }
 
   return (
     <div className="space-y-6">

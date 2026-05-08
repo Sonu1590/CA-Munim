@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { taskTypeGroups, months } from "@/data/mockTasks";
-import { mockClients } from "@/data/mockClients";
+import { taskTypeGroups, months } from "@/data/Tasks";
+import { mockClients } from "@/data/Clients";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
 

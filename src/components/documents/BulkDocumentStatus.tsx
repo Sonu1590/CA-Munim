@@ -1,9 +1,10 @@
-import { mockDocumentRequests } from "@/data/mockDocuments";
+import { useState, useEffect } from "react";
+import { fetchDocumentRequestsFromSupabase } from "@/data/Documents";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const statusColors: Record<string, string> = {
@@ -13,7 +14,52 @@ const statusColors: Record<string, string> = {
 };
 
 export function BulkDocumentStatus() {
-  const pendingRequests = mockDocumentRequests.filter((r) => r.status !== "submitted");
+  const [requests, setRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadRequests = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchDocumentRequestsFromSupabase();
+        setRequests(data);
+      } catch (err: any) {
+        setError(err?.message ?? "Failed to load requests");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadRequests();
+  }, []);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-heading">Pending Document Requests</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span className="ml-2">Loading requests...</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-heading">Pending Document Requests</CardTitle>
+        </CardHeader>
+        <CardContent className="text-center py-8 text-red-600">
+          Error: {error}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -34,7 +80,7 @@ export function BulkDocumentStatus() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockDocumentRequests.map((req) => (
+              {requests.map((req) => (
                 <TableRow key={req.id}>
                   <TableCell className="font-medium text-sm">{req.clientName}</TableCell>
                   <TableCell className="text-sm">{req.documentType}</TableCell>
@@ -65,7 +111,7 @@ export function BulkDocumentStatus() {
 
         {/* Mobile cards */}
         <div className="md:hidden space-y-2 p-4">
-          {mockDocumentRequests.map((req) => (
+          {requests.map((req) => (
             <div key={req.id} className="rounded-xl border p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">{req.clientName}</p>

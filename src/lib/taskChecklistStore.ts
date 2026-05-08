@@ -1,5 +1,5 @@
 // Lightweight in-memory store for task document checklists (UI-only demo)
-import { ChecklistItem, mockTasks, Task } from "@/data/mockTasks";
+import { ChecklistItem, mockTasks, Task } from "@/data/Tasks";
 
 type Listener = () => void;
 

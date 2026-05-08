@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { defaultTemplates, MessageTemplate, TemplateCategory } from "@/data/mockWhatsapp";
-import { Plus, Search, Edit, Copy, Trash2, Eye } from "lucide-react";
+import { defaultTemplates, fetchMessageTemplatesFromSupabase, saveMessageTemplateToSupabase, deleteMessageTemplateFromSupabase, MessageTemplate, TemplateCategory } from "@/data/mockWhatsapp";
+import { Plus, Search, Edit, Copy, Trash2, Eye, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 const categoryColors: Record<TemplateCategory, string> = {
@@ -23,12 +23,32 @@ const categoryColors: Record<TemplateCategory, string> = {
 const categories: TemplateCategory[] = ["General", "GST", "Income Tax", "TDS", "ROC", "Billing"];
 
 export function MessageTemplates() {
-  const [templates, setTemplates] = useState<MessageTemplate[]>(defaultTemplates);
+  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [previewTemplate, setPreviewTemplate] = useState<MessageTemplate | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editTemplate, setEditTemplate] = useState<Partial<MessageTemplate>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadTemplates = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchMessageTemplatesFromSupabase();
+        setTemplates(data);
+      } catch (err: any) {
+        setError(err.message ?? "Unable to load templates");
+        setTemplates(defaultTemplates);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTemplates();
+  }, []);
 
   const filtered = templates.filter((t) => {
     const matchSearch = t.name.toLowerCase().includes(search.toLowerCase()) || t.body.toLowerCase().includes(search.toLowerCase());
@@ -36,34 +56,43 @@ export function MessageTemplates() {
     return matchSearch && matchCategory;
   });
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!editTemplate.name || !editTemplate.body || !editTemplate.category) {
       toast.error("Please fill all required fields");
       return;
     }
     const vars = (editTemplate.body?.match(/\{\{(\w+)\}\}/g) || []).map((v) => v.replace(/\{|\}/g, ""));
-    if (editTemplate.id) {
-      setTemplates((prev) => prev.map((t) => (t.id === editTemplate.id ? { ...t, ...editTemplate, variables: vars } as MessageTemplate : t)));
-      toast.success("Template updated");
-    } else {
-      const newT: MessageTemplate = {
-        id: `t-${Date.now()}`,
-        name: editTemplate.name,
-        category: editTemplate.category as TemplateCategory,
-        body: editTemplate.body,
-        variables: vars,
-        isDefault: false,
-      };
-      setTemplates((prev) => [...prev, newT]);
-      toast.success("Template created");
+    const templateToSave: MessageTemplate = {
+      id: editTemplate.id ?? `t-${Date.now()}`,
+      name: editTemplate.name,
+      category: editTemplate.category as TemplateCategory,
+      body: editTemplate.body,
+      variables: vars,
+      isDefault: editTemplate.id ? (editTemplate.isDefault ?? false) : false,
+    };
+
+    try {
+      const saved = await saveMessageTemplateToSupabase(templateToSave);
+      setTemplates((prev) => {
+        const exists = prev.some((t) => t.id === saved.id);
+        return exists ? prev.map((t) => (t.id === saved.id ? saved : t)) : [...prev, saved];
+      });
+      toast.success(editTemplate.id ? "Template updated" : "Template created");
+      setEditOpen(false);
+      setEditTemplate({});
+    } catch (err: any) {
+      toast.error(err.message ?? "Unable to save template");
     }
-    setEditOpen(false);
-    setEditTemplate({});
   };
 
-  const handleDelete = (id: string) => {
-    setTemplates((prev) => prev.filter((t) => t.id !== id));
-    toast.success("Template deleted");
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMessageTemplateFromSupabase(id);
+      setTemplates((prev) => prev.filter((t) => t.id !== id));
+      toast.success("Template deleted");
+    } catch (err: any) {
+      toast.error(err.message ?? "Unable to delete template");
+    }
   };
 
   const handleDuplicate = (t: MessageTemplate) => {
@@ -93,40 +122,53 @@ export function MessageTemplates() {
       </div>
 
       {/* Template Grid */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((t) => (
-          <Card key={t.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="text-sm font-heading leading-tight">{t.name}</CardTitle>
-                <Badge variant="secondary" className={`text-[10px] shrink-0 ${categoryColors[t.category]}`}>{t.category}</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">{t.body}</p>
-              <div className="flex flex-wrap gap-1">
-                {t.variables.slice(0, 4).map((v) => (
-                  <span key={v} className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">{`{{${v}}}`}</span>
-                ))}
-                {t.variables.length > 4 && <span className="text-[10px] text-muted-foreground">+{t.variables.length - 4} more</span>}
-              </div>
-              <div className="flex items-center gap-1 pt-1 border-t border-border">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPreviewTemplate(t)}><Eye className="h-3.5 w-3.5" /></Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditTemplate(t); setEditOpen(true); }}><Edit className="h-3.5 w-3.5" /></Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDuplicate(t)}><Copy className="h-3.5 w-3.5" /></Button>
-                {!t.isDefault && (
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(t.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {filtered.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          <p className="text-sm">No templates found. Create one to get started!</p>
+      {loading ? (
+        <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" /> Loading templates...
         </div>
+      ) : error ? (
+        <div className="text-center text-destructive py-16">
+          <AlertCircle className="mx-auto mb-2 h-6 w-6" />
+          {error}
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((t) => (
+              <Card key={t.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-sm font-heading leading-tight">{t.name}</CardTitle>
+                    <Badge variant="secondary" className={`text-[10px] shrink-0 ${categoryColors[t.category]}`}>{t.category}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">{t.body}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {t.variables.slice(0, 4).map((v) => (
+                      <span key={v} className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">{`{{${v}}}`}</span>
+                    ))}
+                    {t.variables.length > 4 && <span className="text-[10px] text-muted-foreground">+{t.variables.length - 4} more</span>}
+                  </div>
+                  <div className="flex items-center gap-1 pt-1 border-t border-border">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPreviewTemplate(t)}><Eye className="h-3.5 w-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditTemplate(t); setEditOpen(true); }}><Edit className="h-3.5 w-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDuplicate(t)}><Copy className="h-3.5 w-3.5" /></Button>
+                    {!t.isDefault && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(t.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {filtered.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              <p className="text-sm">No templates found. Create one to get started!</p>
+            </div>
+          )}
+        </>
       )}
 
       {/* Preview Dialog */}

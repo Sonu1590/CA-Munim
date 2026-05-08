@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Download, Calendar } from "lucide-react";
-import { mockClients } from "@/data/mockClients";
-import { dueDateRules } from "@/data/mockTasks";
+import { Download, Calendar, Loader2 } from "lucide-react";
+import { fetchClientsFromSupabase } from "@/data/Clients";
+import { dueDateRules } from "@/data/Tasks";
 
 const calendarMonths = [
   { month: "April", filings: ["GSTR-1", "GSTR-3B", "TDS Challan", "GSTR-4"] },
@@ -22,17 +22,38 @@ const calendarMonths = [
 ];
 
 export function ComplianceCalendarReport() {
-  const [clientId, setClientId] = useState(mockClients[0]?.id || "");
-  const client = mockClients.find((c) => c.id === clientId);
+  const [clientId, setClientId] = useState("");
+  const [clients, setClients] = useState<{ id: string; name: string; servicesSubscribed?: string[] }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadClients = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchClientsFromSupabase();
+        setClients(data);
+        if (data.length > 0) setClientId(data[0].id);
+      } catch (err: any) {
+        setError(err?.message ?? "Failed to load clients");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadClients();
+  }, []);
+
+  const client = clients.find((c) => c.id === clientId);
 
   const applicableFilings = (filings: string[]) => {
     if (!client) return filings;
     return filings.filter((f) => {
-      if (["GSTR-1", "GSTR-3B", "GSTR-9", "GSTR-4"].includes(f)) return client.servicesSubscribed.includes("GST Returns");
-      if (["ITR Filing"].includes(f)) return client.servicesSubscribed.includes("ITR Filing");
-      if (["TDS Challan", "24Q", "26Q", "Form 16"].includes(f)) return client.servicesSubscribed.includes("TDS Returns");
-      if (["MGT-7", "AOC-4", "DIR-3 KYC"].includes(f)) return client.servicesSubscribed.includes("ROC / MCA Compliance");
-      if (f === "Advance Tax") return client.servicesSubscribed.includes("ITR Filing");
+      if (["GSTR-1", "GSTR-3B", "GSTR-9", "GSTR-4"].includes(f)) return client.servicesSubscribed?.includes("GST Returns");
+      if (["ITR Filing"].includes(f)) return client.servicesSubscribed?.includes("ITR Filing");
+      if (["TDS Challan", "24Q", "26Q", "Form 16"].includes(f)) return client.servicesSubscribed?.includes("TDS Returns");
+      if (["MGT-7", "AOC-4", "DIR-3 KYC"].includes(f)) return client.servicesSubscribed?.includes("ROC / MCA Compliance");
+      if (f === "Advance Tax") return client.servicesSubscribed?.includes("ITR Filing");
       return true;
     });
   };
@@ -48,7 +69,7 @@ export function ComplianceCalendarReport() {
                 <SelectValue placeholder="Select client" />
               </SelectTrigger>
               <SelectContent>
-                {mockClients.map((c) => (
+                {clients.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -60,13 +81,22 @@ export function ComplianceCalendarReport() {
         </div>
       </CardHeader>
       <CardContent>
-        {client && (
-          <div className="mb-4 p-3 bg-primary/5 rounded-xl text-sm border border-primary/10">
-            <p className="font-medium">{client.name}</p>
-            <p className="text-xs text-muted-foreground">Services: {client.servicesSubscribed.join(", ")}</p>
+        {loading ? (
+          <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span>Loading clients...</span>
           </div>
-        )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        ) : error ? (
+          <div className="p-8 text-center text-destructive">{error}</div>
+        ) : (
+          <>
+            {client && (
+              <div className="mb-4 p-3 bg-primary/5 rounded-xl text-sm border border-primary/10">
+                <p className="font-medium">{client.name}</p>
+                <p className="text-xs text-muted-foreground">Services: {client.servicesSubscribed?.join(", ")}</p>
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {calendarMonths.map((m) => {
             const filings = applicableFilings(m.filings);
             return (
@@ -95,7 +125,9 @@ export function ComplianceCalendarReport() {
               </div>
             );
           })}
-        </div>
+          </div>
+        </>
+      )}
       </CardContent>
     </Card>
   );

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,8 @@ import { InvoiceList } from "@/components/billing/InvoiceList";
 import { CreateInvoiceModal } from "@/components/billing/CreateInvoiceModal";
 import { RecordPaymentModal } from "@/components/billing/RecordPaymentModal";
 import { FeesDashboard } from "@/components/billing/FeesDashboard";
-import { mockInvoices, Invoice, InvoiceStatus } from "@/data/mockBilling";
-import { Plus, Search } from "lucide-react";
+import { fetchInvoicesFromSupabase, Invoice, InvoiceStatus } from "@/data/Billing";
+import { Plus, Search, Loader2, AlertCircle } from "lucide-react";
 
 const statusFilters: (InvoiceStatus | "All")[] = ["All", "Draft", "Sent", "Paid", "Partially Paid", "Overdue", "Cancelled"];
 
@@ -19,16 +19,59 @@ export default function Billing() {
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [createOpen, setCreateOpen] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadInvoices = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchInvoicesFromSupabase();
+        setInvoices(data);
+      } catch (err: any) {
+        setError(err?.message ?? "Failed to load invoices.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInvoices();
+  }, []);
 
   const filtered = useMemo(() => {
-    return mockInvoices.filter((inv) => {
+    return invoices.filter((inv) => {
       const matchesSearch =
         inv.clientName.toLowerCase().includes(search.toLowerCase()) ||
         inv.invoiceNumber.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === "All" || inv.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [search, statusFilter]);
+  }, [invoices, search, statusFilter]);
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-3 text-muted-foreground">Loading invoices...</span>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
+          <AlertCircle className="h-10 w-10 text-destructive" />
+          <p className="text-muted-foreground">{error}</p>
+          <Button variant="outline" onClick={() => window.location.reload()}>Try Again</Button>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -36,7 +79,7 @@ export default function Billing() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2">
             <h1 className="text-xl md:text-2xl font-heading font-bold">Billing & Fees</h1>
-            <Badge className="bg-primary text-primary-foreground text-xs">{mockInvoices.length}</Badge>
+            <Badge className="bg-primary text-primary-foreground text-xs">{invoices.length}</Badge>
           </div>
           <Button
             className="bg-accent text-accent-foreground hover:bg-accent/90 w-full sm:w-auto"
@@ -79,7 +122,7 @@ export default function Billing() {
           </TabsContent>
 
           <TabsContent value="dashboard">
-            <FeesDashboard invoices={mockInvoices} />
+            <FeesDashboard invoices={invoices} />
           </TabsContent>
         </Tabs>
 

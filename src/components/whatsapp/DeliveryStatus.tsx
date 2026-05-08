@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { mockSentMessages, SentMessage } from "@/data/mockWhatsapp";
-import { Search, RefreshCw, Check, CheckCheck } from "lucide-react";
+import { fetchSentMessagesFromSupabase, SentMessage } from "@/data/mockWhatsapp";
+import { Search, RefreshCw, Check, CheckCheck, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 const statusConfig: Record<SentMessage["status"], { label: string; icon: React.ReactNode; className: string }> = {
@@ -15,8 +15,27 @@ const statusConfig: Record<SentMessage["status"], { label: string; icon: React.R
 };
 
 export function DeliveryStatus() {
-  const [messages] = useState(mockSentMessages);
+  const [messages, setMessages] = useState<SentMessage[]>([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadMessages = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchSentMessagesFromSupabase();
+        setMessages(data);
+      } catch (err: any) {
+        setError(err.message ?? "Unable to load sent messages");
+        setMessages([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadMessages();
+  }, []);
 
   const filtered = messages.filter((m) => m.clientName.toLowerCase().includes(search.toLowerCase()));
 
@@ -34,20 +53,31 @@ export function DeliveryStatus() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-2">
-        {(["sent", "delivered", "read", "failed"] as const).map((s) => {
-          const count = messages.filter((m) => m.status === s).length;
-          const cfg = statusConfig[s];
-          return (
-            <Card key={s} className="text-center p-3">
-              <p className="text-lg font-bold">{count}</p>
-              <p className="text-xs text-muted-foreground capitalize">{s}</p>
-            </Card>
-          );
-        })}
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" /> Loading status...
+        </div>
+      ) : error ? (
+        <div className="text-center text-destructive py-12">
+          <AlertCircle className="mx-auto mb-2 h-6 w-6" />
+          {error}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-4 gap-2">
+            {(["sent", "delivered", "read", "failed"] as const).map((s) => {
+              const count = messages.filter((m) => m.status === s).length;
+              const cfg = statusConfig[s];
+              return (
+                <Card key={s} className="text-center p-3">
+                  <p className="text-lg font-bold">{count}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{s}</p>
+                </Card>
+              );
+            })}
+          </div>
 
-      {/* Messages Table (mobile cards) */}
+          {/* Messages Table (mobile cards) */}
       <div className="space-y-2">
         {filtered.map((msg) => {
           const cfg = statusConfig[msg.status];
@@ -84,8 +114,10 @@ export function DeliveryStatus() {
         })}
       </div>
 
-      {filtered.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground text-sm">No messages found.</div>
+          {filtered.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground text-sm">No messages found.</div>
+          )}
+        </>
       )}
     </div>
   );

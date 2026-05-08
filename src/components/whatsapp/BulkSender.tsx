@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,9 +6,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { defaultTemplates } from "@/data/mockWhatsapp";
-import { mockClients } from "@/data/mockClients";
-import { Send, ChevronRight, ChevronLeft, Search, Clock, CheckCircle2 } from "lucide-react";
+import { defaultTemplates, fetchMessageTemplatesFromSupabase, MessageTemplate, TemplateCategory } from "@/data/mockWhatsapp";
+import { fetchClientsFromSupabase, type Client } from "@/data/Clients";
+import { Send, ChevronRight, ChevronLeft, Search, Clock, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -24,26 +24,66 @@ const recipientFilters = [
 export function BulkSender() {
   const [step, setStep] = useState<Step>(1);
   const [selectedTemplate, setSelectedTemplate] = useState("");
-  const [recipientFilter, setRecipientFilter] = useState("");
+  const [recipientFilter, setRecipientFilter] = useState("all");
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [clientSearch, setClientSearch] = useState("");
   const [scheduleType, setScheduleType] = useState<"now" | "later">("now");
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("10:00");
 
-  const template = defaultTemplates.find((t) => t.id === selectedTemplate);
+  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [clientsLoading, setClientsLoading] = useState(true);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
+  const [clientsError, setClientsError] = useState<string | null>(null);
+
+  const template = templates.find((t) => t.id === selectedTemplate);
+
+  useEffect(() => {
+    const loadTemplates = async () => {
+      setTemplatesLoading(true);
+      setTemplatesError(null);
+      try {
+        const data = await fetchMessageTemplatesFromSupabase();
+        setTemplates(data);
+      } catch (err: any) {
+        setTemplatesError(err.message ?? "Unable to load templates");
+        setTemplates(defaultTemplates);
+      } finally {
+        setTemplatesLoading(false);
+      }
+    };
+
+    const loadClients = async () => {
+      setClientsLoading(true);
+      setClientsError(null);
+      try {
+        const data = await fetchClientsFromSupabase();
+        setClients(data);
+      } catch (err: any) {
+        setClientsError(err.message ?? "Unable to load clients");
+        setClients([]);
+      } finally {
+        setClientsLoading(false);
+      }
+    };
+
+    loadTemplates();
+    loadClients();
+  }, []);
 
   const getFilteredClients = () => {
     switch (recipientFilter) {
-      case "gst": return mockClients.filter((c) => c.gstin);
-      case "fees": return mockClients.filter((c) => c.pendingFees > 0);
-      case "itr": return mockClients.filter((c) => c.servicesSubscribed.includes("ITR Filing"));
-      default: return mockClients;
+      case "gst": return clients.filter((c) => c.gstin);
+      case "fees": return clients.filter((c) => c.pendingFees > 0);
+      case "itr": return clients.filter((c) => c.servicesSubscribed.includes("ITR Filing"));
+      default: return clients;
     }
   };
 
-  const clients = getFilteredClients();
-  const searchedClients = clients.filter((c) => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
+  const filteredClients = getFilteredClients();
+  const searchedClients = filteredClients.filter((c) => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
 
   const toggleClient = (id: string) => {
     setSelectedClients((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -75,7 +115,7 @@ export function BulkSender() {
     setStep(1);
     setSelectedTemplate("");
     setSelectedClients([]);
-    setRecipientFilter("");
+    setRecipientFilter("all");
     setScheduleType("now");
   };
 
@@ -109,21 +149,34 @@ export function BulkSender() {
         <Card>
           <CardHeader><CardTitle className="text-base font-heading">Select Message Template</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            {defaultTemplates.map((t) => (
-              <div
-                key={t.id}
-                onClick={() => setSelectedTemplate(t.id)}
-                className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                  selectedTemplate === t.id ? "border-[#25D366] bg-[#25D366]/5" : "border-border hover:border-muted-foreground/30"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium">{t.name}</span>
-                  <Badge variant="secondary" className="text-[10px]">{t.category}</Badge>
-                </div>
-                <p className="text-xs text-muted-foreground line-clamp-2">{t.body}</p>
+            {templatesLoading ? (
+              <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" /> Loading templates...
               </div>
-            ))}
+            ) : templatesError ? (
+              <div className="text-center text-destructive py-12">
+                <AlertCircle className="mx-auto mb-2 h-6 w-6" />
+                {templatesError}
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">No templates available. Please create one in the Templates tab.</div>
+            ) : (
+              templates.map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => setSelectedTemplate(t.id)}
+                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                    selectedTemplate === t.id ? "border-[#25D366] bg-[#25D366]/5" : "border-border hover:border-muted-foreground/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium">{t.name}</span>
+                    <Badge variant="secondary" className="text-[10px]">{t.category}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{t.body}</p>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       )}
@@ -145,24 +198,39 @@ export function BulkSender() {
               <Input placeholder="Search clients..." className="pl-9" value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} />
             </div>
 
-            <div className="flex items-center gap-2 pb-2 border-b border-border">
-              <Checkbox checked={selectedClients.length === searchedClients.length && searchedClients.length > 0} onCheckedChange={toggleAll} />
-              <span className="text-sm font-medium">Select All ({searchedClients.length})</span>
-              <Badge className="ml-auto">{selectedClients.length} selected</Badge>
-            </div>
-
-            <div className="max-h-64 overflow-y-auto space-y-1">
-              {searchedClients.map((c) => (
-                <div key={c.id} className="flex items-center gap-3 py-2 px-1 hover:bg-muted/50 rounded">
-                  <Checkbox checked={selectedClients.includes(c.id)} onCheckedChange={() => toggleClient(c.id)} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{c.name}</p>
-                    <p className="text-xs text-muted-foreground">{c.phone}</p>
-                  </div>
-                  <Badge variant="outline" className="text-[10px] shrink-0">{c.type}</Badge>
+            {clientsLoading ? (
+              <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" /> Loading clients...
+              </div>
+            ) : clientsError ? (
+              <div className="text-center text-destructive py-12">
+                <AlertCircle className="mx-auto mb-2 h-6 w-6" />
+                {clientsError}
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 pb-2 border-b border-border">
+                  <Checkbox checked={selectedClients.length === searchedClients.length && searchedClients.length > 0} onCheckedChange={toggleAll} />
+                  <span className="text-sm font-medium">Select All ({searchedClients.length})</span>
+                  <Badge className="ml-auto">{selectedClients.length} selected</Badge>
                 </div>
-              ))}
-            </div>
+
+                <div className="max-h-64 overflow-y-auto space-y-1">
+                  {searchedClients.length > 0 ? searchedClients.map((c) => (
+                    <div key={c.id} className="flex items-center gap-3 py-2 px-1 hover:bg-muted/50 rounded">
+                      <Checkbox checked={selectedClients.includes(c.id)} onCheckedChange={() => toggleClient(c.id)} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{c.name}</p>
+                        <p className="text-xs text-muted-foreground">{c.phone}</p>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] shrink-0">{c.type}</Badge>
+                    </div>
+                  )) : (
+                    <div className="text-center py-12 text-muted-foreground">No clients match the filter/search.</div>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
@@ -174,7 +242,7 @@ export function BulkSender() {
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">Showing preview for first 3 selected clients:</p>
             {selectedClients.slice(0, 3).map((id) => {
-              const client = mockClients.find((c) => c.id === id);
+              const client = clients.find((c) => c.id === id);
               if (!client) return null;
               return (
                 <div key={id} className="rounded-xl bg-[#dcf8c6] p-3 text-sm border border-[#25D366]/20">

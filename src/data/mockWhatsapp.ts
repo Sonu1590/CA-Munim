@@ -1,3 +1,5 @@
+import { supabase } from "@/lib/supabase";
+
 export type TemplateCategory = "GST" | "Income Tax" | "TDS" | "ROC" | "Billing" | "General";
 
 export interface MessageTemplate {
@@ -122,3 +124,113 @@ export const mockReceivedMessages: ReceivedMessage[] = [
   { id: "r5", clientId: "7", clientName: "Anil Joshi", phone: "9765432109", message: "GST number change ho gaya hai, new number: 27ABCPJ6789N2Z7", receivedAt: "2025-04-10T10:00:00", isRead: false },
   { id: "r6", clientId: "5", clientName: "Gupta & Sons HUF", phone: "9871234560", message: "Thank you for filing the return. Received acknowledgement.", receivedAt: "2025-04-10T18:00:00", isRead: true },
 ];
+
+const parseVariables = (value: any): string[] => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+export async function fetchMessageTemplatesFromSupabase(): Promise<MessageTemplate[]> {
+  const { data, error } = await supabase
+    .from("whatsapp_templates")
+    .select(`id, name, category, body, variables, is_default`)
+    .order("name", { ascending: true });
+
+  if (error || !data) return defaultTemplates;
+
+  return data.map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    category: row.category as TemplateCategory,
+    body: row.body,
+    variables: parseVariables(row.variables),
+    isDefault: Boolean(row.is_default),
+  }));
+}
+
+export async function saveMessageTemplateToSupabase(template: MessageTemplate): Promise<MessageTemplate> {
+  const { data, error } = await supabase
+    .from("whatsapp_templates")
+    .upsert({
+      id: template.id,
+      name: template.name,
+      category: template.category,
+      body: template.body,
+      variables: template.variables,
+      is_default: template.isDefault,
+    }, { onConflict: "id" })
+    .select()
+    .single();
+
+  if (error || !data) throw error;
+
+  return {
+    id: data.id,
+    name: data.name,
+    category: data.category as TemplateCategory,
+    body: data.body,
+    variables: parseVariables(data.variables),
+    isDefault: Boolean(data.is_default),
+  };
+}
+
+export async function deleteMessageTemplateFromSupabase(id: string): Promise<void> {
+  const { error } = await supabase.from("whatsapp_templates").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function fetchSentMessagesFromSupabase(): Promise<SentMessage[]> {
+  const { data, error } = await supabase
+    .from("whatsapp_sent_messages")
+    .select(`id, client_id, client_name, phone, template_name, message, sent_at, status, fail_reason`)
+    .order("sent_at", { ascending: false });
+
+  if (error || !data) return mockSentMessages;
+
+  return data.map((row: any) => ({
+    id: row.id,
+    clientId: row.client_id,
+    clientName: row.client_name,
+    phone: row.phone,
+    templateName: row.template_name,
+    message: row.message,
+    sentAt: row.sent_at,
+    status: row.status,
+    failReason: row.fail_reason,
+  }));
+}
+
+export async function fetchReceivedMessagesFromSupabase(): Promise<ReceivedMessage[]> {
+  const { data, error } = await supabase
+    .from("whatsapp_received_messages")
+    .select(`id, client_id, client_name, phone, message, received_at, is_read`)
+    .order("received_at", { ascending: false });
+
+  if (error || !data) return mockReceivedMessages;
+
+  return data.map((row: any) => ({
+    id: row.id,
+    clientId: row.client_id,
+    clientName: row.client_name,
+    phone: row.phone,
+    message: row.message,
+    receivedAt: row.received_at,
+    isRead: Boolean(row.is_read),
+  }));
+}
+
+export async function markReceivedMessageRead(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("whatsapp_received_messages")
+    .update({ is_read: true })
+    .eq("id", id);
+  if (error) throw error;
+}

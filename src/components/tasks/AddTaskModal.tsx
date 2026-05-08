@@ -10,8 +10,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Info } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { taskTypeGroups, dueDateRules, staffMembers, financialYears, quarters, months, TaskType } from "@/data/mockTasks";
-import { mockClients } from "@/data/mockClients";
+import { taskTypeGroups, dueDateRules, staffMembers, financialYears, quarters, months, TaskType } from "@/data/Tasks";
+import { mockClients } from "@/data/Clients";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
