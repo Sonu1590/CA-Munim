@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -6,10 +7,22 @@ import { MessageTemplates } from "@/components/whatsapp/MessageTemplates";
 import { BulkSender } from "@/components/whatsapp/BulkSender";
 import { DeliveryStatus } from "@/components/whatsapp/DeliveryStatus";
 import { ReceivedMessages } from "@/components/whatsapp/ReceivedMessages";
-import { mockReceivedMessages } from "@/data/mockWhatsapp";
+import { fetchReceivedMessagesFromSupabase } from "@/data/mockWhatsapp";
 
 export default function WhatsApp() {
-  const unreadCount = mockReceivedMessages.filter((m) => !m.isRead).length;
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const loadUnread = async () => {
+      try {
+        const messages = await fetchReceivedMessagesFromSupabase();
+        setUnreadCount(messages.filter((m) => !m.isRead).length);
+      } catch {
+        // keep unreadCount at 0 if fetch fails
+      }
+    };
+    loadUnread();
+  }, []);
 
   return (
     <AppLayout>

@@ -14,8 +14,8 @@ import { useTasks } from "@/hooks/useTasks"; // ← CHANGED from mockTasks
 
 // Keep these exports here so child components (AddTaskModal etc.) 
 // can still import them from this file if needed
-export { taskTypeGroups, taskTypeIcons, dueDateRules, staffMembers, financialYears, quarters, months } from "@/data/mockTasks";
-export type { Task, TaskType, TaskStatus, TaskPriority, ChecklistItem } from "@/data/mockTasks";
+export { taskTypeGroups, taskTypeIcons, dueDateRules, staffMembers, financialYears, quarters, months } from "@/data/Tasks";
+export type { Task, TaskType, TaskStatus, TaskPriority, ChecklistItem } from "@/data/Tasks";
 
 export default function Tasks() {
   const [view, setView] = useState<"kanban" | "list" | "calendar">("kanban");

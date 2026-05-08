@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { mockClients } from "@/data/mockClients";
-import { mockDocuments } from "@/data/mockDocuments";
+import { useState, useEffect } from "react";
+import { fetchClientsFromSupabase } from "@/data/Clients";
+import { fetchDocumentsFromSupabase } from "@/data/Documents";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, FolderOpen, ChevronRight } from "lucide-react";
+import { Search, FolderOpen, ChevronRight, Loader2 } from "lucide-react";
 
 interface Props {
   onSelectClient: (clientId: string) => void;
@@ -12,16 +12,57 @@ interface Props {
 
 export function ClientDocumentList({ onSelectClient }: Props) {
   const [search, setSearch] = useState("");
+  const [clients, setClients] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const clientsWithCounts = mockClients.map((c) => ({
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [clientsData, documentsData] = await Promise.all([
+          fetchClientsFromSupabase(),
+          fetchDocumentsFromSupabase(),
+        ]);
+        setClients(clientsData);
+        setDocuments(documentsData);
+      } catch (err: any) {
+        setError(err?.message ?? "Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  const clientsWithCounts = clients.map((c) => ({
     ...c,
-    docCount: mockDocuments.filter((d) => d.clientId === c.id).length,
+    docCount: documents.filter((d) => d.clientId === c.id).length,
   }));
 
   const filtered = clientsWithCounts.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.pan.toLowerCase().includes(search.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin" />
+        <span className="ml-2">Loading clients...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8 text-red-600">
+        Error: {error}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

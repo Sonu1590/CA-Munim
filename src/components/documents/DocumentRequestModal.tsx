@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { mockClients } from "@/data/mockClients";
-import { documentRequestTypes } from "@/data/mockDocuments";
-import { MessageCircle, Link2, Copy } from "lucide-react";
+import { fetchClientsFromSupabase } from "@/data/Clients";
+import { documentRequestTypes } from "@/data/Documents";
+import { MessageCircle, Link2, Copy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
@@ -20,9 +20,28 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
   const [docType, setDocType] = useState("");
   const [customLabel, setCustomLabel] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [clients, setClients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      const loadClients = async () => {
+        setLoading(true);
+        try {
+          const data = await fetchClientsFromSupabase();
+          setClients(data);
+        } catch (err: any) {
+          toast.error("Failed to load clients");
+        } finally {
+          setLoading(false);
+        }
+      };
+      loadClients();
+    }
+  }, [open]);
 
   const isCustom = docType === "Custom";
-  const client = mockClients.find((c) => c.id === clientId);
+  const client = clients.find((c) => c.id === clientId);
 
   // Generate a deterministic upload token preview
   const token = clientId && docType
@@ -61,10 +80,12 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Client</Label>
-            <Select value={clientId} onValueChange={setClientId}>
-              <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+            <Select value={clientId} onValueChange={setClientId} disabled={loading}>
+              <SelectTrigger>
+                <SelectValue placeholder={loading ? "Loading clients..." : "Select client"} />
+              </SelectTrigger>
               <SelectContent>
-                {mockClients.map((c) => (
+                {clients.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
               </SelectContent>

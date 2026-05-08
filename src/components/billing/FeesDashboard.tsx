@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Invoice } from "@/data/mockBilling";
+import { Invoice } from "@/data/Billing";
 import { IndianRupee, TrendingUp, AlertTriangle, Clock } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 

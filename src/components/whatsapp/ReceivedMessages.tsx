@@ -1,27 +1,57 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { mockReceivedMessages, ReceivedMessage } from "@/data/mockWhatsapp";
-import { Search, CheckCheck, Circle } from "lucide-react";
+import { fetchReceivedMessagesFromSupabase, markReceivedMessageRead, ReceivedMessage } from "@/data/mockWhatsapp";
+import { Search, CheckCheck, Circle, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export function ReceivedMessages() {
-  const [messages, setMessages] = useState(mockReceivedMessages);
+  const [messages, setMessages] = useState<ReceivedMessage[]>([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadMessages = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchReceivedMessagesFromSupabase();
+        setMessages(data);
+      } catch (err: any) {
+        setError(err.message ?? "Unable to load messages");
+        setMessages([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadMessages();
+  }, []);
 
   const filtered = messages.filter((m) => m.clientName.toLowerCase().includes(search.toLowerCase()) || m.message.toLowerCase().includes(search.toLowerCase()));
 
   const unreadCount = messages.filter((m) => !m.isRead).length;
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isRead: true } : m)));
+    try {
+      await markReceivedMessageRead(id);
+    } catch {
+      toast.error("Unable to update message status");
+    }
   };
 
-  const markAllRead = () => {
+  const markAllRead = async () => {
+    const unreadIds = messages.filter((m) => !m.isRead).map((m) => m.id);
     setMessages((prev) => prev.map((m) => ({ ...m, isRead: true })));
-    toast.success("All messages marked as read");
+    try {
+      await Promise.all(unreadIds.map((id) => markReceivedMessageRead(id)));
+      toast.success("All messages marked as read");
+    } catch {
+      toast.error("Unable to update all message statuses");
+    }
   };
 
   return (
@@ -37,6 +67,17 @@ export function ReceivedMessages() {
           </Button>
         )}
       </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" /> Loading messages...
+        </div>
+      ) : error ? (
+        <div className="text-center text-destructive py-12">
+          <AlertCircle className="mx-auto mb-2 h-6 w-6" />
+          {error}
+        </div>
+      ) : (
+        <>
 
       <div className="space-y-2">
         {filtered.map((msg) => (
@@ -68,6 +109,8 @@ export function ReceivedMessages() {
 
       {filtered.length === 0 && (
         <div className="text-center py-12 text-muted-foreground text-sm">No received messages.</div>
+      )}
+        </>
       )}
     </div>
   );

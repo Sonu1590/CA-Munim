@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Download, FileText } from "lucide-react";
-import { getComplianceData, type FilingStatus } from "@/data/mockReports";
-import { financialYears } from "@/data/mockTasks";
+import { Download, FileText, Loader2 } from "lucide-react";
+import { getComplianceData, type FilingStatus, type ClientComplianceRow } from "@/data/Reports";
+import { financialYears } from "@/data/Tasks";
 
 const statusIcon: Record<FilingStatus, { label: string; className: string }> = {
   filed: { label: "✅ Filed", className: "bg-green-100 text-green-800 border-green-200" },
@@ -16,7 +16,25 @@ const statusIcon: Record<FilingStatus, { label: string; className: string }> = {
 
 export function ComplianceStatusReport() {
   const [fy, setFy] = useState("FY 2025-26");
-  const data = getComplianceData(fy);
+  const [data, setData] = useState<ClientComplianceRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const report = await getComplianceData(fy);
+        setData(report);
+      } catch (err: any) {
+        setError(err?.message ?? "Failed to load compliance data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [fy]);
 
   const StatusBadge = ({ status }: { status: FilingStatus }) => (
     <Badge variant="outline" className={`text-xs font-medium ${statusIcon[status].className}`}>
@@ -47,7 +65,16 @@ export function ComplianceStatusReport() {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        {/* Desktop Table */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span>Loading compliance data...</span>
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center text-destructive">{error}</div>
+        ) : (
+          <>
+            {/* Desktop Table */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -79,40 +106,42 @@ export function ComplianceStatusReport() {
         </div>
         {/* Mobile Cards */}
         <div className="md:hidden space-y-3 p-4">
-          {data.map((row) => (
-            <div key={row.clientId} className="border border-border rounded-xl p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="font-medium text-sm">{row.clientName}</p>
-                  <p className="text-xs text-muted-foreground">{row.clientType}</p>
+            {data.map((row) => (
+              <div key={row.clientId} className="border border-border rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium text-sm">{row.clientName}</p>
+                    <p className="text-xs text-muted-foreground">{row.clientType}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">GSTR-1</span>
+                    <StatusBadge status={row.gstr1} />
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">GSTR-3B</span>
+                    <StatusBadge status={row.gstr3b} />
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">ITR</span>
+                    <StatusBadge status={row.itr} />
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">TDS</span>
+                    <StatusBadge status={row.tds} />
+                  </div>
+                  <div className="flex items-center justify-between text-xs col-span-2">
+                    <span className="text-muted-foreground">ROC</span>
+                    <StatusBadge status={row.roc} />
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">GSTR-1</span>
-                  <StatusBadge status={row.gstr1} />
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">GSTR-3B</span>
-                  <StatusBadge status={row.gstr3b} />
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">ITR</span>
-                  <StatusBadge status={row.itr} />
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">TDS</span>
-                  <StatusBadge status={row.tds} />
-                </div>
-                <div className="flex items-center justify-between text-xs col-span-2">
-                  <span className="text-muted-foreground">ROC</span>
-                  <StatusBadge status={row.roc} />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

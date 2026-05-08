@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,33 +7,67 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Users, Plus, Mail, Phone, Shield, ShieldCheck, ShieldAlert } from "lucide-react";
-import { mockStaff, StaffMember } from "@/data/mockSettings";
+import { Users, Plus, Mail, Phone, Shield, ShieldCheck, ShieldAlert, Loader2 } from "lucide-react";
+import { fetchStaffFromSupabase, addStaffToSupabase, updateStaffActiveStatus, type StaffMember } from "@/data/Settings";
 import { toast } from "sonner";
 
 const roleIcons = { "Senior CA": ShieldCheck, "Article Clerk": Shield, "Admin Staff": ShieldAlert };
 const roleColors = { "Senior CA": "bg-primary/10 text-primary", "Article Clerk": "bg-accent/10 text-accent", "Admin Staff": "bg-muted text-muted-foreground" };
 
 export function StaffManagement() {
-  const [staff, setStaff] = useState<StaffMember[]>(mockStaff);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newStaff, setNewStaff] = useState({ name: "", role: "Article Clerk" as StaffMember["role"], email: "", phone: "" });
 
-  const toggleActive = (id: string) => {
-    setStaff((prev) => prev.map((s) => s.id === id ? { ...s, isActive: !s.isActive } : s));
-    toast.success("Staff status updated");
+  useEffect(() => {
+    const loadStaff = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchStaffFromSupabase();
+        setStaff(data);
+      } catch (err: any) {
+        setError(err.message ?? "Unable to load staff members");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadStaff();
+  }, []);
+
+  const toggleActive = async (id: string) => {
+    const existing = staff.find((s) => s.id === id);
+    if (!existing) return;
+    const updated = { ...existing, isActive: !existing.isActive };
+    setStaff((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    try {
+      await updateStaffActiveStatus(id, updated.isActive);
+      toast.success("Staff status updated");
+    } catch (err: any) {
+      setStaff((prev) => prev.map((s) => (s.id === id ? existing : s)));
+      toast.error(err.message ?? "Unable to update staff status");
+    }
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newStaff.name || !newStaff.email) { toast.error("Name and email are required"); return; }
-    const member: StaffMember = {
-      id: Date.now().toString(), ...newStaff, isActive: true,
-      joinedDate: new Date().toISOString().split("T")[0], tasksCompleted: 0, tasksPending: 0,
-    };
-    setStaff((prev) => [...prev, member]);
-    setShowAddModal(false);
-    setNewStaff({ name: "", role: "Article Clerk", email: "", phone: "" });
-    toast.success("Staff member added. Invitation email sent.");
+    try {
+      const member = await addStaffToSupabase({
+        name: newStaff.name,
+        role: newStaff.role,
+        email: newStaff.email,
+        phone: newStaff.phone,
+        isActive: true,
+      });
+      setStaff((prev) => [...prev, member]);
+      setShowAddModal(false);
+      setNewStaff({ name: "", role: "Article Clerk", email: "", phone: "" });
+      toast.success("Staff member added. Invitation email sent.");
+    } catch (err: any) {
+      toast.error(err.message ?? "Unable to add staff member");
+    }
   };
 
   return (
@@ -47,7 +81,13 @@ export function StaffManagement() {
       </div>
 
       <div className="grid gap-4">
-        {staff.map((member) => {
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground gap-2"><Loader2 className="h-5 w-5 animate-spin" />Loading staff...</div>
+        ) : error ? (
+          <div className="text-center py-8 text-destructive">{error}</div>
+        ) : staff.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">No staff members found.</div>
+        ) : staff.map((member) => {
           const RoleIcon = roleIcons[member.role];
           return (
             <Card key={member.id} className={!member.isActive ? "opacity-60" : ""}>

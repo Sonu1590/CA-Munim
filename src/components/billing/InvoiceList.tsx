@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Invoice } from "@/data/mockBilling";
+import { Invoice } from "@/data/Billing";
 import { Eye, Download, MessageCircle, CreditCard } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 

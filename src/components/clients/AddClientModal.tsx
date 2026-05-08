@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { ClientType } from "@/data/mockClients";
+import { ClientType } from "@/data/Clients";
 import { validatePAN, validateGSTIN } from "@/lib/indianTaxUtils";
 import { FYHint } from "@/components/common/FYHint";
 import { CheckCircle2, XCircle } from "lucide-react";

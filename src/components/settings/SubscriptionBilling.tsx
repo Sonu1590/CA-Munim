@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CreditCard, Check, Crown, Zap, Building, Download } from "lucide-react";
-import { subscriptionPlans, SubscriptionPlan } from "@/data/mockSettings";
+import { CreditCard, Check, Crown, Zap, Building, Download, Loader2 } from "lucide-react";
+import { fetchSubscriptionPlansFromSupabase, type SubscriptionPlan } from "@/data/Settings";
 import { RazorpayCheckoutModal } from "@/components/billing/RazorpayCheckoutModal";
 
 const planIcons = { Starter: Zap, Professional: Crown, Firm: Building };
@@ -14,9 +14,28 @@ const billingHistory = [
 ];
 
 export function SubscriptionBilling() {
-  const [currentPlan] = useState("Starter");
+  const [currentPlan, setCurrentPlan] = useState("Starter");
   const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
   const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlan | null>(null);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadPlans = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchSubscriptionPlansFromSupabase();
+        setPlans(data);
+      } catch (err: any) {
+        setError(err.message ?? "Unable to load subscription plans");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadPlans();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -33,52 +52,61 @@ export function SubscriptionBilling() {
         </Tabs>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {subscriptionPlans.map((plan) => {
-          const Icon = planIcons[plan.name];
-          const isCurrent = plan.name === currentPlan;
-          const displayPrice = cycle === "annual" ? plan.price * 10 : plan.price;
-          return (
-            <Card key={plan.name} className={isCurrent ? "border-primary ring-2 ring-primary/20" : ""}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Icon className="h-5 w-5 text-primary" />{plan.name}
-                  </CardTitle>
-                  {isCurrent && <Badge className="bg-primary text-primary-foreground">Current</Badge>}
-                </div>
-                <div className="mt-2">
-                  {plan.price === 0 ? (
-                    <span className="text-2xl font-bold">Free</span>
-                  ) : (
-                    <><span className="text-2xl font-bold">₹{displayPrice.toLocaleString("en-IN")}</span><span className="text-sm text-muted-foreground">/{cycle === "annual" ? "year" : "month"}</span></>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {plan.clientLimit >= 999 ? "Unlimited clients" : `Up to ${plan.clientLimit} clients`} · {plan.staffLimit} {plan.staffLimit === 1 ? "user" : "users"}
-                </p>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-600 shrink-0" />{f}
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  className="w-full mt-4"
-                  variant={isCurrent ? "outline" : "default"}
-                  disabled={isCurrent || plan.price === 0}
-                  onClick={() => setCheckoutPlan(plan)}
-                >
-                  {isCurrent ? "Current Plan" : plan.price === 0 ? "Free Plan" : `Upgrade via Razorpay`}
-                </Button>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      {loading ? (
+        <div className="py-16 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto" />Loading plans...</div>
+      ) : error ? (
+        <div className="p-8 text-center text-destructive">{error}</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {plans.map((plan) => {
+            const Icon = planIcons[plan.name];
+            const isCurrent = plan.name === currentPlan;
+            const displayPrice = cycle === "annual" ? plan.price * 10 : plan.price;
+            return (
+              <Card key={plan.name} className={isCurrent ? "border-primary ring-2 ring-primary/20" : ""}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Icon className="h-5 w-5 text-primary" />{plan.name}
+                    </CardTitle>
+                    {isCurrent && <Badge className="bg-primary text-primary-foreground">Current</Badge>}
+                  </div>
+                  <div className="mt-2">
+                    {plan.price === 0 ? (
+                      <span className="text-2xl font-bold">Free</span>
+                    ) : (
+                      <>
+                        <span className="text-2xl font-bold">₹{displayPrice.toLocaleString("en-IN")}</span>
+                        <span className="text-sm text-muted-foreground">/{cycle === "annual" ? "year" : "month"}</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {plan.clientLimit >= 999 ? "Unlimited clients" : `Up to ${plan.clientLimit} clients`} · {plan.staffLimit} {plan.staffLimit === 1 ? "user" : "users"}
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-center gap-2 text-sm">
+                        <Check className="h-4 w-4 text-green-600 shrink-0" />{f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    className="w-full mt-4"
+                    variant={isCurrent ? "outline" : "default"}
+                    disabled={isCurrent || plan.price === 0}
+                    onClick={() => setCheckoutPlan(plan)}
+                  >
+                    {isCurrent ? "Current Plan" : plan.price === 0 ? "Free Plan" : `Upgrade via Razorpay`}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       <Card>
         <CardHeader><CardTitle className="text-base">Billing History</CardTitle></CardHeader>

@@ -1,4 +1,4 @@
-import { Task } from "@/data/mockTasks";
+import { Task } from "@/data/Tasks";
 import { TaskCard } from "./TaskCard";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 

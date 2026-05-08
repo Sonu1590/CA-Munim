@@ -1,9 +1,9 @@
-import { useState, useRef, DragEvent } from "react";
+import { useState, useRef, useEffect, DragEvent } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { UploadCloud, FileText, CheckCircle2, X, Calendar, Building2 } from "lucide-react";
-import { mockFirmProfile } from "@/data/mockSettings";
+import { UploadCloud, FileText, CheckCircle2, X, Calendar, Building2, Loader2 } from "lucide-react";
+import { fetchFirmProfileFromSupabase, mockFirmProfile } from "@/data/Settings";
 import { taskChecklistStore } from "@/lib/taskChecklistStore";
 import { toast } from "sonner";
 
@@ -30,8 +30,26 @@ export default function UploadPortal() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [firm, setFirm] = useState(mockFirmProfile);
+  const [loadingFirm, setLoadingFirm] = useState(true);
+  const [firmError, setFirmError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const firm = mockFirmProfile;
+
+  useEffect(() => {
+    const loadFirm = async () => {
+      setLoadingFirm(true);
+      setFirmError(null);
+      try {
+        const profile = await fetchFirmProfileFromSupabase();
+        setFirm(profile);
+      } catch (err: any) {
+        setFirmError(err.message ?? "Unable to load firm profile");
+      } finally {
+        setLoadingFirm(false);
+      }
+    };
+    loadFirm();
+  }, []);
 
   const handleFiles = (list: FileList | File[]) => {
     const incoming = Array.from(list);
@@ -90,8 +108,16 @@ export default function UploadPortal() {
             <Building2 className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="font-heading font-bold text-base text-foreground">{firm.firmName}</h1>
-            <p className="text-xs text-muted-foreground">{firm.phone} · {firm.email}</p>
+            {loadingFirm ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading firm info...</div>
+            ) : firmError ? (
+              <div className="text-sm text-destructive">{firmError}</div>
+            ) : (
+              <>
+                <h1 className="font-heading font-bold text-base text-foreground">{firm.firmName}</h1>
+                <p className="text-xs text-muted-foreground">{firm.phone} · {firm.email}</p>
+              </>
+            )}
           </div>
         </div>
       </header>

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, CheckCircle2, ShieldCheck, CreditCard, Smartphone, Building, IndianRupee } from "lucide-react";
-import { SubscriptionPlan } from "@/data/mockSettings";
+import { SubscriptionPlan } from "@/data/Settings";
 import { toast } from "sonner";
 
 interface Props {

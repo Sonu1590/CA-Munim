@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { taskChecklistStore } from "@/lib/taskChecklistStore";
-import { ChecklistItem } from "@/data/mockTasks";
+import { ChecklistItem } from "@/data/Tasks";
 import { Plus, Trash2, MessageCircle, Upload } from "lucide-react";
 import { toast } from "sonner";
 
