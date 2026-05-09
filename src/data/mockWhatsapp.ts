@@ -108,23 +108,6 @@ export const defaultTemplates: MessageTemplate[] = [
   },
 ];
 
-export const mockSentMessages: SentMessage[] = [
-  { id: "s1", clientId: "1", clientName: "Ramesh Kumar Gupta", phone: "9876543210", templateName: "Deadline Reminder", message: "Hello Ramesh Kumar Gupta, your GSTR-3B is due on 20/04/2025...", sentAt: "2025-04-13T10:30:00", status: "read" },
-  { id: "s2", clientId: "2", clientName: "Mehta Traders", phone: "9123456789", templateName: "Deadline Reminder", message: "Hello Mehta Traders, your GSTR-3B is due on 20/04/2025...", sentAt: "2025-04-13T10:30:00", status: "delivered" },
-  { id: "s3", clientId: "3", clientName: "Priya Sharma", phone: "9988776655", templateName: "Document Request", message: "Hello Priya Sharma, for your ITR-1 filing we need Form 16...", sentAt: "2025-04-12T14:00:00", status: "sent" },
-  { id: "s4", clientId: "4", clientName: "Sunrise Technologies Pvt Ltd", phone: "9001234567", templateName: "Invoice Reminder", message: "Hello Sunrise Technologies, your invoice INV-2526-0012...", sentAt: "2025-04-11T09:15:00", status: "failed", failReason: "Number not on WhatsApp" },
-  { id: "s5", clientId: "5", clientName: "Gupta & Sons HUF", phone: "9871234560", templateName: "Filing Completed", message: "Dear Gupta & Sons HUF, your ITR-2 has been filed...", sentAt: "2025-04-10T16:45:00", status: "read" },
-];
-
-export const mockReceivedMessages: ReceivedMessage[] = [
-  { id: "r1", clientId: "1", clientName: "Ramesh Kumar Gupta", phone: "9876543210", message: "Sir, I will send Form 16 by tomorrow evening.", receivedAt: "2025-04-13T11:00:00", isRead: false },
-  { id: "r2", clientId: "3", clientName: "Priya Sharma", phone: "9988776655", message: "Bank statement uploaded. Please check.", receivedAt: "2025-04-12T15:30:00", isRead: true },
-  { id: "r3", clientId: "2", clientName: "Mehta Traders", phone: "9123456789", message: "Can you also file GSTR-9 this year? What will be the additional fees?", receivedAt: "2025-04-12T12:00:00", isRead: false },
-  { id: "r4", clientId: "6", clientName: "Patel Associates LLP", phone: "9812345678", message: "Payment done via NEFT. Sending screenshot.", receivedAt: "2025-04-11T17:20:00", isRead: true },
-  { id: "r5", clientId: "7", clientName: "Anil Joshi", phone: "9765432109", message: "GST number change ho gaya hai, new number: 27ABCPJ6789N2Z7", receivedAt: "2025-04-10T10:00:00", isRead: false },
-  { id: "r6", clientId: "5", clientName: "Gupta & Sons HUF", phone: "9871234560", message: "Thank you for filing the return. Received acknowledgement.", receivedAt: "2025-04-10T18:00:00", isRead: true },
-];
-
 const parseVariables = (value: any): string[] => {
   if (Array.isArray(value)) return value;
   if (typeof value === "string") {
@@ -193,9 +176,12 @@ export async function fetchSentMessagesFromSupabase(): Promise<SentMessage[]> {
     .select(`id, client_id, client_name, phone, template_name, message, sent_at, status, fail_reason`)
     .order("sent_at", { ascending: false });
 
-  if (error || !data) return mockSentMessages;
+  if (error) {
+    console.warn("fetchSentMessagesFromSupabase:", error.message);
+    return [];
+  }
 
-  return data.map((row: any) => ({
+  return (data ?? []).map((row: any) => ({
     id: row.id,
     clientId: row.client_id,
     clientName: row.client_name,
@@ -214,9 +200,12 @@ export async function fetchReceivedMessagesFromSupabase(): Promise<ReceivedMessa
     .select(`id, client_id, client_name, phone, message, received_at, is_read`)
     .order("received_at", { ascending: false });
 
-  if (error || !data) return mockReceivedMessages;
+  if (error) {
+    console.warn("fetchReceivedMessagesFromSupabase:", error.message);
+    return [];
+  }
 
-  return data.map((row: any) => ({
+  return (data ?? []).map((row: any) => ({
     id: row.id,
     clientId: row.client_id,
     clientName: row.client_name,

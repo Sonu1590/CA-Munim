@@ -73,7 +73,7 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="font-heading">Request Document from Client</DialogTitle>
         </DialogHeader>

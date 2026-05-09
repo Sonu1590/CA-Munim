@@ -128,18 +128,18 @@ export function BulkSender() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       {/* Step Indicator */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
         {["Template", "Recipients", "Preview", "Schedule", "Confirm"].map((label, i) => (
-          <div key={label} className="flex items-center gap-2 shrink-0">
-            <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-semibold ${
+          <div key={label} className="flex items-center gap-1.5">
+            <div className={`h-7 w-7 shrink-0 rounded-full flex items-center justify-center text-xs font-semibold ${
               step > i + 1 ? "bg-[#25D366] text-white" : step === i + 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
             }`}>
               {step > i + 1 ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
             </div>
-            <span className={`text-xs font-medium ${step === i + 1 ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
-            {i < 4 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+            <span className={`text-xs font-medium whitespace-nowrap ${step === i + 1 ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+            {i < 4 && <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground max-sm:hidden" aria-hidden />}
           </div>
         ))}
       </div>
@@ -159,7 +159,7 @@ export function BulkSender() {
                 {templatesError}
               </div>
             ) : templates.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">No templates available. Please create one in the Templates tab.</div>
+              <div className="text-center break-words px-1 py-12 text-muted-foreground">No templates available. Please create one in the Templates tab.</div>
             ) : (
               templates.map((t) => (
                 <div
@@ -321,12 +321,12 @@ export function BulkSender() {
       )}
 
       {/* Navigation Buttons */}
-      <div className="flex justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="outline" onClick={() => setStep((s) => (s - 1) as Step)} disabled={step === 1}>
           <ChevronLeft className="h-4 w-4 mr-1" /> Back
         </Button>
         {step < 5 && (
-          <Button onClick={() => setStep((s) => (s + 1) as Step)} disabled={!canNext()} className="bg-primary">
+          <Button onClick={() => setStep((s) => (s + 1) as Step)} disabled={!canNext()} className="bg-primary shrink-0">
             Next <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         )}
