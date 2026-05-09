@@ -63,11 +63,11 @@ export function QuickActions() {
       <CreateInvoiceModal open={invoiceOpen} onOpenChange={setInvoiceOpen} />
 
       <Dialog open={whatsappOpen} onOpenChange={setWhatsappOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="font-heading">Bulk WhatsApp Reminder</DialogTitle>
           </DialogHeader>
-          <div className="p-4">
+          <div className="min-w-0 p-4">
             <BulkSender />
           </div>
         </DialogContent>

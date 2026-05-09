@@ -79,34 +79,68 @@ export const staffMembers = [
   { name: "Neha Patel", initials: "NP" },
 ]
 
-export const financialYears = ["FY 2022-23", "FY 2023-24", "FY 2024-25", "FY 2025-26"]
+export const financialYears = [
+  "FY 2022-23",
+  "FY 2023-24",
+  "FY 2024-25",
+  "FY 2025-26",
+  "FY 2026-27",
+  "FY 2027-28",
+]
 export const quarters = ["Q1 (Apr-Jun)", "Q2 (Jul-Sep)", "Q3 (Oct-Dec)", "Q4 (Jan-Mar)"]
 export const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"]
 
 export const mockTasks: Task[] = []
 
+const taskSelectColumns = `
+  id,
+  client_id,
+  task_type,
+  custom_name,
+  financial_year,
+  period,
+  due_date,
+  status,
+  priority,
+  assigned_to,
+  document_checklist,
+  notes,
+  completed_at,
+  created_at,
+  clients(name),
+  staff(name)
+`
+
+function mapDbRowToTask(row: any): Task {
+  const assignedName = row.staff?.name ?? row.assigned_to ?? 'Unassigned'
+  return {
+    id: row.id,
+    clientName: row.clients?.name ?? 'Unknown Client',
+    clientId: row.client_id,
+    taskType: row.task_type as TaskType,
+    customTaskName: row.custom_name,
+    financialYear: row.financial_year ?? '',
+    month: typeof row.period === 'string' && row.period.startsWith('Q') ? undefined : row.period,
+    quarter: typeof row.period === 'string' && row.period.startsWith('Q') ? row.period : undefined,
+    dueDate: row.due_date,
+    priority: row.priority as TaskPriority,
+    status: row.status as TaskStatus,
+    assignedTo: assignedName,
+    assignedInitials: assignedName
+      .split(' ')
+      .map((w: string) => w[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase(),
+    docsReceived: (row.document_checklist ?? []).filter((d: any) => d.received || d.checked).length,
+    docsTotal: (row.document_checklist ?? []).length,
+    notes: row.notes,
+    documentChecklist: row.document_checklist ?? [],
+  }
+}
+
 export async function fetchTasksFromSupabase(statusFilter?: TaskStatus): Promise<Task[]> {
-  let query = supabase
-    .from('tasks')
-    .select(`
-      id,
-      client_id,
-      task_type,
-      custom_name,
-      financial_year,
-      period,
-      due_date,
-      status,
-      priority,
-      assigned_to,
-      document_checklist,
-      notes,
-      completed_at,
-      created_at,
-      clients(name),
-      staff(name)
-    `)
-    .order('due_date', { ascending: true })
+  let query = supabase.from('tasks').select(taskSelectColumns).order('due_date', { ascending: true })
 
   if (statusFilter) {
     query = query.eq('status', statusFilter)
@@ -115,31 +149,22 @@ export async function fetchTasksFromSupabase(statusFilter?: TaskStatus): Promise
   const { data, error } = await query
   if (error) throw error
 
-  return (data ?? []).map((row: any) => {
-    const assignedName = row.staff?.name ?? row.assigned_to ?? 'Unassigned'
-    return {
-      id: row.id,
-      clientName: row.clients?.name ?? 'Unknown Client',
-      clientId: row.client_id,
-      taskType: row.task_type as TaskType,
-      customTaskName: row.custom_name,
-      financialYear: row.financial_year ?? '',
-      month: typeof row.period === 'string' && row.period.startsWith('Q') ? undefined : row.period,
-      quarter: typeof row.period === 'string' && row.period.startsWith('Q') ? row.period : undefined,
-      dueDate: row.due_date,
-      priority: row.priority as TaskPriority,
-      status: row.status as TaskStatus,
-      assignedTo: assignedName,
-      assignedInitials: assignedName
-        .split(' ')
-        .map((w: string) => w[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase(),
-      docsReceived: (row.document_checklist ?? []).filter((d: any) => d.received || d.checked).length,
-      docsTotal: (row.document_checklist ?? []).length,
-      notes: row.notes,
-      documentChecklist: row.document_checklist ?? [],
-    }
-  })
+  return (data ?? []).map(mapDbRowToTask)
+}
+
+/** Open tasks with due dates for the compliance calendar report (FY-scoped per client). */
+export async function fetchComplianceTasksForClient(clientId: string, financialYear: string): Promise<Task[]> {
+  if (!clientId || !financialYear) return []
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select(taskSelectColumns)
+    .eq('client_id', clientId)
+    .eq('financial_year', financialYear)
+    .neq('status', 'completed')
+    .order('due_date', { ascending: true })
+
+  if (error) throw error
+
+  return (data ?? []).map(mapDbRowToTask)
 }

@@ -173,7 +173,7 @@ export function MessageTemplates() {
 
       {/* Preview Dialog */}
       <Dialog open={!!previewTemplate} onOpenChange={() => setPreviewTemplate(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="font-heading">{previewTemplate?.name}</DialogTitle>
           </DialogHeader>
@@ -191,7 +191,7 @@ export function MessageTemplates() {
 
       {/* Edit/Create Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-heading">{editTemplate.id ? "Edit Template" : "Create Template"}</DialogTitle>
           </DialogHeader>

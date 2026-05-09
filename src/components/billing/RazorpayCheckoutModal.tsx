@@ -57,7 +57,7 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="font-heading flex items-center gap-2">
             <div className="h-7 px-2 rounded bg-[#072654] text-white text-xs font-bold flex items-center">Razorpay</div>
