@@ -39,8 +39,92 @@ export function useAuth() {
     return () => subscription.unsubscribe()
   }, [])
 
+  const emailAlreadyExists = async (email: string) => {
+    const { data: firm, error: firmError } = await supabase
+      .from('firms')
+      .select('id')
+      .eq('email', email)
+      .limit(1)
+      .maybeSingle()
+
+    if (firm) return true
+    if (firmError) {
+      console.warn('Error checking existing firm email before signup:', firmError)
+      return false
+    }
+
+    const { data: staff, error: staffError } = await supabase
+      .from('staff')
+      .select('id')
+      .eq('email', email)
+      .limit(1)
+      .maybeSingle()
+
+    if (staff) return true
+    if (staffError) {
+      console.warn('Error checking existing staff email before signup:', staffError)
+      return false
+    }
+
+    return false
+  }
+
   const signUp = async (email: string, password: string) => {
+    const duplicate = await emailAlreadyExists(email)
+    if (duplicate) {
+      return {
+        data: null,
+        error: { message: 'An account with this email already exists. Please sign in instead.' },
+      }
+    }
+
     const { data, error } = await supabase.auth.signUp({ email, password })
+
+    if (error) return { data, error }
+
+    // If signup successful and we have user data, create firm and staff records
+    if (data.user) {
+      try {
+        // Create firm record with placeholder data
+        const { error: firmError } = await supabase
+          .from('firms')
+          .insert({
+            id: data.user.id, // Use auth user ID as firm ID
+            name: 'My CA Firm', // Placeholder name
+            email: email,
+            onboarding_complete: false,
+            created_at: new Date().toISOString(),
+          })
+
+        if (firmError) {
+          console.error('Failed to create firm record:', firmError)
+          // Don't fail signup if firm creation fails, but log it
+        }
+
+        // Create staff record for the user
+        const { error: staffError } = await supabase
+          .from('staff')
+          .insert({
+            firm_id: data.user.id,
+            name: email.split('@')[0], // Use email prefix as name placeholder
+            email: email,
+            auth_user_id: data.user.id,
+            role: 'admin',
+            active: true,
+            created_at: new Date().toISOString(),
+          })
+
+        if (staffError) {
+          console.error('Failed to create staff record:', staffError)
+          // Don't fail signup if staff creation fails, but log it
+        }
+
+      } catch (err) {
+        console.error('Error creating initial records:', err)
+        // Don't fail the signup
+      }
+    }
+
     return { data, error }
   }
 

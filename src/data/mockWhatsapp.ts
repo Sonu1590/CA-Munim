@@ -140,7 +140,7 @@ const parseVariables = (value: any): string[] => {
 
 export async function fetchMessageTemplatesFromSupabase(): Promise<MessageTemplate[]> {
   const { data, error } = await supabase
-    .from("whatsapp_templates")
+    .from("message_templates")
     .select(`id, name, category, body, variables, is_default`)
     .order("name", { ascending: true });
 
@@ -158,7 +158,7 @@ export async function fetchMessageTemplatesFromSupabase(): Promise<MessageTempla
 
 export async function saveMessageTemplateToSupabase(template: MessageTemplate): Promise<MessageTemplate> {
   const { data, error } = await supabase
-    .from("whatsapp_templates")
+    .from("message_templates")
     .upsert({
       id: template.id,
       name: template.name,
@@ -183,7 +183,7 @@ export async function saveMessageTemplateToSupabase(template: MessageTemplate): 
 }
 
 export async function deleteMessageTemplateFromSupabase(id: string): Promise<void> {
-  const { error } = await supabase.from("whatsapp_templates").delete().eq("id", id);
+  const { error } = await supabase.from("message_templates").delete().eq("id", id);
   if (error) throw error;
 }
 

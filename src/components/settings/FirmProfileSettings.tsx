@@ -98,12 +98,23 @@ export function FirmProfileSettings() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div><Label>Firm Name</Label><Input className="mt-1.5" value={profile.firmName} onChange={(e) => updateField("firmName", e.target.value)} /></div>
+            <div>
+              <Label>Firm Name</Label>
+              <Input
+                className="mt-1.5"
+                value={profile.firmName}
+                onChange={(e) => updateField("firmName", e.target.value)}
+                disabled={profile.practiceType === "solo"}
+                placeholder={profile.practiceType === "solo" ? "Solo practitioner — no firm name needed" : ""}
+              />
+              {profile.practiceType === "solo" && (
+                <p className="text-xs text-muted-foreground mt-1">Firm name is not required for solo practitioners.</p>
+              )}
+            </div>
             <div><Label>CA Name</Label><Input className="mt-1.5" value={profile.caName} onChange={(e) => updateField("caName", e.target.value)} /></div>
             <div><Label>ICAI Membership No.</Label><Input className="mt-1.5 font-mono" value={profile.icaiMembershipNo} onChange={(e) => updateField("icaiMembershipNo", e.target.value)} /></div>
             <div><Label>Phone</Label><Input className="mt-1.5" value={profile.phone} onChange={(e) => updateField("phone", e.target.value)} /></div>
             <div><Label>Email</Label><Input className="mt-1.5" type="email" value={profile.email} onChange={(e) => updateField("email", e.target.value)} /></div>
-            <div><Label>Website</Label><Input className="mt-1.5" value={profile.website || ""} onChange={(e) => updateField("website", e.target.value)} /></div>
           </div>
 
           <div><Label>Address</Label><Textarea className="mt-1.5" rows={2} value={profile.address} onChange={(e) => updateField("address", e.target.value)} /></div>
