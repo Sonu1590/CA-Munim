@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,8 @@ import { ReceivedMessages } from "@/components/whatsapp/ReceivedMessages";
 import { fetchReceivedMessagesFromSupabase } from "@/data/mockWhatsapp";
 
 export default function WhatsApp() {
+  const [searchParams] = useSearchParams();
+  const [tabValue, setTabValue] = useState("templates");
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -23,6 +26,15 @@ export default function WhatsApp() {
     };
     loadUnread();
   }, []);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get("tab");
+    if (requestedTab === "bulk" || requestedTab === "templates" || requestedTab === "status" || requestedTab === "inbox") {
+      setTabValue(requestedTab);
+    } else {
+      setTabValue("templates");
+    }
+  }, [searchParams]);
 
   return (
     <AppLayout>
@@ -39,7 +51,7 @@ export default function WhatsApp() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="templates" className="space-y-4">
+        <Tabs value={tabValue} onValueChange={setTabValue} className="space-y-4">
           <TabsList className="w-full grid grid-cols-4 h-auto p-1">
             <TabsTrigger value="templates" className="text-xs gap-1 py-2">
               <FileText className="h-3.5 w-3.5 hidden sm:block" /> Templates
