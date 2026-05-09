@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 
 export interface FirmProfile {
+  practiceType?: "firm" | "solo";
   firmName: string;
   caName: string;
   icaiMembershipNo: string;
@@ -11,7 +12,6 @@ export interface FirmProfile {
   pinCode: string;
   phone: string;
   email: string;
-  website?: string;
   firmPan: string;
   firmGstin?: string;
   bankName: string;
@@ -76,7 +76,6 @@ export const mockFirmProfile: FirmProfile = {
   pinCode: "110019",
   phone: "9876543210",
   email: "rajesh@sharma-ca.in",
-  website: "www.sharma-ca.in",
   firmPan: "AADFS1234K",
   firmGstin: "07AADFS1234K1Z5",
   bankName: "HDFC Bank",
@@ -131,87 +130,157 @@ export const filingCategories: FilingCategory[] = [
 
 const toBool = (value: any) => typeof value === "boolean" ? value : String(value).toLowerCase() === "true";
 
-export async function fetchFirmProfileFromSupabase(): Promise<FirmProfile> {
-  const { data, error } = await supabase.from("firm_profile").select(`
-    firm_name,
-    ca_name,
-    icai_membership_no,
-    logo_url,
-    address,
-    city,
-    state,
-    pin_code,
-    phone,
-    email,
-    website,
-    firm_pan,
-    firm_gstin,
-    bank_name,
-    account_name,
-    account_number,
-    ifsc_code,
-    branch_name,
-    upi_id
-  `).single();
+const extractSupabaseError = (err: any): string => {
+  if (!err) return "";
+  if (typeof err === "string") return err;
+  if (typeof err.message === "string") return err.message;
+  if (typeof err.error === "string") return err.error;
+  if (typeof err.details === "string") return err.details;
+  if (typeof err.hint === "string") return err.hint;
+  return String(err);
+};
 
-  if (error || !data) return mockFirmProfile;
+const getFirmProfileError = (err: any) => {
+  const message = extractSupabaseError(err).toLowerCase();
+  if (message.includes("row-level security") || message.includes("policy")) {
+    return new Error("Unable to load firm profile because of permissions. Check your Supabase RLS policy for the firms table.");
+  }
+  return new Error(extractSupabaseError(err) || "Unable to load firm profile.");
+};
+
+export async function fetchFirmProfileFromSupabase(): Promise<FirmProfile> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const selectFields = `
+      name,
+      ca_name,
+      icai_number,
+      logo_url,
+      address,
+      city,
+      state,
+      pan,
+      gstin,
+      phone,
+      email,
+      bank_details,
+      upi_id,
+      practice_type
+    `;
+
+  let profileData: any = null;
+  let error: any = null;
+
+  const { data, error: firmError } = await supabase
+    .from("firms")
+    .select(selectFields)
+    .eq('id', user.id)
+    .single();
+
+  if (firmError) {
+    error = firmError;
+  } else {
+    profileData = data;
+  }
+
+  if (!profileData) {
+    const { data: staffData, error: staffError } = await supabase
+      .from('staff')
+      .select(`firms(${selectFields})`)
+      .eq('auth_user_id', user.id)
+      .single();
+
+    if (staffError) {
+      if (error) throw getFirmProfileError(error);
+      throw getFirmProfileError(staffError);
+    }
+
+    profileData = (staffData as any)?.firms;
+    if (!profileData) {
+      throw new Error("Firm profile not found.");
+    }
+  }
+
+  const bankDetails = profileData.bank_details
+    ? typeof profileData.bank_details === "string"
+      ? JSON.parse(profileData.bank_details)
+      : profileData.bank_details
+    : {};
 
   return {
-    firmName: data.firm_name ?? mockFirmProfile.firmName,
-    caName: data.ca_name ?? mockFirmProfile.caName,
-    icaiMembershipNo: data.icai_membership_no ?? mockFirmProfile.icaiMembershipNo,
-    logoUrl: data.logo_url ?? mockFirmProfile.logoUrl,
-    address: data.address ?? mockFirmProfile.address,
-    city: data.city ?? mockFirmProfile.city,
-    state: data.state ?? mockFirmProfile.state,
-    pinCode: data.pin_code ?? mockFirmProfile.pinCode,
-    phone: data.phone ?? mockFirmProfile.phone,
-    email: data.email ?? mockFirmProfile.email,
-    website: data.website ?? mockFirmProfile.website,
-    firmPan: data.firm_pan ?? mockFirmProfile.firmPan,
-    firmGstin: data.firm_gstin ?? mockFirmProfile.firmGstin,
-    bankName: data.bank_name ?? mockFirmProfile.bankName,
-    accountName: data.account_name ?? mockFirmProfile.accountName,
-    accountNumber: data.account_number ?? mockFirmProfile.accountNumber,
-    ifscCode: data.ifsc_code ?? mockFirmProfile.ifscCode,
-    branchName: data.branch_name ?? mockFirmProfile.branchName,
-    upiId: data.upi_id ?? mockFirmProfile.upiId,
+    practiceType: profileData.practice_type ?? 'firm',
+    firmName: profileData.name ?? '',
+    caName: profileData.ca_name ?? '',
+    icaiMembershipNo: profileData.icai_number ?? '',
+    logoUrl: profileData.logo_url ?? '',
+    address: profileData.address ?? '',
+    city: profileData.city ?? '',
+    state: profileData.state ?? '',
+    pinCode: '', // Not in firms table
+    phone: profileData.phone ?? '',
+    email: profileData.email ?? '',
+    firmPan: profileData.pan ?? '',
+    firmGstin: profileData.gstin ?? '',
+    bankName: bankDetails.bank_name ?? '',
+    accountName: bankDetails.account_name ?? '',
+    accountNumber: bankDetails.account_number ?? '',
+    ifscCode: bankDetails.ifsc_code ?? '',
+    branchName: bankDetails.branch_name ?? '',
+    upiId: profileData.upi_id ?? '',
   };
 }
 
 export async function saveFirmProfileToSupabase(profile: FirmProfile): Promise<FirmProfile> {
-  const { error } = await supabase.from("firm_profile").upsert({
-    id: 1,
-    firm_name: profile.firmName,
-    ca_name: profile.caName,
-    icai_membership_no: profile.icaiMembershipNo,
-    logo_url: profile.logoUrl,
-    address: profile.address,
-    city: profile.city,
-    state: profile.state,
-    pin_code: profile.pinCode,
-    phone: profile.phone,
-    email: profile.email,
-    website: profile.website,
-    firm_pan: profile.firmPan,
-    firm_gstin: profile.firmGstin,
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const bankDetails = {
     bank_name: profile.bankName,
     account_name: profile.accountName,
     account_number: profile.accountNumber,
     ifsc_code: profile.ifscCode,
     branch_name: profile.branchName,
-    upi_id: profile.upiId,
-  }, { onConflict: "id" });
+  };
 
-  if (error) throw error;
+  const row = {
+    id: user.id,
+    practice_type: profile.practiceType ?? 'firm',
+    name: profile.firmName,
+    ca_name: profile.caName,
+    icai_number: profile.icaiMembershipNo,
+    logo_url: profile.logoUrl,
+    address: profile.address,
+    city: profile.city,
+    state: profile.state,
+    pan: profile.firmPan,
+    gstin: profile.firmGstin,
+    phone: profile.phone,
+    email: profile.email,
+    bank_details: bankDetails,
+    upi_id: profile.upiId,
+  };
+
+  const { data: upsertData, error: upsertError } = await supabase
+    .from("firms")
+    .upsert(row, { onConflict: "id" });
+
+  if (upsertError) {
+    const message = extractSupabaseError(upsertError).toLowerCase();
+    if (message.includes("firms_email_unique") || message.includes("duplicate key value")) {
+      throw new Error("A firm profile with this email address already exists. Please sign out and sign in again or contact support.");
+    }
+    throw upsertError;
+  }
+
   return profile;
 }
 
 export async function fetchStaffFromSupabase(): Promise<StaffMember[]> {
   const { data, error } = await supabase
     .from("staff")
-    .select(`id, name, role, email, phone, is_active, joined_date, tasks_completed, tasks_pending`)
-    .order("joined_date", { ascending: false });
+    .select(`id, name, role, email, phone, active, created_at`)
+    .order("created_at", { ascending: false });
 
   if (error || !data) return mockStaff;
 
@@ -221,37 +290,52 @@ export async function fetchStaffFromSupabase(): Promise<StaffMember[]> {
     role: row.role,
     email: row.email,
     phone: row.phone,
-    isActive: toBool(row.is_active),
-    joinedDate: row.joined_date ?? new Date().toISOString().split("T")[0],
-    tasksCompleted: Number(row.tasks_completed ?? 0),
-    tasksPending: Number(row.tasks_pending ?? 0),
+    isActive: toBool(row.active),
+    joinedDate: row.created_at?.split('T')[0] ?? new Date().toISOString().split("T")[0],
+    tasksCompleted: Number(0), // Not in schema
+    tasksPending: Number(0), // Not in schema
   }));
 }
 
 export async function addStaffToSupabase(staff: Omit<StaffMember, "id" | "joinedDate" | "tasksCompleted" | "tasksPending">): Promise<StaffMember> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Get the current user's firm_id
+  const { data: staffData } = await supabase
+    .from('staff')
+    .select('firm_id')
+    .eq('auth_user_id', user.id)
+    .single();
+
+  if (!staffData) throw new Error('Unable to determine firm');
+
   const { data, error } = await supabase.from("staff").insert([{
+    firm_id: staffData.firm_id,
     name: staff.name,
     role: staff.role,
     email: staff.email,
     phone: staff.phone,
-    is_active: staff.isActive,
+    active: staff.isActive,
   }]).select().single();
+
   if (error || !data) throw error;
+
   return {
     id: data.id,
     name: data.name,
     role: data.role,
     email: data.email,
     phone: data.phone,
-    isActive: toBool(data.is_active),
-    joinedDate: data.joined_date ?? new Date().toISOString().split("T")[0],
-    tasksCompleted: Number(data.tasks_completed ?? 0),
-    tasksPending: Number(data.tasks_pending ?? 0),
+    isActive: toBool(data.active),
+    joinedDate: data.created_at?.split('T')[0] ?? new Date().toISOString().split("T")[0],
+    tasksCompleted: 0,
+    tasksPending: 0,
   };
 }
 
 export async function updateStaffActiveStatus(id: string, isActive: boolean): Promise<void> {
-  const { error } = await supabase.from("staff").update({ is_active: isActive }).eq("id", id);
+  const { error } = await supabase.from("staff").update({ active: isActive }).eq("id", id);
   if (error) throw error;
 }
 

@@ -25,7 +25,7 @@ const Dashboard = () => {
     return "Good evening";
   };
 
-  const displayName = caName ? `CA ${caName}` : "CA";
+  const displayName = caName ? `CA ${normalizeCAName(caName)}` : "CA";
 
   return (
     <AppLayout>
