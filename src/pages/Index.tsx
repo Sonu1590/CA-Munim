@@ -25,7 +25,7 @@ const Dashboard = () => {
     return "Good evening";
   };
 
-  const displayName = caName ? `CA ${normalizeCAName(caName)}` : "CA";
+  const displayName = caName ? `CA ${caName}` : "CA";
 
   return (
     <AppLayout>
@@ -34,7 +34,7 @@ const Dashboard = () => {
         <div className="md:hidden">
           <h1 className="text-xl font-heading font-bold text-primary">CA Munim</h1>
           <p className="text-sm text-muted-foreground">
-            {greeting()}, {displayName} 👋
+            {greeting()}, {displayName} 
           </p>
         </div>
         <div className="hidden md:block">

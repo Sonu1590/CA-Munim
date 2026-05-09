@@ -1,6 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate, useLocation, useNavigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Route,
+  Routes,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -25,132 +31,163 @@ import { GlobalSearch } from "./components/common/GlobalSearch";
 
 const queryClient = new QueryClient();
 
-// ── Auth + onboarding guard ──────────────────────────────────────────────────
-function ProtectedRoute({
-  session,
-  onboardingComplete,
-  children,
-}: {
-  session: Session | null;
-  onboardingComplete: boolean | null;
-  children: React.ReactNode;
-}) {
+// ── Auth status type — single source of truth ────────────────────────────────
+type AuthStatus = "loading" | "unauthenticated" | "onboarding" | "ready";
+
+// ── Route guard ──────────────────────────────────────────────────────────────
+function ProtectedRoute({ status, children }: { status: AuthStatus; children: React.ReactNode }) {
   const location = useLocation();
 
-  // Not logged in → go to login
-  if (!session) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  // Logged in but onboarding not done → go to onboarding
-  if (onboardingComplete === false) {
-    return <Navigate to="/onboarding" replace />;
-  }
-
-  return <>{children}</>;
-}
-
-// ── Inner app (has router context) ──────────────────────────────────────────
-function AppRoutes() {
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
-  const [checkingOnboarding, setCheckingOnboarding] = useState(false);
-
-  // Check if onboarding is complete for this user
-  const checkOnboarding = async (userId: string) => {
-    setCheckingOnboarding(true);
-
-    try {
-      const { data: firmData, error: firmError } = await supabase
-        .from("firms")
-        .select("onboarding_complete")
-        .eq("id", userId)
-        .single();
-
-      if (firmData && !firmError) {
-        setOnboardingComplete(Boolean(firmData.onboarding_complete));
-        return;
-      }
-
-      const { data: staffData, error: staffError } = await supabase
-        .from("staff")
-        .select("firm_id, firms(onboarding_complete)")
-        .eq("auth_user_id", userId)
-        .single();
-
-      if (staffError) {
-        console.warn("Unable to check onboarding status via staff record:", staffError);
-      }
-
-      const complete = (staffData?.firms as any)?.onboarding_complete ?? false;
-      setOnboardingComplete(Boolean(complete));
-    } catch (err) {
-      console.warn("Error checking onboarding status:", err);
-      setOnboardingComplete(false);
-    } finally {
-      setCheckingOnboarding(false);
-    }
-  };
-
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) checkOnboarding(session.user.id);
-      else setOnboardingComplete(null);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session?.user) checkOnboarding(session.user.id);
-      else { setOnboardingComplete(null); setCheckingOnboarding(false); }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Show spinner while checking session or onboarding status
-  if (session === undefined || (session && checkingOnboarding)) {
+  if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
+  if (status === "unauthenticated") {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  if (status === "onboarding") {
+    return <Navigate to="/onboarding" replace />;
+  }
+  return <>{children}</>;
+}
+
+// ── Inner app ────────────────────────────────────────────────────────────────
+function AppRoutes() {
+  const [status, setStatus] = useState<AuthStatus>("loading");
+
+  /**
+   * Creates missing firms + staff rows when the signup trigger fails.
+   * Silent — never throws, never blocks the user.
+   */
+  const bootstrapMissingRecords = async (userId: string, email: string): Promise<void> => {
+    try {
+      let firmId: string | null = null;
+
+      const { data: existingFirm } = await supabase
+        .from("firms")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (existingFirm?.id) {
+        firmId = existingFirm.id;
+      } else {
+        const { data: newFirm } = await supabase
+          .from("firms")
+          .insert({ name: email.split("@")[0], email, onboarding_complete: false })
+          .select("id")
+          .single();
+        firmId = newFirm?.id ?? null;
+      }
+
+      if (!firmId) return;
+
+      await supabase.from("staff").upsert(
+        { firm_id: firmId, name: email.split("@")[0], email, auth_user_id: userId, role: "admin", active: true },
+        { onConflict: "auth_user_id" }
+      );
+    } catch (err) {
+      console.error("bootstrapMissingRecords:", err);
+    }
+  };
+
+  /**
+   * THE SINGLE AUTH RESOLUTION PATH.
+   * staff(auth_user_id) → firm(onboarding_complete)
+   * No alternate paths. No fallbacks that hide bugs.
+   */
+  const resolveStatus = useCallback(async (session: Session | null) => {
+    if (!session?.user) {
+      setStatus("unauthenticated");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("staff")
+        .select("firm_id, firms(onboarding_complete)")
+        .eq("auth_user_id", session.user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("resolveStatus error:", error.message);
+        setStatus("onboarding");
+        return;
+      }
+
+      if (!data) {
+        // Trigger failed — bootstrap silently then go to onboarding
+        await bootstrapMissingRecords(session.user.id, session.user.email ?? "");
+        setStatus("onboarding");
+        return;
+      }
+
+      const complete = (data.firms as any)?.onboarding_complete;
+      setStatus(complete === true ? "ready" : "onboarding");
+
+    } catch (err) {
+      console.error("resolveStatus unexpected:", err);
+      setStatus("onboarding");
+    }
+  }, []);
+
+  useEffect(() => {
+    // Initial session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      resolveStatus(session);
+    });
+
+    // All future auth changes (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      resolveStatus(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [resolveStatus]);
+
+  // Global loading screen — shown once on initial load
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading CA Munim...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
-      {session && onboardingComplete && <GlobalSearch />}
+      {status === "ready" && <GlobalSearch />}
       <Routes>
-        {/* ── Fully public ── */}
+        {/* Public */}
         <Route path="/upload/:token" element={<UploadPortal />} />
 
-        {/* ── Auth — redirect to / if already logged in ── */}
+        {/* Login — bounces away if already authenticated */}
         <Route
           path="/login"
           element={
-            session
-              ? onboardingComplete
-                ? <Navigate to="/" replace />
-                : <Navigate to="/onboarding" replace />
-              : <AuthPage />
+            status === "unauthenticated" ? <AuthPage /> :
+            status === "onboarding" ? <Navigate to="/onboarding" replace /> :
+            <Navigate to="/" replace />
           }
         />
 
-        {/* ── Onboarding — only for logged-in users who haven't completed it ── */}
+        {/* Onboarding — only when logged in + incomplete */}
         <Route
           path="/onboarding"
           element={
-            !session
-              ? <Navigate to="/login" replace />
-              : onboardingComplete
-              ? <Navigate to="/" replace />
-              : <OnboardingPage onComplete={() => setOnboardingComplete(true)} />
+            status === "unauthenticated" ? <Navigate to="/login" replace /> :
+            status === "ready" ? <Navigate to="/" replace /> :
+            <OnboardingPage onComplete={() => setStatus("ready")} />
           }
         />
 
-        {/* ── Protected app routes ── */}
+        {/* Protected app pages */}
         {[
           { path: "/", element: <Index /> },
           { path: "/clients", element: <Clients /> },
@@ -165,11 +202,7 @@ function AppRoutes() {
           <Route
             key={path}
             path={path}
-            element={
-              <ProtectedRoute session={session} onboardingComplete={onboardingComplete}>
-                {element}
-              </ProtectedRoute>
-            }
+            element={<ProtectedRoute status={status}>{element}</ProtectedRoute>}
           />
         ))}
 

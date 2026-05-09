@@ -15,47 +15,34 @@ import { Building2, User, ChevronRight, ChevronLeft, Loader2 } from "lucide-reac
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-const extractSupabaseError = (err: any): string => {
-  if (!err) return "";
-  if (typeof err === "string") return err;
-  if (typeof err.message === "string") return err.message;
-  if (typeof err.error === "string") return err.error;
-  if (typeof err.details === "string") return err.details;
-  if (typeof err.hint === "string") return err.hint;
-  return String(err);
-};
-
-const getOnboardingErrorMessage = (error: any) => {
-  const message = extractSupabaseError(error).toLowerCase();
-  if (message.includes("row-level security") || message.includes("policy")) {
-    return "Unable to save your profile because of permissions. Please sign out and sign in again or contact support.";
-  }
-  return extractSupabaseError(error) || "Failed to save profile. Please try again.";
-};
-
 type PracticeType = "firm" | "solo";
 
 const INDIAN_STATES = [
-  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
-  "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
-  "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
-  "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
-  "Delhi", "Jammu & Kashmir", "Ladakh", "Puducherry", "Chandigarh",
-  "Dadra & Nagar Haveli and Daman & Diu", "Lakshadweep", "Andaman & Nicobar Islands",
+  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa",
+  "Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala",
+  "Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland",
+  "Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura",
+  "Uttar Pradesh","Uttarakhand","West Bengal","Delhi","Jammu & Kashmir",
+  "Ladakh","Puducherry","Chandigarh",
+  "Dadra & Nagar Haveli and Daman & Diu","Lakshadweep","Andaman & Nicobar Islands",
 ];
 
+// Validate Indian phone number
+const isValidPhone = (p: string) => p === "" || /^[6-9]\d{9}$/.test(p);
+
+// Validate ICAI membership number (4-6 digits)
+const isValidICAI = (n: string) => n === "" || /^\d{4,6}$/.test(n);
+
 interface OnboardingPageProps {
-  onComplete?: () => void;}
+  onComplete?: () => void;
+}
 
 export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
   const navigate = useNavigate();
 
-  // Step 1 — practice type
   const [step, setStep] = useState<1 | 2>(1);
   const [practiceType, setPracticeType] = useState<PracticeType | null>(null);
 
-  // Step 2 — details
   const [caName, setCaName] = useState("");
   const [firmName, setFirmName] = useState("");
   const [icaiNumber, setIcaiNumber] = useState("");
@@ -63,6 +50,27 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
   const [state, setState] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Field-level errors
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!caName.trim()) newErrors.caName = "Your name is required.";
+    else if (caName.trim().length < 2) newErrors.caName = "Name must be at least 2 characters.";
+
+    if (practiceType === "firm") {
+      if (!firmName.trim()) newErrors.firmName = "Firm name is required.";
+      else if (firmName.trim().length < 2) newErrors.firmName = "Firm name must be at least 2 characters.";
+    }
+
+    if (!isValidPhone(phone)) newErrors.phone = "Enter a valid 10-digit Indian mobile number.";
+    if (!isValidICAI(icaiNumber)) newErrors.icaiNumber = "ICAI number should be 4–6 digits.";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleNext = () => {
     if (!practiceType) {
@@ -73,90 +81,87 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
   };
 
   const handleSave = async () => {
-    if (!caName.trim()) {
-      toast.error("Please enter your name.");
-      return;
-    }
-    if (practiceType === "firm" && !firmName.trim()) {
-      toast.error("Please enter your firm name.");
-      return;
-    }
-
-    const displayName = practiceType === "firm"
-      ? firmName.trim()
-      : caName.trim();
-
-    if (!displayName) {
-      toast.error("Please enter a firm or practitioner name.");
-      return;
-    }
+    if (!validate()) return;
 
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-      if (!user.email) throw new Error("Signed-in account is missing an email address.");
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Session expired. Please sign in again.");
 
-      const row = {
-        id: user.id,
-        name: practiceType === "firm" ? firmName.trim() : "",
-        ca_name: caName.trim(),
-        email: user.email,
-        icai_number: icaiNumber.trim() || null,
-        city: city || null,
-        state: state || null,
-        phone: phone.trim() || null,
-        practice_type: practiceType,
-        onboarding_complete: true,
-        created_at: new Date().toISOString(),
-      };
-
-      const { data: upsertData, error: upsertError } = await supabase
-        .from("firms")
-        .upsert(row, { onConflict: "id" });
-
-      if (upsertError) {
-        const message = extractSupabaseError(upsertError).toLowerCase();
-        if (message.includes("firms_email_unique") || message.includes("duplicate key value")) {
-          throw new Error("A firm profile already exists for this email address. Please sign out and sign in again or contact support.");
-        }
-        throw upsertError;
-      }
-
-      // Update or create staff record with the onboarded name.
-      const { error: staffErr } = await supabase
+      // Find the firm_id via staff record (NOT by user.id — firms have their own UUID)
+      const { data: staffRow, error: staffError } = await supabase
         .from("staff")
-        .upsert(
-          {
-            firm_id: user.id,
-            name: caName.trim(),
-            email: user.email,
-            auth_user_id: user.id,
-            role: "admin",
-            active: true,
-            created_at: new Date().toISOString(),
-          },
-          { onConflict: "auth_user_id" }
-        );
+        .select("firm_id")
+        .eq("auth_user_id", user.id)
+        .single();
 
-      if (staffErr) {
-        console.warn("Unable to upsert staff during onboarding:", staffErr);
+      if (staffError || !staffRow?.firm_id) {
+        throw new Error("Could not find your practice profile. Please sign out and sign in again.");
       }
+
+      const firmId = staffRow.firm_id;
+      const displayName = practiceType === "firm" ? firmName.trim() : caName.trim();
+
+      // Update the EXISTING firms row by its actual firm_id
+      const { error: updateError } = await supabase
+        .from("firms")
+        .update({
+          name: displayName,
+          ca_name: caName.trim(),
+          icai_number: icaiNumber.trim() || null,
+          city: city || null,
+          state: state || null,
+          phone: phone.trim() || null,
+          practice_type: practiceType,
+          onboarding_complete: true,
+        })
+        .eq("id", firmId);  // ← Uses the REAL firm UUID, not user.id
+
+      if (updateError) throw updateError;
+
+      // Update staff name to match
+      await supabase
+        .from("staff")
+        .update({ name: caName.trim() })
+        .eq("auth_user_id", user.id);
 
       toast.success("Profile saved! Welcome to CA Munim.");
-      onComplete?.();           // ← tells App.tsx state to update immediately
+      onComplete?.();
       navigate("/", { replace: true });
 
     } catch (err: any) {
-      toast.error(getOnboardingErrorMessage(err));
+      const msg = err?.message ?? "Failed to save. Please try again.";
+      if (msg.toLowerCase().includes("row-level security") || msg.toLowerCase().includes("policy")) {
+        toast.error("Permission error. Please sign out and sign back in, then try again.");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const Field = ({
+    id, label, required, optional, children, error,
+  }: {
+    id: string; label: string; required?: boolean; optional?: boolean;
+    children: React.ReactNode; error?: string;
+  }) => (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>
+        {label}
+        {required && <span className="text-destructive ml-0.5">*</span>}
+        {optional && <span className="text-muted-foreground text-xs ml-1">(optional)</span>}
+      </Label>
+      {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-muted/30 flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-muted/30 flex flex-col items-center justify-center px-4 py-8">
       <div className="w-full max-w-lg">
+
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-primary mb-4">
@@ -164,84 +169,73 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
           </div>
           <h1 className="text-2xl font-heading font-bold">Welcome to CA Munim</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Let's set up your practice profile — takes 2 minutes
+            Set up your practice profile — takes 2 minutes
           </p>
         </div>
 
-        {/* Progress dots */}
+        {/* Progress */}
         <div className="flex justify-center gap-2 mb-6">
-          <div className={cn("h-2 rounded-full transition-all", step === 1 ? "w-8 bg-primary" : "w-2 bg-primary/30")} />
-          <div className={cn("h-2 rounded-full transition-all", step === 2 ? "w-8 bg-primary" : "w-2 bg-primary/30")} />
+          <div className={cn("h-2 rounded-full transition-all duration-300",
+            step === 1 ? "w-8 bg-primary" : "w-2 bg-primary")} />
+          <div className={cn("h-2 rounded-full transition-all duration-300",
+            step === 2 ? "w-8 bg-primary" : "w-2 bg-primary/30")} />
         </div>
 
         <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
 
-          {/* ── STEP 1: Practice type ── */}
+          {/* ── Step 1: Practice type ── */}
           {step === 1 && (
             <div className="space-y-5">
               <div>
                 <h2 className="text-lg font-heading font-semibold">How do you practice?</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  This helps us personalise your experience.
+                  This personalises your experience throughout the app.
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                {/* Firm option */}
-                <button
-                  type="button"
-                  onClick={() => setPracticeType("firm")}
-                  className={cn(
-                    "flex flex-col items-center justify-center gap-3 p-5 rounded-xl border-2 transition-all text-center",
-                    practiceType === "firm"
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/40 hover:bg-muted/50"
-                  )}
-                >
-                  <div className={cn(
-                    "h-12 w-12 rounded-xl flex items-center justify-center",
-                    practiceType === "firm" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                  )}>
-                    <Building2 className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm">CA Firm</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Registered firm with partners or staff
-                    </p>
-                  </div>
-                  {practiceType === "firm" && (
-                    <span className="text-xs font-medium text-primary">✓ Selected</span>
-                  )}
-                </button>
-
-                {/* Solo option */}
-                <button
-                  type="button"
-                  onClick={() => setPracticeType("solo")}
-                  className={cn(
-                    "flex flex-col items-center justify-center gap-3 p-5 rounded-xl border-2 transition-all text-center",
-                    practiceType === "solo"
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/40 hover:bg-muted/50"
-                  )}
-                >
-                  <div className={cn(
-                    "h-12 w-12 rounded-xl flex items-center justify-center",
-                    practiceType === "solo" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                  )}>
-                    <User className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm">Solo Practitioner</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Individual CA practising in own name
-                    </p>
-                  </div>
-                  {practiceType === "solo" && (
-                    <span className="text-xs font-medium text-primary">✓ Selected</span>
-                  )}
-                </button>
+                {[
+                  {
+                    type: "firm" as PracticeType,
+                    icon: Building2,
+                    title: "CA Firm",
+                    desc: "Registered firm with partners or staff",
+                  },
+                  {
+                    type: "solo" as PracticeType,
+                    icon: User,
+                    title: "Solo Practitioner",
+                    desc: "Individual CA practising in own name",
+                  },
+                ].map(({ type, icon: Icon, title, desc }) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setPracticeType(type)}
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-3 p-5 rounded-xl border-2 transition-all text-center",
+                      practiceType === type
+                        ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                        : "border-border hover:border-primary/40 hover:bg-muted/50"
+                    )}
+                  >
+                    <div className={cn(
+                      "h-12 w-12 rounded-xl flex items-center justify-center transition-colors",
+                      practiceType === type
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                    )}>
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">{title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                    </div>
+                    {practiceType === type && (
+                      <span className="text-xs font-semibold text-primary">✓ Selected</span>
+                    )}
+                  </button>
+                ))}
               </div>
 
               <Button
@@ -254,7 +248,7 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
             </div>
           )}
 
-          {/* ── STEP 2: Details form ── */}
+          {/* ── Step 2: Details ── */}
           {step === 2 && (
             <div className="space-y-4">
               <div>
@@ -263,85 +257,66 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
                   {practiceType === "firm"
-                    ? "Tell us about your firm."
-                    : "Tell us about yourself."}
+                    ? "Tell us about your firm. This appears on invoices and client-facing pages."
+                    : "Tell us about yourself. This appears on invoices and client-facing pages."}
                 </p>
               </div>
 
-              {/* Firm name — only for firm type */}
               {practiceType === "firm" && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="firmName">
-                    Firm Name <span className="text-destructive">*</span>
-                  </Label>
+                <Field id="firmName" label="Firm Name" required error={errors.firmName}>
                   <Input
                     id="firmName"
                     placeholder="e.g. Sharma & Associates"
                     value={firmName}
-                    onChange={(e) => setFirmName(e.target.value)}
+                    onChange={(e) => { setFirmName(e.target.value); setErrors(p => ({...p, firmName: ""})); }}
+                    className={errors.firmName ? "border-destructive" : ""}
                   />
-                </div>
+                </Field>
               )}
 
-              {/* CA Name */}
-              <div className="space-y-1.5">
-                <Label htmlFor="caName">
-                  Your Name <span className="text-destructive">*</span>
-                </Label>
+              <Field id="caName" label="Your Full Name" required error={errors.caName}>
                 <Input
                   id="caName"
-                  placeholder="e.g. CA Rajesh Sharma"
+                  placeholder={practiceType === "firm" ? "e.g. CA Rajesh Sharma" : "e.g. CA Sonu Singh"}
                   value={caName}
-                  onChange={(e) => setCaName(e.target.value)}
+                  onChange={(e) => { setCaName(e.target.value); setErrors(p => ({...p, caName: ""})); }}
+                  className={errors.caName ? "border-destructive" : ""}
                 />
-              </div>
+              </Field>
 
-              {/* ICAI Number */}
-              <div className="space-y-1.5">
-                <Label htmlFor="icai">
-                  ICAI Membership Number
-                  <span className="text-muted-foreground text-xs ml-1">(optional)</span>
-                </Label>
+              <Field id="icai" label="ICAI Membership Number" optional error={errors.icaiNumber}>
                 <Input
                   id="icai"
                   placeholder="e.g. 123456"
                   value={icaiNumber}
-                  onChange={(e) => setIcaiNumber(e.target.value)}
+                  maxLength={6}
+                  onChange={(e) => { setIcaiNumber(e.target.value.replace(/\D/g, "")); setErrors(p => ({...p, icaiNumber: ""})); }}
+                  className={errors.icaiNumber ? "border-destructive" : ""}
                 />
-              </div>
+              </Field>
 
-              {/* Phone */}
-              <div className="space-y-1.5">
-                <Label htmlFor="phone">
-                  Phone Number
-                  <span className="text-muted-foreground text-xs ml-1">(optional)</span>
-                </Label>
+              <Field id="phone" label="Phone Number" optional error={errors.phone}>
                 <Input
                   id="phone"
                   type="tel"
                   placeholder="10-digit mobile number"
                   value={phone}
                   maxLength={10}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "")); setErrors(p => ({...p, phone: ""})); }}
+                  className={errors.phone ? "border-destructive" : ""}
                 />
-              </div>
+              </Field>
 
-              {/* City + State side by side */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="city">
-                    City
-                    <span className="text-muted-foreground text-xs ml-1">(optional)</span>
-                  </Label>
+                <Field id="city" label="City" optional>
                   <Input
                     id="city"
                     placeholder="e.g. Pune"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="state">State</Label>
+                </Field>
+                <Field id="state" label="State" optional>
                   <Select value={state} onValueChange={setState}>
                     <SelectTrigger id="state">
                       <SelectValue placeholder="Select" />
@@ -352,16 +327,15 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </Field>
               </div>
 
-              {/* Action buttons */}
               <div className="flex gap-3 pt-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setStep(1)}
-                  className="flex-none"
+                  disabled={loading}
                 >
                   <ChevronLeft className="h-4 w-4 mr-1" /> Back
                 </Button>
@@ -371,7 +345,7 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
                   className="flex-1 h-11 bg-accent hover:bg-accent/90 text-white"
                 >
                   {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
                   ) : (
                     "Save & Get Started"
                   )}
@@ -382,7 +356,7 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          You can update these details anytime in Settings.
+          You can update all details anytime in Settings.
         </p>
       </div>
     </div>

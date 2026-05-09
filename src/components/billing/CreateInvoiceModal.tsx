@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { mockClients } from "@/data/Clients";
+import { useClients } from "@/hooks/useClients";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
@@ -32,11 +32,13 @@ export function CreateInvoiceModal({ open, onOpenChange }: CreateInvoiceModalPro
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const [sendEmail, setSendEmail] = useState(false);
   const [notes, setNotes] = useState("");
+  const { clients } = useClients();
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: "1", description: "", sacCode: "998231", amount: "" },
+    
   ]);
 
-  const selectedClient = mockClients.find((c) => c.id === clientId);
+  const selectedClient = clients.find((c) => c.id === clientId);
   const isSameState = selectedClient ? selectedClient.state === firmState : true;
 
   const subtotal = lineItems.reduce((s, li) => s + (parseFloat(li.amount) || 0), 0);
@@ -80,7 +82,7 @@ export function CreateInvoiceModal({ open, onOpenChange }: CreateInvoiceModalPro
               <Select value={clientId} onValueChange={setClientId}>
                 <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
                 <SelectContent>
-                  {mockClients.map((c) => (
+                  {clients.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
