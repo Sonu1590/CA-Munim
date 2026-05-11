@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,11 +7,11 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Info } from "lucide-react";
+import { AlertCircle, CalendarIcon, Info, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { taskTypeGroups, dueDateRules, staffMembers, financialYears, quarters, months, TaskType } from "@/data/Tasks";
-import { mockClients } from "@/data/Clients";
+import { useClients } from "@/hooks/useClients";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
@@ -21,6 +21,7 @@ interface Props {
 }
 
 export function AddTaskModal({ open, onOpenChange }: Props) {
+  const { clients, loading: clientsLoading, error: clientsError } = useClients();
   const [client, setClient] = useState("");
   const [taskType, setTaskType] = useState("");
   const [customName, setCustomName] = useState("");
@@ -34,7 +35,25 @@ export function AddTaskModal({ open, onOpenChange }: Props) {
 
   const dueDateRule = dueDateRules[taskType as TaskType];
 
+  useEffect(() => {
+    // #region agent log
+    fetch("http://127.0.0.1:7850/ingest/ea05f44b-15c8-4257-80b1-25521e9f9204", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "674a68" }, body: JSON.stringify({ sessionId: "674a68", runId: "pre-fix", hypothesisId: "H1", location: "AddTaskModal.tsx:39", message: "client hook state on modal render", data: { open, clientsLoading, hasError: Boolean(clientsError), clientsCount: clients.length }, timestamp: Date.now() }) }).catch(() => {});
+    // #endregion
+  }, [open, clientsLoading, clientsError, clients.length]);
+
+  useEffect(() => {
+    if (!client) return;
+    if (clients.some((c) => c.id === client)) return;
+    setClient("");
+    // #region agent log
+    fetch("http://127.0.0.1:7850/ingest/ea05f44b-15c8-4257-80b1-25521e9f9204", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "674a68" }, body: JSON.stringify({ sessionId: "674a68", runId: "pre-fix", hypothesisId: "H2", location: "AddTaskModal.tsx:47", message: "reset stale selected client", data: { selectedClientPresent: false, clientsCount: clients.length }, timestamp: Date.now() }) }).catch(() => {});
+    // #endregion
+  }, [client, clients]);
+
   const handleSave = () => {
+    // #region agent log
+    fetch("http://127.0.0.1:7850/ingest/ea05f44b-15c8-4257-80b1-25521e9f9204", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "674a68" }, body: JSON.stringify({ sessionId: "674a68", runId: "pre-fix", hypothesisId: "H5", location: "AddTaskModal.tsx:53", message: "create task clicked", data: { hasClient: Boolean(client), hasTaskType: Boolean(taskType), clientsCount: clients.length }, timestamp: Date.now() }) }).catch(() => {});
+    // #endregion
     if (!client || !taskType) {
       toast.error("Please select client and task type");
       return;
@@ -55,13 +74,27 @@ export function AddTaskModal({ open, onOpenChange }: Props) {
           <div>
             <Label>Client</Label>
             <Select value={client} onValueChange={setClient}>
-              <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+              <SelectTrigger disabled={clientsLoading || Boolean(clientsError)}>
+                <SelectValue placeholder={clientsLoading ? "Loading clients..." : clientsError ? "Unable to load clients" : "Select client"} />
+              </SelectTrigger>
               <SelectContent>
-                {mockClients.map((c) => (
+                {clients.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {clientsLoading && (
+              <p className="mt-1.5 text-xs text-muted-foreground flex items-center gap-1.5">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Fetching clients...
+              </p>
+            )}
+            {clientsError && (
+              <p className="mt-1.5 text-xs text-destructive flex items-center gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {clientsError}
+              </p>
+            )}
           </div>
 
           {/* Task Type */}

@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { taskTypeGroups, months } from "@/data/Tasks";
-import { mockClients } from "@/data/Clients";
+import { useClients } from "@/hooks/useClients";
 import { toast } from "sonner";
-import { Check } from "lucide-react";
+import { AlertCircle, Check, Loader2 } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -15,6 +15,7 @@ interface Props {
 }
 
 export function BulkTaskGenerator({ open, onOpenChange }: Props) {
+  const { clients, loading: clientsLoading, error: clientsError } = useClients();
   const [step, setStep] = useState(1);
   const [taskType, setTaskType] = useState("");
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
@@ -33,12 +34,31 @@ export function BulkTaskGenerator({ open, onOpenChange }: Props) {
   };
 
   const selectAllClients = () => {
-    if (selectedClients.length === mockClients.length) {
+    if (selectedClients.length === clients.length) {
       setSelectedClients([]);
     } else {
-      setSelectedClients(mockClients.map((c) => c.id));
+      setSelectedClients(clients.map((c) => c.id));
     }
+    // #region agent log
+    fetch("http://127.0.0.1:7850/ingest/ea05f44b-15c8-4257-80b1-25521e9f9204", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "674a68" }, body: JSON.stringify({ sessionId: "674a68", runId: "pre-fix", hypothesisId: "H3", location: "BulkTaskGenerator.tsx:39", message: "bulk select all toggled", data: { selectedClientsCount: selectedClients.length, totalClientsCount: clients.length }, timestamp: Date.now() }) }).catch(() => {});
+    // #endregion
   };
+
+  useEffect(() => {
+    // #region agent log
+    fetch("http://127.0.0.1:7850/ingest/ea05f44b-15c8-4257-80b1-25521e9f9204", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "674a68" }, body: JSON.stringify({ sessionId: "674a68", runId: "pre-fix", hypothesisId: "H4", location: "BulkTaskGenerator.tsx:45", message: "bulk generator client hook state", data: { open, step, clientsLoading, hasError: Boolean(clientsError), clientsCount: clients.length }, timestamp: Date.now() }) }).catch(() => {});
+    // #endregion
+  }, [open, step, clientsLoading, clientsError, clients.length]);
+
+  useEffect(() => {
+    const allowed = new Set(clients.map((c) => c.id));
+    const sanitized = selectedClients.filter((id) => allowed.has(id));
+    if (sanitized.length === selectedClients.length) return;
+    setSelectedClients(sanitized);
+    // #region agent log
+    fetch("http://127.0.0.1:7850/ingest/ea05f44b-15c8-4257-80b1-25521e9f9204", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "674a68" }, body: JSON.stringify({ sessionId: "674a68", runId: "pre-fix", hypothesisId: "H2", location: "BulkTaskGenerator.tsx:52", message: "bulk modal removed stale selected clients", data: { beforeCount: selectedClients.length, afterCount: sanitized.length, clientsCount: clients.length }, timestamp: Date.now() }) }).catch(() => {});
+    // #endregion
+  }, [clients, selectedClients]);
 
   const totalTasks = selectedClients.length * selectedMonths.length;
 
@@ -96,11 +116,23 @@ export function BulkTaskGenerator({ open, onOpenChange }: Props) {
             <div className="flex items-center justify-between">
               <Label>Select Clients</Label>
               <Button variant="ghost" size="sm" onClick={selectAllClients} className="text-xs">
-                {selectedClients.length === mockClients.length ? "Deselect All" : "Select All"}
+                {selectedClients.length === clients.length ? "Deselect All" : "Select All"}
               </Button>
             </div>
             <div className="max-h-60 overflow-y-auto space-y-2 border border-border rounded-lg p-3">
-              {mockClients.map((c) => (
+              {clientsLoading && (
+                <div className="text-xs text-muted-foreground flex items-center gap-1.5 py-1">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Loading clients...
+                </div>
+              )}
+              {clientsError && (
+                <div className="text-xs text-destructive flex items-center gap-1.5 py-1">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  {clientsError}
+                </div>
+              )}
+              {!clientsLoading && !clientsError && clients.map((c) => (
                 <label key={c.id} className="flex items-center gap-2 cursor-pointer py-1">
                   <Checkbox
                     checked={selectedClients.includes(c.id)}
