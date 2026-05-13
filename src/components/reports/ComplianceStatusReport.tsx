@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Download, FileText, Loader2 } from "lucide-react";
 import { getComplianceData, type FilingStatus, type ClientComplianceRow } from "@/data/Reports";
 import { financialYears } from "@/data/Tasks";
+import { downloadCsv, slugifyFileName } from "@/lib/downloads";
+import { toast } from "sonner";
 
 const statusIcon: Record<FilingStatus, { label: string; className: string }> = {
   filed: { label: "✅ Filed", className: "bg-green-100 text-green-800 border-green-200" },
@@ -42,6 +44,19 @@ export function ComplianceStatusReport() {
     </Badge>
   );
 
+  const exportReport = () => {
+    downloadCsv(`${slugifyFileName(`client-compliance-status-${fy}`)}.csv`, data, [
+      { header: "Client", value: (row) => row.clientName },
+      { header: "Client Type", value: (row) => row.clientType },
+      { header: "GSTR-1", value: (row) => statusIcon[row.gstr1].label.replace(/[^\w\s/-]/g, "").trim() },
+      { header: "GSTR-3B", value: (row) => statusIcon[row.gstr3b].label.replace(/[^\w\s/-]/g, "").trim() },
+      { header: "ITR", value: (row) => statusIcon[row.itr].label.replace(/[^\w\s/-]/g, "").trim() },
+      { header: "TDS", value: (row) => statusIcon[row.tds].label.replace(/[^\w\s/-]/g, "").trim() },
+      { header: "ROC", value: (row) => statusIcon[row.roc].label.replace(/[^\w\s/-]/g, "").trim() },
+    ]);
+    toast.success("Compliance status CSV downloaded");
+  };
+
   return (
     <Card>
       <CardHeader className="pb-4">
@@ -58,7 +73,7 @@ export function ComplianceStatusReport() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" className="gap-1.5">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={exportReport} disabled={loading || !!error}>
               <Download className="h-4 w-4" /> Export
             </Button>
           </div>

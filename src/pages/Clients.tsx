@@ -40,7 +40,7 @@ export default function Clients() {
     });
   }, [clients, search, typeFilter]);
 
-  const handleEdit = (client: Client) => {
+  const handleEdit = (_client: Client) => {
     setModalOpen(true);
   };
 
@@ -139,14 +139,12 @@ export default function Clients() {
         )}
 
         <AddClientModal
-          {...({
-            open: modalOpen,
-            onOpenChange: setModalOpen,
-            onSave: async (formData: any) => {
-              const success = await addClient(formData);
-              if (success) setModalOpen(false);
-            },
-          } as any)}
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          onSave={async (formData) => {
+            const success = await addClient(formData);
+            if (success) setModalOpen(false);
+          }}
         />
       </div>
     </AppLayout>

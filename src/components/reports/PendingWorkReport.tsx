@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Download, Clock, AlertTriangle, Loader2 } from "lucide-react";
 import { getPendingWork, type PendingWorkFilter } from "@/data/Reports";
+import { downloadHtmlReport, formatDateIN, slugifyFileName } from "@/lib/downloads";
+import { toast } from "sonner";
 
 type Filter = PendingWorkFilter;
 
@@ -38,12 +40,31 @@ export function PendingWorkReport() {
     { key: "overdue", label: "Overdue" },
   ];
 
+  const exportReport = () => {
+    const filterLabel = filters.find((f) => f.key === filter)?.label ?? "Pending Work";
+    downloadHtmlReport(
+      `${slugifyFileName(`pending-work-${filterLabel}`)}.html`,
+      "Pending Work Report",
+      openTasks,
+      [
+        { header: "Client", value: (task) => task.clientName },
+        { header: "Task", value: (task) => task.taskType },
+        { header: "Assigned To", value: (task) => task.assignedTo || "Unassigned" },
+        { header: "Financial Year", value: (task) => task.financialYear, align: "center" },
+        { header: "Due Date", value: (task) => formatDateIN(task.dueDate), align: "center" },
+        { header: "Priority", value: (task) => task.priority, align: "center" },
+      ],
+      { Filter: filterLabel },
+    );
+    toast.success("Pending work report downloaded");
+  };
+
   return (
     <Card>
       <CardHeader className="pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <CardTitle className="text-lg font-heading">Pending Work Report</CardTitle>
-          <Button variant="outline" size="sm" className="gap-1.5 w-fit">
+          <Button variant="outline" size="sm" className="gap-1.5 w-fit" onClick={exportReport} disabled={loading || !!error}>
             <Download className="h-4 w-4" /> Export PDF
           </Button>
         </div>

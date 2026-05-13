@@ -6,6 +6,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, Check, Crown, Zap, Building, Download, Loader2 } from "lucide-react";
 import { fetchSubscriptionPlansFromSupabase, type SubscriptionPlan } from "@/data/Settings";
 import { RazorpayCheckoutModal } from "@/components/billing/RazorpayCheckoutModal";
+import { downloadHtmlDocument, formatDateIN, formatINR, slugifyFileName } from "@/lib/downloads";
+import { toast } from "sonner";
 
 const planIcons = { Starter: Zap, Professional: Crown, Firm: Building };
 
@@ -36,6 +38,29 @@ export function SubscriptionBilling() {
     };
     loadPlans();
   }, []);
+
+  const downloadReceipt = (bill: (typeof billingHistory)[number]) => {
+    downloadHtmlDocument(
+      `${slugifyFileName(`subscription-receipt-${bill.id}`)}.html`,
+      "Subscription Receipt",
+      `
+        <div class="summary">
+          <div><strong>Receipt ID</strong>${bill.id}</div>
+          <div><strong>Plan</strong>${bill.plan}</div>
+          <div><strong>Billing date</strong>${formatDateIN(bill.date)}</div>
+          <div><strong>Status</strong>${bill.status}</div>
+        </div>
+        <table style="max-width: 420px; margin-left: auto;">
+          <tbody>
+            <tr><th class="left">Subscription amount</th><td class="right">${bill.amount === 0 ? "Free" : formatINR(bill.amount)}</td></tr>
+            <tr><th class="left">Amount paid</th><td class="right">${bill.amount === 0 ? "Free" : formatINR(bill.amount)}</td></tr>
+          </tbody>
+        </table>
+      `,
+      { Product: "CA Munim" },
+    );
+    toast.success("Subscription receipt downloaded");
+  };
 
   return (
     <div className="space-y-6">
@@ -120,7 +145,9 @@ export function SubscriptionBilling() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-medium">{b.amount === 0 ? "Free" : `₹${b.amount.toLocaleString("en-IN")}`}</span>
-                  <Button variant="ghost" size="icon" className="h-8 w-8"><Download className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadReceipt(b)}>
+                    <Download className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             ))}

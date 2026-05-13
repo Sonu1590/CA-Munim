@@ -3,9 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Printer, Loader2 } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 import { fetchClientsFromSupabase } from "@/data/Clients";
 import { getClientLedger, type LedgerEntry } from "@/data/Reports";
+import { downloadHtmlReport, formatDateIN, formatINR, slugifyFileName } from "@/lib/downloads";
+import { toast } from "sonner";
 
 export function ClientLedgerReport() {
   const [clientId, setClientId] = useState("");
@@ -53,6 +55,29 @@ export function ClientLedgerReport() {
   const client = clients.find((c) => c.id === clientId);
   const balance = ledger.length > 0 ? ledger[ledger.length - 1].balance : 0;
 
+  const downloadLedger = () => {
+    downloadHtmlReport(
+      `${slugifyFileName(`client-ledger-${client?.name ?? "client"}`)}.html`,
+      "Client Ledger",
+      ledger,
+      [
+        { header: "Date", value: (entry) => formatDateIN(entry.date), align: "center" },
+        { header: "Type", value: (entry) => entry.type, align: "center" },
+        { header: "Description", value: (entry) => entry.description },
+        { header: "Debit", value: (entry) => (entry.debit > 0 ? formatINR(entry.debit) : "-"), align: "right" },
+        { header: "Credit", value: (entry) => (entry.credit > 0 ? formatINR(entry.credit) : "-"), align: "right" },
+        { header: "Balance", value: (entry) => formatINR(entry.balance), align: "right" },
+      ],
+      {
+        Client: client?.name ?? "-",
+        PAN: client?.pan ?? "-",
+        Location: [client?.city, client?.state].filter(Boolean).join(", ") || "-",
+        "Outstanding balance": formatINR(balance),
+      },
+    );
+    toast.success("Client ledger downloaded");
+  };
+
   return (
     <Card>
       <CardHeader className="pb-4">
@@ -69,8 +94,8 @@ export function ClientLedgerReport() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <Printer className="h-4 w-4" /> Print
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={downloadLedger} disabled={loading || !!error || !clientId}>
+              <Download className="h-4 w-4" /> Download
             </Button>
           </div>
         </div>
