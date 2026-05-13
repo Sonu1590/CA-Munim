@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Invoice } from "@/data/Billing";
 import { Eye, Download, MessageCircle, CreditCard } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { downloadHtmlDocument, formatDateIN, formatINR, openHtmlDocument, slugifyFileName } from "@/lib/downloads";
 
 interface InvoiceListProps {
   invoices: Invoice[];
@@ -19,6 +20,72 @@ const statusColors: Record<string, string> = {
   Cancelled: "bg-muted text-muted-foreground line-through",
 };
 
+function buildInvoiceHtml(inv: Invoice) {
+  const taxLabel = inv.isSameState ? "CGST + SGST" : "IGST";
+  const taxAmount = inv.isSameState ? inv.cgst + inv.sgst : inv.igst;
+  return `
+    <div class="summary">
+      <div><strong>Client</strong>${inv.clientName}</div>
+      <div><strong>Invoice status</strong>${inv.status}</div>
+      <div><strong>Invoice date</strong>${formatDateIN(inv.invoiceDate)}</div>
+      <div><strong>Due date</strong>${formatDateIN(inv.dueDate)}</div>
+    </div>
+    <div class="section-title">Line Items</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="left">Description</th>
+          <th class="center">SAC</th>
+          <th class="right">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${inv.lineItems
+          .map(
+            (item) => `<tr>
+              <td>${item.description}</td>
+              <td class="center">${item.sacCode || "-"}</td>
+              <td class="right">${formatINR(item.amount)}</td>
+            </tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>
+    <table style="margin-top: 16px; margin-left: auto; max-width: 360px;">
+      <tbody>
+        <tr><th class="left">Subtotal</th><td class="right">${formatINR(inv.subtotal)}</td></tr>
+        <tr><th class="left">${taxLabel}</th><td class="right">${formatINR(taxAmount)}</td></tr>
+        <tr><th class="left">Grand Total</th><td class="right"><strong>${formatINR(inv.grandTotal)}</strong></td></tr>
+        <tr><th class="left">Amount Paid</th><td class="right">${formatINR(inv.amountPaid)}</td></tr>
+        <tr><th class="left">Amount Due</th><td class="right"><strong>${formatINR(inv.amountDue)}</strong></td></tr>
+      </tbody>
+    </table>
+    ${
+      inv.payments.length
+        ? `<div class="section-title">Payments</div>
+          <table>
+            <thead>
+              <tr><th>Date</th><th>Mode</th><th>Reference</th><th class="right">Amount</th></tr>
+            </thead>
+            <tbody>
+              ${inv.payments
+                .map(
+                  (p) => `<tr>
+                    <td>${formatDateIN(p.date)}</td>
+                    <td>${p.mode}</td>
+                    <td>${p.reference || "-"}</td>
+                    <td class="right">${formatINR(p.amount)}</td>
+                  </tr>`,
+                )
+                .join("")}
+            </tbody>
+          </table>`
+        : ""
+    }
+    ${inv.notes ? `<p class="muted"><strong>Notes:</strong> ${inv.notes}</p>` : ""}
+  `;
+}
+
 export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
   if (invoices.length === 0) {
     return (
@@ -27,6 +94,35 @@ export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
       </div>
     );
   }
+
+  const downloadInvoice = (inv: Invoice) => {
+    downloadHtmlDocument(
+      `${slugifyFileName(inv.invoiceNumber || `invoice-${inv.clientName}`)}.html`,
+      `Invoice ${inv.invoiceNumber}`,
+      buildInvoiceHtml(inv),
+      { Client: inv.clientName, "Financial year": inv.financialYear },
+    );
+    toast.success("Invoice downloaded");
+  };
+
+  const previewInvoice = (inv: Invoice) => {
+    openHtmlDocument(
+      `Invoice ${inv.invoiceNumber}`,
+      buildInvoiceHtml(inv),
+      { Client: inv.clientName, "Financial year": inv.financialYear },
+    );
+  };
+
+  const shareInvoiceOnWhatsApp = (inv: Invoice) => {
+    const text = [
+      `Invoice ${inv.invoiceNumber}`,
+      `Client: ${inv.clientName}`,
+      `Date: ${formatDateIN(inv.invoiceDate)}`,
+      `Total: ${formatINR(inv.grandTotal)}`,
+      `Amount due: ${formatINR(inv.amountDue)}`,
+    ].join("\n");
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <>
@@ -64,17 +160,17 @@ export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
                     </td>
                     <td className="p-3">
                       <div className="flex items-center justify-center gap-1">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => toast.info("Invoice preview coming soon")}>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => previewInvoice(inv)}>
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => toast.info("PDF download coming soon")}>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => downloadInvoice(inv)}>
                           <Download className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           size="icon"
                           variant="ghost"
                           className="h-7 w-7 text-[#25D366]"
-                          onClick={() => toast.success(`Invoice sent to ${inv.clientName} via WhatsApp`)}
+                          onClick={() => shareInvoiceOnWhatsApp(inv)}
                         >
                           <MessageCircle className="h-3.5 w-3.5" />
                         </Button>
@@ -120,8 +216,16 @@ export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => downloadInvoice(inv)}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
                     className="h-8 w-8 text-[#25D366]"
-                    onClick={() => toast.success(`Invoice sent to ${inv.clientName} via WhatsApp`)}
+                    onClick={() => shareInvoiceOnWhatsApp(inv)}
                   >
                     <MessageCircle className="h-4 w-4" />
                   </Button>

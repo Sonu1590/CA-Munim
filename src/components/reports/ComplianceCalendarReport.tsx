@@ -13,6 +13,8 @@ import {
   Task,
   TaskType,
 } from "@/data/Tasks";
+import { downloadHtmlReport, slugifyFileName } from "@/lib/downloads";
+import { toast } from "sonner";
 
 function getCurrentFY(): string {
   const now = new Date();
@@ -115,6 +117,41 @@ export function ComplianceCalendarReport() {
     return d && !Number.isNaN(d.getTime()) ? format(d, "dd MMM yyyy") : due || "—";
   };
 
+  const exportCalendar = () => {
+    const rows = months.flatMap((month) =>
+      (tasksByFYMonth[month] ?? []).map((task) => ({
+        month,
+        task: displayTitle(task),
+        dueDate: formatDue(task.dueDate),
+        assignedTo: task.assignedTo || "Unassigned",
+        priority: task.priority,
+        status: task.status.replace("_", " "),
+        rule: ruleHint(task.taskType) ?? "",
+      })),
+    );
+
+    downloadHtmlReport(
+      `${slugifyFileName(`compliance-calendar-${client?.name ?? "client"}-${financialYear}`)}.html`,
+      "Compliance Calendar",
+      rows,
+      [
+        { header: "FY Month", value: (row) => row.month },
+        { header: "Task", value: (row) => row.task },
+        { header: "Due Date", value: (row) => row.dueDate, align: "center" },
+        { header: "Assigned To", value: (row) => row.assignedTo },
+        { header: "Priority", value: (row) => row.priority, align: "center" },
+        { header: "Status", value: (row) => row.status, align: "center" },
+        { header: "Rule", value: (row) => row.rule },
+      ],
+      {
+        Client: client?.name ?? "Not selected",
+        "Financial year": financialYear,
+        Services: client?.servicesSubscribed?.length ? client.servicesSubscribed.join(", ") : "-",
+      },
+    );
+    toast.success("Compliance calendar downloaded");
+  };
+
   return (
     <Card>
       <CardHeader className="pb-4">
@@ -145,7 +182,14 @@ export function ComplianceCalendarReport() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" type="button" className="gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              className="gap-1.5"
+              onClick={exportCalendar}
+              disabled={!clientId || loadingClients || loadingTasks || !!clientsError || !!tasksError}
+            >
               <Download className="h-4 w-4" /> PDF
             </Button>
           </div>

@@ -52,12 +52,12 @@ const Dashboard = () => {
         ) : (
           <>
             {/* Pass real metrics to existing components */}
-            <MetricCards {...({ metrics } as any)} />
-            <ComplianceAlerts {...({ alerts: complianceAlerts } as any)} />
+            <MetricCards metrics={metrics} />
+            <ComplianceAlerts alerts={complianceAlerts} />
             <div className="grid md:grid-cols-2 gap-6">
-              <RecentActivity {...({ items: activity } as any)} />
+              <RecentActivity items={activity} />
               <div className="space-y-6">
-                <MonthlyWork {...({ data: monthlyWork } as any)} />
+                <MonthlyWork data={monthlyWork} />
                 <QuickActions />
               </div>
             </div>

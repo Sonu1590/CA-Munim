@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { ClientType } from "@/data/Clients";
+import { ClientFormData, ClientType } from "@/hooks/useClients";
 import { validatePAN, validateGSTIN } from "@/lib/indianTaxUtils";
 import { FYHint } from "@/components/common/FYHint";
 import { CheckCircle2, XCircle } from "lucide-react";
@@ -27,6 +27,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 interface AddClientModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSave?: (formData: ClientFormData) => Promise<void> | void;
 }
 
 const clientTypes: ClientType[] = [
@@ -67,15 +68,25 @@ const rocJurisdictions = [
 
 const mcaFilings = ["MGT-7", "AOC-4", "DIR-3 KYC", "ADT-1", "INC-20A", "PAS-3"];
 
-export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
+export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalProps) {
   const [clientType, setClientType] = useState<string>("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedMcaFilings, setSelectedMcaFilings] = useState<string[]>([]);
+  const [fullName, setFullName] = useState("");
   const [panValue, setPanValue] = useState("");
   const [gstinValue, setGstinValue] = useState("");
+  const [phone, setPhone] = useState("");
+  const [altPhone, setAltPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [pin, setPin] = useState("");
   const [dob, setDob] = useState("");
   const [gstRegDate, setGstRegDate] = useState("");
   const [compRegDate, setCompRegDate] = useState("");
+  const [annualFees, setAnnualFees] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const isCompanyType = ["Private Ltd", "LLP", "Public Ltd"].includes(clientType);
   const panCheck = validatePAN(panValue);
@@ -91,6 +102,36 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
     setSelectedMcaFilings((prev) =>
       prev.includes(filing) ? prev.filter((f) => f !== filing) : [...prev, filing]
     );
+  };
+
+  const handleSave = async () => {
+    if (!onSave) {
+      onOpenChange(false);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onSave({
+        name: fullName.trim(),
+        type: (clientType || "Individual") as ClientType,
+        pan: panValue,
+        phone,
+        alt_phone: altPhone,
+        email,
+        address,
+        city,
+        state,
+        pin,
+        gstin: gstinValue,
+        gst_reg_date: gstRegDate,
+        services_subscribed: selectedServices,
+        mca_filings: selectedMcaFilings,
+        annual_fees: annualFees ? Number(annualFees) : 0,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -109,7 +150,7 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="fullName">Full Name *</Label>
-                  <Input id="fullName" placeholder="Client name" />
+                  <Input id="fullName" placeholder="Client name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Client Type *</Label>
@@ -165,27 +206,27 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="phone">Phone *</Label>
-                  <Input id="phone" type="tel" placeholder="10-digit mobile" maxLength={10} />
+                  <Input id="phone" type="tel" placeholder="10-digit mobile" maxLength={10} value={phone} onChange={(e) => setPhone(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="altPhone">Alternate Phone</Label>
-                  <Input id="altPhone" type="tel" placeholder="Optional" />
+                  <Input id="altPhone" type="tel" placeholder="Optional" value={altPhone} onChange={(e) => setAltPhone(e.target.value)} />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="email@example.com" />
+                  <Input id="email" type="email" placeholder="email@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label htmlFor="address">Address</Label>
-                  <Textarea id="address" placeholder="Full address" rows={2} />
+                  <Textarea id="address" placeholder="Full address" rows={2} value={address} onChange={(e) => setAddress(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="city">City</Label>
-                  <Input id="city" placeholder="City" />
+                  <Input id="city" placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>State</Label>
-                  <Select>
+                  <Select value={state} onValueChange={setState}>
                     <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
                     <SelectContent>
                       {indianStates.map((s) => (
@@ -196,7 +237,7 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="pin">PIN Code</Label>
-                  <Input id="pin" placeholder="6-digit PIN" maxLength={6} />
+                  <Input id="pin" placeholder="6-digit PIN" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value)} />
                 </div>
               </div>
             </section>
@@ -377,7 +418,7 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="annualFees">Annual Fees (₹)</Label>
-                  <Input id="annualFees" type="number" placeholder="₹" />
+                  <Input id="annualFees" type="number" placeholder="₹" value={annualFees} onChange={(e) => setAnnualFees(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>GST on Fees (18%)</Label>
@@ -421,9 +462,10 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
               </Button>
               <Button
                 className="bg-accent text-accent-foreground hover:bg-accent/90"
-                onClick={() => onOpenChange(false)}
+                onClick={handleSave}
+                disabled={saving}
               >
-                Save Client
+                {saving ? "Saving..." : "Save Client"}
               </Button>
             </div>
           </div>

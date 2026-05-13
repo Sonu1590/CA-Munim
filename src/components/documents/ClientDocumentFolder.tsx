@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
-import { fetchDocumentsFromSupabase, documentCategories, type DocumentCategory } from "@/data/Documents";
+import { fetchDocumentsFromSupabase, documentCategories, type Document, type DocumentCategory } from "@/data/Documents";
 import { fetchClientsFromSupabase } from "@/data/Clients";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Image, FileSpreadsheet, Download, Eye, Trash2, Share2, FolderOpen, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { downloadRemoteFile, openUrl } from "@/lib/downloads";
+import { supabase } from "@/lib/supabase";
 
 interface Props {
   clientId: string;
@@ -22,10 +24,12 @@ const fileIconMap: Record<string, typeof FileText> = {
   docx: FileText,
 };
 
+const placeholderHosts = new Set(["example.com", "www.example.com"]);
+
 export function ClientDocumentFolder({ clientId, onBack }: Props) {
   const [selectedCategory, setSelectedCategory] = useState<DocumentCategory | null>(null);
   const [client, setClient] = useState<any>(null);
-  const [documents, setDocuments] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,8 +66,79 @@ export function ClientDocumentFolder({ clientId, onBack }: Props) {
     ? documents.filter((d) => d.category === selectedCategory)
     : documents;
 
-  const handleAction = (action: string, fileName: string) => {
-    toast.success(`${action}: ${fileName}`);
+  const resolveFileUrl = async (doc: Document) => {
+    const rawUrl = doc.fileUrl?.trim();
+    if (!rawUrl) {
+      toast.error("No file link is available for this document");
+      return null;
+    }
+
+    if (rawUrl === "example.com" || rawUrl === "www.example.com") {
+      toast.error("This document has a placeholder link. Upload the actual file before downloading.");
+      return null;
+    }
+
+    if (/^https?:\/\//i.test(rawUrl)) {
+      const parsed = new URL(rawUrl);
+      if (placeholderHosts.has(parsed.hostname)) {
+        toast.error("This document has a placeholder link. Upload the actual file before downloading.");
+        return null;
+      }
+      return rawUrl;
+    }
+
+    const path = rawUrl.replace(/^\/+/, "");
+    const { data } = supabase.storage.from("documents").getPublicUrl(path);
+    return data.publicUrl;
+  };
+
+  const handlePreview = async (doc: Document) => {
+    const url = await resolveFileUrl(doc);
+    if (!url) return;
+    openUrl(url);
+  };
+
+  const handleDownload = async (doc: Document) => {
+    const url = await resolveFileUrl(doc);
+    if (!url) return;
+
+    try {
+      await downloadRemoteFile(doc.fileName || "document", url);
+      toast.success(`Download started: ${doc.fileName}`);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Could not download this document");
+    }
+  };
+
+  const handleShare = async (doc: Document) => {
+    const url = await resolveFileUrl(doc);
+    if (!url) return;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: doc.fileName, text: doc.fileName, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      toast.success("Document link copied");
+    } catch (err: any) {
+      if (err?.name !== "AbortError") {
+        toast.error("Could not share this document link");
+      }
+    }
+  };
+
+  const handleDelete = async (doc: Document) => {
+    const previous = documents;
+    setDocuments((current) => current.filter((d) => d.id !== doc.id));
+    try {
+      const { error: deleteError } = await supabase.from("documents").delete().eq("id", doc.id);
+      if (deleteError) throw deleteError;
+      toast.success(`Deleted: ${doc.fileName}`);
+    } catch (err: any) {
+      setDocuments(previous);
+      toast.error(err?.message ?? "Could not delete document");
+    }
   };
 
   if (loading) {
@@ -145,16 +220,16 @@ export function ClientDocumentFolder({ clientId, onBack }: Props) {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAction("Preview", doc.fileName)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handlePreview(doc)}>
                       <Eye className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAction("Download", doc.fileName)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownload(doc)}>
                       <Download className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAction("Share link generated for", doc.fileName)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleShare(doc)}>
                       <Share2 className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleAction("Deleted", doc.fileName)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(doc)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
