@@ -72,13 +72,6 @@ export const dueDateRules: Record<string, string> = {
   "AOC-4": "30 days from AGM date",
 }
 
-export const staffMembers = [
-  { name: "CA Rajesh Sharma", initials: "RS" },
-  { name: "Priya Verma", initials: "PV" },
-  { name: "Amit Joshi", initials: "AJ" },
-  { name: "Neha Patel", initials: "NP" },
-]
-
 export const financialYears = [
   "FY 2022-23",
   "FY 2023-24",

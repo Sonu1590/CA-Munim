@@ -10,7 +10,8 @@ import { TaskListView } from "@/components/tasks/TaskListView";
 import { TaskCalendarView } from "@/components/tasks/TaskCalendarView";
 import { AddTaskModal } from "@/components/tasks/AddTaskModal";
 import { BulkTaskGenerator } from "@/components/tasks/BulkTaskGenerator";
-import { useTasks } from "@/hooks/useTasks"; // ← CHANGED from mockTasks
+import { useTasks } from "@/hooks/useTasks"; 
+import { toast } from "sonner";
 
 // Keep these exports here so child components (AddTaskModal etc.) 
 // can still import them from this file if needed
@@ -22,10 +23,8 @@ export default function Tasks() {
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
-  const [bulkOpen, setBulkOpen] = useState(false);
-
-  // ── Real data from Supabase ──────────────────────────────────────────────
-  const { tasks, loading, error, updateTaskStatus, refetch } = useTasks();
+  const [bulkOpen, setBulkOpen] = useState(false);  
+  const { tasks, loading, error, updateTaskStatus, refetch, addTask } = useTasks();
 
   // ── Map Supabase task shape → shape that child components expect ─────────
   // useTasks returns a slightly different shape than mockTasks.
@@ -202,10 +201,19 @@ export default function Tasks() {
         <AddTaskModal
           open={addOpen}
           onOpenChange={setAddOpen}
-          onSave={async () => {
-            await refetch(); // refresh after new task added
-            setAddOpen(false);
-          }}
+          onSave={async (taskData) => {
+            const success = await addTask(taskData);
+
+            if (success) {
+              await refetch();
+
+              toast.success("Task created successfully");
+
+              setAddOpen(false);
+            } else {
+              toast.error("Failed to create task");
+            }
+         }}
         />
         <BulkTaskGenerator
           open={bulkOpen}

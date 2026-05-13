@@ -1,21 +1,41 @@
-import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+// src/components/tasks/AddTaskModal.tsx
+
+import { useState } from "react";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { toast } from "sonner";
+import { useStaff } from "@/hooks/useStaff";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { AlertCircle, CalendarIcon, Info, Loader2 } from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
-import { taskTypeGroups, dueDateRules, staffMembers, financialYears, quarters, months, TaskType } from "@/data/Tasks";
-import { useClients } from "@/hooks/useClients";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { toast } from "sonner";
 
-import { TaskFormData, useTasks } from "@/hooks/useTasks";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { Calendar } from "@/components/ui/calendar";
+
+import { cn } from "@/lib/utils";
+
+import { useClients } from "@/hooks/useClients";
+import { TaskFormData } from "@/hooks/useTasks";
 
 interface Props {
   open: boolean;
@@ -23,244 +43,395 @@ interface Props {
   onSave?: (data: TaskFormData) => Promise<void>;
 }
 
-export function AddTaskModal({ open, onOpenChange, onSave }: Props) {
-  const { clients, loading: clientsLoading, error: clientsError } = useClients();
-  const { addTask } = useTasks();
+export function AddTaskModal({
+  open,
+  onOpenChange,
+  onSave,
+}: Props) {
+  const { clients, loading: clientsLoading } = useClients();
+  const { staff, loading: staffLoading } = useStaff();
   const [client, setClient] = useState("");
   const [taskType, setTaskType] = useState("");
   const [customName, setCustomName] = useState("");
-  const [fy, setFy] = useState("FY 2025-26");
-  const [quarter, setQuarter] = useState("");
-  const [month, setMonth] = useState("");
+
+  const [financialYear, setFinancialYear] =
+    useState("FY 2025-26");
+
+  const [period, setPeriod] = useState("Q1");
+
   const [dueDate, setDueDate] = useState<Date>();
+
   const [priority, setPriority] = useState("medium");
-  const [assignedTo, setAssignedTo] = useState("");
+
   const [notes, setNotes] = useState("");
 
-  const dueDateRule = dueDateRules[taskType as TaskType];
+  const [assignedTo, setAssignedTo] = useState("");
 
-  useEffect(() => {
-    // #region agent log
-    fetch("http://127.0.0.1:7850/ingest/ea05f44b-15c8-4257-80b1-25521e9f9204", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "674a68" }, body: JSON.stringify({ sessionId: "674a68", runId: "pre-fix", hypothesisId: "H1", location: "AddTaskModal.tsx:39", message: "client hook state on modal render", data: { open, clientsLoading, hasError: Boolean(clientsError), clientsCount: clients.length }, timestamp: Date.now() }) }).catch(() => {});
-    // #endregion
-  }, [open, clientsLoading, clientsError, clients.length]);
-
-  useEffect(() => {
-    if (!client) return;
-    if (clients.some((c) => c.id === client)) return;
+  const resetForm = () => {
     setClient("");
-    // #region agent log
-    fetch("http://127.0.0.1:7850/ingest/ea05f44b-15c8-4257-80b1-25521e9f9204", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "674a68" }, body: JSON.stringify({ sessionId: "674a68", runId: "pre-fix", hypothesisId: "H2", location: "AddTaskModal.tsx:47", message: "reset stale selected client", data: { selectedClientPresent: false, clientsCount: clients.length }, timestamp: Date.now() }) }).catch(() => {});
-    // #endregion
-  }, [client, clients]);
+    setTaskType("");
+    setCustomName("");
+    setFinancialYear("FY 2025-26");
+    setPeriod("Q1");
+    setDueDate(undefined);
+    setPriority("medium");
+    setNotes("");
+    setAssignedTo("");
+  };
+
+  const handleClose = (value: boolean) => {
+    if (!value) {
+      resetForm();
+    }
+
+    onOpenChange(value);
+  };
 
   const handleSave = async () => {
-  if (!client || !taskType) {
-    toast.error("Please select client and task type");
-    return;
-  }
-
-  try {
-    const success = await addTask({
-      client_id: client,
-      task_type: taskType,
-      custom_name: customName,
-      financial_year: financialYear,
-      period,
-      due_date: dueDate ? format(dueDate, "yyyy-MM-dd") : "",
-      priority,
-      notes,
-      assigned_to: assignedTo || undefined,
-      document_checklist: [],
-    });
-
-    if (!success) {
-      toast.error("Unable to create task");
+    if (!client || !taskType) {
+      toast.error("Please select client and task type");
       return;
     }
 
-    toast.success("Task created successfully");
+    if (!onSave) {
+      toast.error("Task save handler missing");
+      return;
+    }
 
-    if (onSave) {
-      await onSave({
+    try 
+    {
+      const payload: TaskFormData = {
         client_id: client,
         task_type: taskType,
-        custom_name: customName,
+        custom_name: customName || undefined,
         financial_year: financialYear,
         period,
-        due_date: dueDate ? format(dueDate, "yyyy-MM-dd") : "",
+        due_date: dueDate
+          ? format(dueDate, "yyyy-MM-dd")
+          : "",
         priority,
         notes,
         assigned_to: assignedTo || undefined,
         document_checklist: [],
-      });
+      };
+
+      console.log("FINAL TASK INSERT", payload);
+
+      await onSave(payload);
+
+      toast.success("Task created successfully");
+
+      handleClose(false);
+    } catch (err) {
+      console.error("Task creation failed:", err);
+
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to create task"
+      );
     }
-
-    onOpenChange(false);
-  } catch (err) {
-    console.error(err);
-    toast.error("Failed to create task");
-  }
-};
-
+  };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-heading">Add New Task</DialogTitle>
+          <DialogTitle className="font-heading">
+            Create New Task
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Client */}
-          <div>
-            <Label>Client</Label>
-            <Select value={client} onValueChange={setClient}>
-              <SelectTrigger disabled={clientsLoading || Boolean(clientsError)}>
-                <SelectValue placeholder={clientsLoading ? "Loading clients..." : clientsError ? "Unable to load clients" : "Select client"} />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {clientsLoading && (
-              <p className="mt-1.5 text-xs text-muted-foreground flex items-center gap-1.5">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Fetching clients...
-              </p>
-            )}
-            {clientsError && (
-              <p className="mt-1.5 text-xs text-destructive flex items-center gap-1.5">
-                <AlertCircle className="h-3.5 w-3.5" />
-                {clientsError}
-              </p>
-            )}
+        <div className="space-y-6 py-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Client
+              </label>
+
+              <Select
+                value={client}
+                onValueChange={setClient}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select client" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {clientsLoading ? (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      Loading clients...
+                    </div>
+                  ) : (
+                    clients.map((c) => (
+                      <SelectItem
+                        key={c.id}
+                        value={c.id}
+                      >
+                        {c.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Task Type
+              </label>
+
+              <Select
+                value={taskType}
+                onValueChange={setTaskType}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select task type" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="GST Filing">
+                    GST Filing
+                  </SelectItem>
+
+                  <SelectItem value="TDS Return">
+                    TDS Return
+                  </SelectItem>
+
+                  <SelectItem value="ITR Filing">
+                    ITR Filing
+                  </SelectItem>
+
+                  <SelectItem value="ROC Filing">
+                    ROC Filing
+                  </SelectItem>
+
+                  <SelectItem value="Audit">
+                    Audit
+                  </SelectItem>
+
+                  <SelectItem value="Other">
+                    Other
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Task Type */}
-          <div>
-            <Label>Task Type</Label>
-            <Select value={taskType} onValueChange={setTaskType}>
-              <SelectTrigger><SelectValue placeholder="Select task type" /></SelectTrigger>
-              <SelectContent>
-                {Object.entries(taskTypeGroups).map(([group, types]) => (
-                  <SelectGroup key={group}>
-                    <SelectLabel>{group}</SelectLabel>
-                    {types.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {taskType === "Other" && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Custom Task Name
+              </label>
 
-          {taskType === "Custom" && (
-            <div>
-              <Label>Custom Task Name</Label>
-              <Input value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="Enter task name" />
+              <Input
+                value={customName}
+                onChange={(e) =>
+                  setCustomName(e.target.value)
+                }
+                placeholder="Enter custom task name"
+              />
             </div>
           )}
 
-          {/* FY + Quarter/Month */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Financial Year</Label>
-              <Select value={fy} onValueChange={setFy}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Financial Year
+              </label>
+
+              <Select
+                value={financialYear}
+                onValueChange={setFinancialYear}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+
                 <SelectContent>
-                  {financialYears.map((y) => (
-                    <SelectItem key={y} value={y}>{y}</SelectItem>
-                  ))}
+                  <SelectItem value="FY 2024-25">
+                    FY 2024-25
+                  </SelectItem>
+
+                  <SelectItem value="FY 2025-26">
+                    FY 2025-26
+                  </SelectItem>
+
+                  <SelectItem value="FY 2026-27">
+                    FY 2026-27
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Quarter / Month</Label>
-              <Select value={quarter || month} onValueChange={(v) => {
-                if (quarters.includes(v)) { setQuarter(v); setMonth(""); }
-                else { setMonth(v); setQuarter(""); }
-              }}>
-                <SelectTrigger><SelectValue placeholder="Select period" /></SelectTrigger>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Period
+              </label>
+
+              <Select
+                value={period}
+                onValueChange={setPeriod}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+
                 <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Quarters</SelectLabel>
-                    {quarters.map((q) => <SelectItem key={q} value={q}>{q}</SelectItem>)}
-                  </SelectGroup>
-                  <SelectGroup>
-                    <SelectLabel>Months</SelectLabel>
-                    {months.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                  </SelectGroup>
+                  <SelectItem value="Q1">
+                    Q1 (Apr-Jun)
+                  </SelectItem>
+
+                  <SelectItem value="Q2">
+                    Q2 (Jul-Sep)
+                  </SelectItem>
+
+                  <SelectItem value="Q3">
+                    Q3 (Oct-Dec)
+                  </SelectItem>
+
+                  <SelectItem value="Q4">
+                    Q4 (Jan-Mar)
+                  </SelectItem>
+
+                  <SelectItem value="Annual">
+                    Annual
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Due Date */}
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Label>Due Date</Label>
-              {dueDateRule && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs text-xs">{dueDateRule}</TooltipContent>
-                </Tooltip>
-              )}
-            </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Due Date
+            </label>
+
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !dueDate && "text-muted-foreground")}>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !dueDate &&
+                      "text-muted-foreground"
+                  )}
+                >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dueDate ? format(dueDate, "dd/MM/yyyy") : "Pick a date"}
+
+                  {dueDate ? (
+                    format(dueDate, "dd/MM/yyyy")
+                  ) : (
+                    <span>Pick a due date</span>
+                  )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dueDate} onSelect={setDueDate} initialFocus className="p-3 pointer-events-auto" />
+
+              <PopoverContent
+                className="w-auto p-0"
+                align="start"
+              >
+                <Calendar
+                  mode="single"
+                  selected={dueDate}
+                  onSelect={setDueDate}
+                  initialFocus
+                />
               </PopoverContent>
             </Popover>
           </div>
 
-          {/* Priority + Assigned */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Priority</Label>
-              <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Priority
+              </label>
+
+              <Select
+                value={priority}
+                onValueChange={setPriority}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+
                 <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
+                  <SelectItem value="low">
+                    Low
+                  </SelectItem>
+
+                  <SelectItem value="medium">
+                    Medium
+                  </SelectItem>
+
+                  <SelectItem value="high">
+                    High
+                  </SelectItem>
+
+                  <SelectItem value="urgent">
+                    Urgent
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Assigned To</Label>
-              <Select value={assignedTo} onValueChange={setAssignedTo}>
-                <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Assigned To
+              </label>
+
+              <Select  value={assignedTo}  onValueChange={setAssignedTo}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Assign staff member" />
+                 </SelectTrigger>
+
                 <SelectContent>
-                  {staffMembers.map((s) => (
-                    <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>
-                  ))}
+                  {staffLoading ? (
+                    <div className="p-2 text-sm text-muted-foreground">
+                    Loading staff...
+                    </div>
+                  ) : (
+                    staff.map((member) => (
+                      <SelectItem
+                        key={member.id}
+                        value={member.id}
+                      >
+                        {member.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Notes */}
-          <div>
-            <Label>Notes / Special Instructions</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add any notes..." rows={3} />
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Notes
+            </label>
+
+            <textarea
+              value={notes}
+              onChange={(e) =>
+                setNotes(e.target.value)
+              }
+              placeholder="Additional notes..."
+              className="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => handleClose(false)}
+            >
+              Cancel
+            </Button>
+
+            <Button onClick={handleSave}>
+              Create Task
+            </Button>
           </div>
         </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} className="bg-accent hover:bg-accent/90 text-white">Create Task</Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
