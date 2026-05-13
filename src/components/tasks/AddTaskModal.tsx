@@ -15,13 +15,17 @@ import { useClients } from "@/hooks/useClients";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
+import { TaskFormData, useTasks } from "@/hooks/useTasks";
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSave?: (data: TaskFormData) => Promise<void>;
 }
 
-export function AddTaskModal({ open, onOpenChange }: Props) {
+export function AddTaskModal({ open, onOpenChange, onSave }: Props) {
   const { clients, loading: clientsLoading, error: clientsError } = useClients();
+  const { addTask } = useTasks();
   const [client, setClient] = useState("");
   const [taskType, setTaskType] = useState("");
   const [customName, setCustomName] = useState("");
@@ -50,17 +54,54 @@ export function AddTaskModal({ open, onOpenChange }: Props) {
     // #endregion
   }, [client, clients]);
 
-  const handleSave = () => {
-    // #region agent log
-    fetch("http://127.0.0.1:7850/ingest/ea05f44b-15c8-4257-80b1-25521e9f9204", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "674a68" }, body: JSON.stringify({ sessionId: "674a68", runId: "pre-fix", hypothesisId: "H5", location: "AddTaskModal.tsx:53", message: "create task clicked", data: { hasClient: Boolean(client), hasTaskType: Boolean(taskType), clientsCount: clients.length }, timestamp: Date.now() }) }).catch(() => {});
-    // #endregion
-    if (!client || !taskType) {
-      toast.error("Please select client and task type");
+  const handleSave = async () => {
+  if (!client || !taskType) {
+    toast.error("Please select client and task type");
+    return;
+  }
+
+  try {
+    const success = await addTask({
+      client_id: client,
+      task_type: taskType,
+      custom_name: customName,
+      financial_year: financialYear,
+      period,
+      due_date: dueDate ? format(dueDate, "yyyy-MM-dd") : "",
+      priority,
+      notes,
+      assigned_to: assignedTo || undefined,
+      document_checklist: [],
+    });
+
+    if (!success) {
+      toast.error("Unable to create task");
       return;
     }
-    toast.success("Task created successfully!");
+
+    toast.success("Task created successfully");
+
+    if (onSave) {
+      await onSave({
+        client_id: client,
+        task_type: taskType,
+        custom_name: customName,
+        financial_year: financialYear,
+        period,
+        due_date: dueDate ? format(dueDate, "yyyy-MM-dd") : "",
+        priority,
+        notes,
+        assigned_to: assignedTo || undefined,
+        document_checklist: [],
+      });
+    }
+
     onOpenChange(false);
-  };
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to create task");
+  }
+};
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

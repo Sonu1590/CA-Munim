@@ -119,10 +119,19 @@ export function useTasks(statusFilter?: TaskStatus) {
       if (!user) throw new Error('Not authenticated')
 
       const { data: staffRow, error: staffErr } = await supabase
-        .from('staff')
-        .select('firm_id')
-        .eq('auth_user_id', user.id)
-        .single()
+      .from('staff')
+      .select('firm_id')
+      .eq('auth_user_id', user.id)
+      .maybeSingle()
+
+if (staffErr) {
+  console.error('Staff lookup failed:', staffErr)
+  throw new Error('Unable to identify firm for current user')
+}
+
+if (!staffRow?.firm_id) {
+  throw new Error('No firm linked to current user')
+}
 
       if (staffErr) throw staffErr
 
