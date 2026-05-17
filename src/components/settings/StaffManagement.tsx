@@ -64,7 +64,9 @@ export function StaffManagement() {
       setStaff((prev) => [...prev, member]);
       setShowAddModal(false);
       setNewStaff({ name: "", role: "Article Clerk", email: "", phone: "" });
-      toast.success("Staff member added. Invitation email sent.");
+      toast.success("Staff member added.", {
+        description: `Share the app URL with them to create their login. They should sign up with this email: ${newStaff.email}`,
+      });
     } catch (err: any) {
       toast.error(err.message ?? "Unable to add staff member");
     }
@@ -156,7 +158,7 @@ export function StaffManagement() {
             <div><Label>Email</Label><Input className="mt-1.5" type="email" value={newStaff.email} onChange={(e) => setNewStaff((p) => ({ ...p, email: e.target.value }))} /></div>
             <div><Label>Phone</Label><Input className="mt-1.5" value={newStaff.phone} onChange={(e) => setNewStaff((p) => ({ ...p, phone: e.target.value }))} /></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button><Button onClick={handleAdd}>Send Invite</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button><Button onClick={handleAdd}>Add Staff</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -6,20 +6,23 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Checkbox } from "@/components/ui/checkbox";
 import { taskTypeGroups, months } from "@/data/Tasks";
 import { useClients } from "@/hooks/useClients";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onGenerated?: () => void;
 }
 
-export function BulkTaskGenerator({ open, onOpenChange }: Props) {
+export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
   const { clients, loading: clientsLoading, error: clientsError } = useClients();
   const [step, setStep] = useState(1);
   const [taskType, setTaskType] = useState("");
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+  const [generating, setGenerating] = useState(false);
 
   const toggleClient = (id: string) => {
     setSelectedClients((prev) =>
@@ -39,36 +42,112 @@ export function BulkTaskGenerator({ open, onOpenChange }: Props) {
     } else {
       setSelectedClients(clients.map((c) => c.id));
     }
-    // #region agent log
-    fetch("http://127.0.0.1:7850/ingest/ea05f44b-15c8-4257-80b1-25521e9f9204", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "674a68" }, body: JSON.stringify({ sessionId: "674a68", runId: "pre-fix", hypothesisId: "H3", location: "BulkTaskGenerator.tsx:39", message: "bulk select all toggled", data: { selectedClientsCount: selectedClients.length, totalClientsCount: clients.length }, timestamp: Date.now() }) }).catch(() => {});
-    // #endregion
   };
-
-  useEffect(() => {
-    // #region agent log
-    fetch("http://127.0.0.1:7850/ingest/ea05f44b-15c8-4257-80b1-25521e9f9204", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "674a68" }, body: JSON.stringify({ sessionId: "674a68", runId: "pre-fix", hypothesisId: "H4", location: "BulkTaskGenerator.tsx:45", message: "bulk generator client hook state", data: { open, step, clientsLoading, hasError: Boolean(clientsError), clientsCount: clients.length }, timestamp: Date.now() }) }).catch(() => {});
-    // #endregion
-  }, [open, step, clientsLoading, clientsError, clients.length]);
 
   useEffect(() => {
     const allowed = new Set(clients.map((c) => c.id));
     const sanitized = selectedClients.filter((id) => allowed.has(id));
     if (sanitized.length === selectedClients.length) return;
     setSelectedClients(sanitized);
-    // #region agent log
-    fetch("http://127.0.0.1:7850/ingest/ea05f44b-15c8-4257-80b1-25521e9f9204", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "674a68" }, body: JSON.stringify({ sessionId: "674a68", runId: "pre-fix", hypothesisId: "H2", location: "BulkTaskGenerator.tsx:52", message: "bulk modal removed stale selected clients", data: { beforeCount: selectedClients.length, afterCount: sanitized.length, clientsCount: clients.length }, timestamp: Date.now() }) }).catch(() => {});
-    // #endregion
   }, [clients, selectedClients]);
 
   const totalTasks = selectedClients.length * selectedMonths.length;
 
-  const handleGenerate = () => {
-    toast.success(`${totalTasks} tasks created successfully!`);
-    onOpenChange(false);
-    setStep(1);
-    setTaskType("");
-    setSelectedClients([]);
-    setSelectedMonths([]);
+  const calculateDueDate = (type: string, month: string) => {
+    const monthIndex = months.indexOf(month);
+    const periodYear = monthIndex <= 8 ? 2025 : 2026;
+    const periodMonth = monthIndex <= 8 ? monthIndex + 3 : monthIndex - 9;
+    const nextMonth = new Date(periodYear, periodMonth + 1, 1);
+
+    const dateForDay = (day: number) =>
+      new Date(nextMonth.getFullYear(), nextMonth.getMonth(), day).toISOString().split("T")[0];
+
+    if (type === "GSTR-1") return dateForDay(11);
+    if (type === "GSTR-3B") return dateForDay(20);
+    if (type === "TDS Challan") {
+      if (month === "March") return "2026-04-30";
+      return dateForDay(7);
+    }
+    if (["24Q", "26Q", "27Q", "27EQ"].includes(type)) {
+      if (["June", "September", "December"].includes(month)) return dateForDay(31);
+      if (month === "March") return "2026-05-31";
+    }
+    if (type === "GSTR-9" || type === "GSTR-9C") return "2026-12-31";
+    if (type === "GSTR-4") return "2026-04-30";
+    if (type === "CMP-08") return dateForDay(18);
+    if (type === "ITR Filing") return "2026-07-31";
+    if (type === "Tax Audit" || type === "Form 3CD") return "2026-09-30";
+    if (type === "DIR-3 KYC") return "2025-09-30";
+    return dateForDay(20);
+  };
+
+  const handleGenerate = async () => {
+    if (!taskType || selectedClients.length === 0 || selectedMonths.length === 0) return;
+
+    setGenerating(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: staffRow } = await supabase
+        .from("staff")
+        .select("firm_id")
+        .eq("auth_user_id", user.id)
+        .single();
+
+      if (!staffRow?.firm_id) throw new Error("Firm not found");
+
+      const tasksToInsert = [];
+      for (const clientId of selectedClients) {
+        for (const month of selectedMonths) {
+          tasksToInsert.push({
+            firm_id: staffRow.firm_id,
+            client_id: clientId,
+            task_type: taskType,
+            financial_year: "FY 2025-26",
+            period: month,
+            due_date: calculateDueDate(taskType, month),
+            status: "pending",
+            priority: "medium",
+            document_checklist: [],
+          });
+        }
+      }
+
+      const batchSize = 50;
+      for (let i = 0; i < tasksToInsert.length; i += batchSize) {
+        const batch = tasksToInsert.slice(i, i + batchSize);
+        const { error } = await supabase
+          .from("tasks")
+          .insert(batch);
+
+        if (error) {
+          failCount += batch.length;
+          console.error("Batch insert error:", error);
+        } else {
+          successCount += batch.length;
+        }
+      }
+
+      if (failCount > 0) {
+        toast.warning(`${successCount} tasks created, ${failCount} failed. Check console for details.`);
+      } else {
+        toast.success(`${successCount} tasks created successfully!`);
+      }
+      onOpenChange(false);
+      onGenerated?.();
+      setStep(1);
+      setTaskType("");
+      setSelectedClients([]);
+      setSelectedMonths([]);
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to generate tasks");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   return (
@@ -188,8 +267,12 @@ export function BulkTaskGenerator({ open, onOpenChange }: Props) {
               Next
             </Button>
           ) : (
-            <Button onClick={handleGenerate} className="bg-accent hover:bg-accent/90 text-white">
-              Generate {totalTasks} Tasks
+            <Button onClick={handleGenerate} disabled={generating} className="bg-accent hover:bg-accent/90 text-white">
+              {generating ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Generating...</>
+              ) : (
+                `Generate ${totalTasks} Tasks`
+              )}
             </Button>
           )}
         </DialogFooter>

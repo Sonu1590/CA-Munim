@@ -62,12 +62,19 @@ export function downloadUrl(fileName: string, url: string) {
 }
 
 export async function downloadRemoteFile(fileName: string, url: string) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Download failed (${response.status})`);
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    downloadBlob(fileName, blob);
+  } catch (err: any) {
+    if (err.message?.includes("Failed to fetch") || err.name === "TypeError") {
+      throw new Error("File download failed. The file may have expired or access was denied. Please refresh and try again.");
+    }
+    throw err;
   }
-  const blob = await response.blob();
-  downloadBlob(fileName, blob);
 }
 
 export function downloadCsv<T>(fileName: string, rows: T[], columns: CsvColumn<T>[]) {

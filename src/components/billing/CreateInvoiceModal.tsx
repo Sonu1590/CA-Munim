@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useClients } from "@/hooks/useClients";
+import { supabase } from "@/lib/supabase";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
@@ -22,8 +23,6 @@ interface LineItem {
   amount: string;
 }
 
-const firmState = "Maharashtra";
-
 export function CreateInvoiceModal({ open, onOpenChange }: CreateInvoiceModalProps) {
   const [clientId, setClientId] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split("T")[0]);
@@ -32,6 +31,7 @@ export function CreateInvoiceModal({ open, onOpenChange }: CreateInvoiceModalPro
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const [sendEmail, setSendEmail] = useState(false);
   const [notes, setNotes] = useState("");
+  const [firmState, setFirmState] = useState("");
   const { clients } = useClients();
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: "1", description: "", sacCode: "998231", amount: "" },
@@ -39,7 +39,21 @@ export function CreateInvoiceModal({ open, onOpenChange }: CreateInvoiceModalPro
   ]);
 
   const selectedClient = clients.find((c) => c.id === clientId);
-  const isSameState = selectedClient ? selectedClient.state === firmState : true;
+  const isSameState = selectedClient && firmState ? selectedClient.state === firmState : true;
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from("staff")
+        .select("firms(state)")
+        .eq("auth_user_id", user.id)
+        .single()
+        .then(({ data }) => {
+          setFirmState((data?.firms as any)?.state ?? "");
+        });
+    });
+  }, []);
 
   const subtotal = lineItems.reduce((s, li) => s + (parseFloat(li.amount) || 0), 0);
   const cgst = gstEnabled && isSameState ? subtotal * 0.09 : 0;

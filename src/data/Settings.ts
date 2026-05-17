@@ -235,6 +235,17 @@ export async function saveFirmProfileToSupabase(profile: FirmProfile): Promise<F
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
+  const { data: staffRow, error: staffError } = await supabase
+    .from('staff')
+    .select('firm_id')
+    .eq('auth_user_id', user.id)
+    .maybeSingle();
+
+  if (staffError) throw staffError;
+  if (!staffRow?.firm_id) {
+    throw new Error("Your account setup is incomplete. Please sign out and sign back in, or contact support.");
+  }
+
   const bankDetails = {
     bank_name: profile.bankName,
     account_name: profile.accountName,
@@ -244,7 +255,6 @@ export async function saveFirmProfileToSupabase(profile: FirmProfile): Promise<F
   };
 
   const row = {
-    id: user.id,
     practice_type: profile.practiceType ?? 'firm',
     name: profile.firmName,
     ca_name: profile.caName,
@@ -261,16 +271,17 @@ export async function saveFirmProfileToSupabase(profile: FirmProfile): Promise<F
     upi_id: profile.upiId,
   };
 
-  const { data: upsertData, error: upsertError } = await supabase
+  const { error: updateError } = await supabase
     .from("firms")
-    .upsert(row, { onConflict: "id" });
+    .update(row)
+    .eq('id', staffRow.firm_id);
 
-  if (upsertError) {
-    const message = extractSupabaseError(upsertError).toLowerCase();
+  if (updateError) {
+    const message = extractSupabaseError(updateError).toLowerCase();
     if (message.includes("firms_email_unique") || message.includes("duplicate key value")) {
       throw new Error("A firm profile with this email address already exists. Please sign out and sign in again or contact support.");
     }
-    throw upsertError;
+    throw updateError;
   }
 
   return profile;

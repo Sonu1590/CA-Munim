@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageCircle, Send, CheckCircle2, AlertCircle } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { Loader2, MessageCircle, Send, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 export function WhatsAppConfig() {
@@ -15,6 +16,7 @@ export function WhatsAppConfig() {
   const [twilioAuth, setTwilioAuth] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("+91");
   const [connected, setConnected] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [notifications, setNotifications] = useState({
     deadlineReminders: true,
     documentReceived: true,
@@ -28,6 +30,50 @@ export function WhatsAppConfig() {
     if (provider === "twilio" && (!twilioSid || !twilioAuth)) { toast.error("Enter Twilio credentials"); return; }
     toast.success("Test message sent to " + whatsappNumber);
     setConnected(true);
+  };
+
+  const handleSave = async () => {
+    const apiKey = provider === "wati" ? watiKey : twilioAuth;
+    const phoneNumber = whatsappNumber;
+
+    if (!apiKey.trim()) { toast.error("API key is required"); return; }
+    if (!phoneNumber.trim()) { toast.error("WhatsApp phone number is required"); return; }
+
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: staffRow } = await supabase
+        .from("staff")
+        .select("firm_id")
+        .eq("auth_user_id", user.id)
+        .single();
+
+      if (!staffRow?.firm_id) throw new Error("Firm not found");
+
+      const { error } = await supabase
+        .from("firms")
+        .update({
+          whatsapp_config: {
+            provider,
+            api_key: apiKey,
+            account_sid: provider === "twilio" ? twilioSid : null,
+            phone_number: phoneNumber,
+            enabled: connected,
+            notifications,
+            reminder_days: Number(reminderDays) || 0,
+          },
+        })
+        .eq("id", staffRow.firm_id);
+
+      if (error) throw error;
+      toast.success("WhatsApp settings saved successfully");
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to save WhatsApp settings");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -107,7 +153,10 @@ export function WhatsAppConfig() {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={() => toast.success("WhatsApp settings saved")} className="gap-2">Save WhatsApp Settings</Button>
+        <Button onClick={handleSave} disabled={saving} className="gap-2">
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          Save WhatsApp Settings
+        </Button>
       </div>
     </div>
   );

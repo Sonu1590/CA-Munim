@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Download, FileSpreadsheet, Users, ClipboardList, Receipt, Archive } from "lucide-react";
 import { toast } from "sonner";
 import { fetchClientsFromSupabase } from "@/data/Clients";
-import { fetchTasksFromSupabase } from "@/data/Tasks";
 import { fetchInvoicesFromSupabase } from "@/data/Billing";
+import { useTasks } from "@/hooks/useTasks";
 import { downloadCsv, downloadExcelTable, downloadTextFile, formatDateIN, formatINR } from "@/lib/downloads";
 
 const exports = [
@@ -14,6 +14,8 @@ const exports = [
 ];
 
 export function DataExport() {
+  const { tasks } = useTasks();
+
   const handleExport = async (key: string) => {
     try {
       if (key === "clients") {
@@ -37,17 +39,16 @@ export function DataExport() {
       }
 
       if (key === "tasks") {
-        const tasks = await fetchTasksFromSupabase();
         downloadExcelTable("task-history.xls", "Complete Task History", tasks, [
           { header: "Client", value: (t) => t.clientName },
-          { header: "Task", value: (t) => t.customTaskName || t.taskType },
+          { header: "Task", value: (t) => t.customName || t.taskType },
           { header: "FY", value: (t) => t.financialYear, align: "center" },
-          { header: "Period", value: (t) => t.quarter || t.month || "-", align: "center" },
+          { header: "Period", value: (t) => t.period || "-", align: "center" },
           { header: "Due Date", value: (t) => formatDateIN(t.dueDate), align: "center" },
           { header: "Priority", value: (t) => t.priority, align: "center" },
           { header: "Status", value: (t) => t.status.replace("_", " "), align: "center" },
-          { header: "Assigned To", value: (t) => t.assignedTo },
-          { header: "Documents", value: (t) => `${t.docsReceived}/${t.docsTotal}`, align: "center" },
+          { header: "Assigned To", value: (t) => t.assignedToName ?? "Unassigned" },
+          { header: "Documents", value: (t) => `${t.documentChecklist.filter((d: any) => d.received || d.checked).length}/${t.documentChecklist.length}`, align: "center" },
           { header: "Notes", value: (t) => t.notes ?? "" },
         ]);
         toast.success("Task history Excel file downloaded");
@@ -78,14 +79,14 @@ export function DataExport() {
 
   const handleBackup = async () => {
     try {
-      const [clients, tasks, invoices] = await Promise.all([
+      const [clients, exportedTasks, invoices] = await Promise.all([
         fetchClientsFromSupabase(),
-        fetchTasksFromSupabase(),
+        Promise.resolve(tasks),
         fetchInvoicesFromSupabase(),
       ]);
       downloadTextFile(
         "ca-munim-backup.json",
-        JSON.stringify({ exportedAt: new Date().toISOString(), clients, tasks, invoices }, null, 2),
+        JSON.stringify({ exportedAt: new Date().toISOString(), clients, tasks: exportedTasks, invoices }, null, 2),
         "application/json;charset=utf-8",
       );
       toast.success("Backup JSON downloaded");

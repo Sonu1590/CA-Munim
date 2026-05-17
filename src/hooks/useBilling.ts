@@ -120,13 +120,28 @@ export function useBilling() {
       ? `${now.getFullYear()}-${String(now.getFullYear() + 1).slice(-2)}`
       : `${now.getFullYear() - 1}-${String(now.getFullYear()).slice(-2)}`
 
-    const { count } = await supabase
-      .from('invoices')
-      .select('*', { count: 'exact', head: true })
-      .eq('financial_year', `FY ${fyYear}`)
+    let attempts = 0
+    while (attempts < 5) {
+      const { count } = await supabase
+        .from('invoices')
+        .select('*', { count: 'exact', head: true })
+        .eq('firm_id', firmId)
+        .eq('financial_year', `FY ${fyYear}`)
 
-    const seq = String((count ?? 0) + 1).padStart(4, '0')
-    return `INV-${fyYear.replace('-', '')}-${seq}`
+      const seq = String((count ?? 0) + 1 + attempts).padStart(4, '0')
+      const candidate = `INV-${fyYear.replace('-', '')}-${seq}`
+
+      const { count: existing } = await supabase
+        .from('invoices')
+        .select('*', { count: 'exact', head: true })
+        .eq('firm_id', firmId)
+        .eq('invoice_number', candidate)
+
+      if (!existing) return candidate
+      attempts++
+    }
+
+    return `INV-${fyYear.replace('-', '')}-${Date.now().toString().slice(-6)}`
   }
 
   // ── Create invoice ─────────────────────────────────────────────────────────
@@ -258,7 +273,8 @@ export function useBilling() {
 
       const totalPaid = (allPayments ?? []).reduce((sum, p) => sum + p.amount, 0)
       const invoiceTotal = invoice?.total ?? 0
-      const newStatus: InvoiceStatus = totalPaid >= invoiceTotal ? 'paid' : 'partially_paid'
+      const EPSILON = 0.01
+      const newStatus: InvoiceStatus = (invoiceTotal - totalPaid) <= EPSILON ? 'paid' : 'partially_paid'
 
       await supabase
         .from('invoices')

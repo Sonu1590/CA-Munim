@@ -37,6 +37,23 @@ interface OnboardingPageProps {
   onComplete?: () => void;
 }
 
+const Field = ({
+  id, label, required, optional, children, error,
+}: {
+  id: string; label: string; required?: boolean; optional?: boolean;
+  children: React.ReactNode; error?: string;
+}) => (
+  <div className="space-y-1.5">
+    <Label htmlFor={id}>
+      {label}
+      {required && <span className="text-destructive ml-0.5">*</span>}
+      {optional && <span className="text-muted-foreground text-xs ml-1">(optional)</span>}
+    </Label>
+    {children}
+    {error && <p className="text-xs text-destructive">{error}</p>}
+  </div>
+);
+
 export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
   const navigate = useNavigate();
 
@@ -93,10 +110,14 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
         .from("staff")
         .select("firm_id")
         .eq("auth_user_id", user.id)
-        .single();
+        .maybeSingle();
 
-      if (staffError || !staffRow?.firm_id) {
-        throw new Error("Could not find your practice profile. Please sign out and sign in again.");
+      if (staffError) throw staffError;
+
+      if (!staffRow?.firm_id) {
+        throw new Error(
+          "Your account setup is incomplete. Please sign out and sign back in, or contact support at hello@camunim.in"
+        );
       }
 
       const firmId = staffRow.firm_id;
@@ -140,23 +161,6 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
       setLoading(false);
     }
   };
-
-  const Field = ({
-    id, label, required, optional, children, error,
-  }: {
-    id: string; label: string; required?: boolean; optional?: boolean;
-    children: React.ReactNode; error?: string;
-  }) => (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>
-        {label}
-        {required && <span className="text-destructive ml-0.5">*</span>}
-        {optional && <span className="text-muted-foreground text-xs ml-1">(optional)</span>}
-      </Label>
-      {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-muted/30 flex flex-col items-center justify-center px-4 py-8">

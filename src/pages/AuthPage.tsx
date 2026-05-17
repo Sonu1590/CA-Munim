@@ -96,31 +96,19 @@ export default function AuthPage() {
         if (error) throw error;
 
         if (!data.user) {
-          const message = "A confirmation email has been sent. Please verify your email before signing in.";
-          toast.success(message);
-          setInfoMessage(message);
+          toast.success("Verification email sent. Please check your inbox and verify before signing in.");
+          setInfoMessage("Verification email sent. Please verify your email before signing in.");
           setEmail("");
           setPassword("");
           return;
         }
 
-        await supabase.from("firms").upsert({
-          id: data.user.id,
-          name: normalizedEmail.split("@")[0],
-          email: normalizedEmail,
-          onboarding_complete: false,
-          created_at: new Date().toISOString(),
-        }, { onConflict: "id" });
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        await supabase.from("staff").upsert({
-          firm_id: data.user.id,
-          name: normalizedEmail.split("@")[0],
-          email: normalizedEmail,
-          auth_user_id: data.user.id,
-          role: "admin",
-          active: true,
-          created_at: new Date().toISOString(),
-        }, { onConflict: "auth_user_id" });
+        await supabase
+          .from("firms")
+          .update({ name: normalizedEmail.split("@")[0] })
+          .eq("email", normalizedEmail);
 
         toast.success("Account created! Complete your profile to get started.");
         setEmail("");
@@ -227,7 +215,6 @@ export default function AuthPage() {
                   placeholder={mode === "signup" ? "Min. 8 characters" : "Your password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  onPaste={(e) => e.preventDefault()}
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
                   required
                   className="pr-10"
