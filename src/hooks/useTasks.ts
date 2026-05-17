@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { toast } from 'sonner'
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed'
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
@@ -91,7 +92,7 @@ export function useTasks(statusFilter?: TaskStatus) {
         status: row.status as TaskStatus,
         priority: row.priority as TaskPriority,
         assignedTo: row.assigned_to,
-        assignedToName: row.staff?.name,
+        assignedToName: row.staff?.name ?? 'Unassigned',
         documentChecklist: row.document_checklist ?? [],
         filingReference: row.filing_reference,
         ackNumber: row.ack_number,
@@ -133,8 +134,6 @@ if (!staffRow?.firm_id) {
   throw new Error('No firm linked to current user')
 }
 
-      if (staffErr) throw staffErr
-
       const { error: insertErr } = await supabase
         .from('tasks')
         .insert({
@@ -163,13 +162,19 @@ if (!staffRow?.firm_id) {
     }
   }
 
-  const updateTaskStatus = async (id: string, status: TaskStatus): Promise<boolean> => {
+  const updateTaskStatus = async (id: string, newStatus: TaskStatus): Promise<boolean> => {
+    const previousTasks = tasks
+
+    setTasks(prev =>
+      prev.map(t => t.id === id ? { ...t, status: newStatus } : t)
+    )
+
     try {
       const updates: any = {
-        status,
+        status: newStatus,
         updated_at: new Date().toISOString(),
       }
-      if (status === 'completed') {
+      if (newStatus === 'completed') {
         updates.completed_at = new Date().toISOString()
       }
 
@@ -182,12 +187,14 @@ if (!staffRow?.firm_id) {
 
       // Optimistic update — no need to refetch entire list
       setTasks(prev =>
-        prev.map(t => t.id === id ? { ...t, status } : t)
+        prev.map(t => t.id === id ? { ...t, status: newStatus } : t)
       )
       return true
     } catch (err: any) {
       console.error('updateTaskStatus error:', err)
+      setTasks(previousTasks)
       setError(err.message)
+      toast.error('Failed to update task status. Please try again.')
       return false
     }
   }

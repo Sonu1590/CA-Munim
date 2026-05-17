@@ -51,10 +51,10 @@ export function validateGSTIN(gstin: string) {
 
 // Financial Year auto-detection (April–March)
 // Returns "FY YYYY-YY" for a given Date
-export function getFinancialYear(date: Date | string | null | undefined): string | null {
-  if (!date) return null;
+export function getFinancialYear(date: Date | string | null | undefined, fallback = "-"): string {
+  if (!date) return fallback;
   const d = typeof date === "string" ? new Date(date) : date;
-  if (isNaN(d.getTime())) return null;
+  if (isNaN(d.getTime())) return fallback;
   const month = d.getMonth(); // 0=Jan
   const year = d.getFullYear();
   const startYear = month >= 3 ? year : year - 1; // April = 3

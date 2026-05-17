@@ -68,7 +68,12 @@ export function useDashboard() {
   }
 
   async function fetchFirmInfo() {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: userErr } = await supabase.auth.getUser()
+    if (userErr?.message?.includes('JWT expired')) {
+      await supabase.auth.signOut()
+      window.location.href = '/login'
+      return
+    }
     if (!user) return
 
     const { data } = await supabase

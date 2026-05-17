@@ -48,6 +48,7 @@ function setupTableMocks(responses: Record<string, TableResponse> = {}) {
       limit: vi.fn().mockReturnThis(),
       maybeSingle: vi.fn().mockResolvedValue(response),
       upsert: vi.fn().mockResolvedValue(response),
+      update: vi.fn().mockReturnThis(),
     };
 
     builders[table] = builders[table] ?? [];
@@ -102,7 +103,7 @@ describe("AuthPage", () => {
     expect(screen.getByRole("button", { name: "Continue with Google" })).toBeInTheDocument();
   });
 
-  it("toggles password visibility and prevents password paste", () => {
+  it("toggles password visibility and allows password paste", () => {
     render(<AuthPage />);
 
     const password = screen.getByLabelText("Password");
@@ -114,7 +115,7 @@ describe("AuthPage", () => {
 
     const pasteEvent = new Event("paste", { bubbles: true, cancelable: true });
     const prevented = !password.dispatchEvent(pasteEvent);
-    expect(prevented).toBe(true);
+    expect(prevented).toBe(false);
   });
 
   it("signs in with normalized email and redirects to the requested page", async () => {
@@ -207,7 +208,7 @@ describe("AuthPage", () => {
     expect(mockSupabase.auth.signUp).not.toHaveBeenCalled();
   });
 
-  it("creates firm and staff rows after successful signup with a user", async () => {
+  it("updates the trigger-created firm after successful signup with a user", async () => {
     const builders = setupTableMocks({
       firms: { data: null, error: null },
       staff: { data: null, error: null },
@@ -225,28 +226,12 @@ describe("AuthPage", () => {
       });
     });
 
-    const firmUpsert = builders.firms[1].upsert;
-    const staffUpsert = builders.staff[1].upsert;
-    expect(firmUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: "user-1",
-        name: "newca",
-        email: "newca@example.com",
-        onboarding_complete: false,
-      }),
-      { onConflict: "id" },
-    );
-    expect(staffUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        firm_id: "user-1",
-        name: "newca",
-        email: "newca@example.com",
-        auth_user_id: "user-1",
-        role: "admin",
-        active: true,
-      }),
-      { onConflict: "auth_user_id" },
-    );
+    await waitFor(() => {
+      expect(builders.firms.at(-1)?.update).toHaveBeenCalledWith({ name: "newca" });
+    });
+    expect(builders.firms.at(-1)?.eq).toHaveBeenCalledWith("email", "newca@example.com");
+    expect(builders.firms.at(-1)?.upsert).not.toHaveBeenCalled();
+    expect(builders.staff).toHaveLength(1);
     expect(mockToast.success).toHaveBeenCalledWith("Account created! Complete your profile to get started.");
     expect(mockNavigate).toHaveBeenCalledWith("/onboarding", { replace: true });
   });
@@ -262,9 +247,11 @@ describe("AuthPage", () => {
     fillAuthForm("confirm@example.com", "strongpass123");
     submitForm(container);
 
-    const message = "A confirmation email has been sent. Please verify your email before signing in.";
+    const message = "Verification email sent. Please verify your email before signing in.";
     await waitFor(() => {
-      expect(mockToast.success).toHaveBeenCalledWith(message);
+      expect(mockToast.success).toHaveBeenCalledWith(
+        "Verification email sent. Please check your inbox and verify before signing in.",
+      );
     });
     expect(screen.getByText(message)).toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();

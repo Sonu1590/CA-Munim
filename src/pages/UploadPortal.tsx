@@ -57,6 +57,7 @@ export default function UploadPortal() {
   const [request, setRequest] = useState<DocumentRequest | null>(null);
   const [loadingRequest, setLoadingRequest] = useState(true);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // ── Fetch firm profile ───────────────────────────────────────────────────
@@ -143,21 +144,28 @@ export default function UploadPortal() {
 
   const handleSubmit = async () => {
     if (files.length === 0 || files.some((f) => !f.done)) {
-      toast.error("Please wait for uploads to finish");
+      toast.error("Please wait for all files to finish uploading");
       return;
     }
 
-    // Mark document request as uploaded in Supabase
-    if (token) {
-      await supabase
-        .from('document_requests')
-        .update({ status: 'uploaded', uploaded_at: new Date().toISOString() })
-        .eq('upload_token', token);
-    }
+    setSubmitting(true);
+    try {
+      if (token) {
+        const { error } = await supabase
+          .from('document_requests')
+          .update({ status: 'uploaded', uploaded_at: new Date().toISOString() })
+          .eq('upload_token', token);
 
-    // Update local task checklist store
-    taskChecklistStore.markReceivedByLabel(request?.clientId, request?.documentName);
-    setSubmitted(true);
+        if (error) throw error;
+      }
+
+      taskChecklistStore.markReceivedByLabel(request?.clientId, request?.documentName);
+      setSubmitted(true);
+    } catch (err: any) {
+      toast.error("Submission failed. Please try again or contact your CA.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const removeFile = (name: string) => {
@@ -314,10 +322,10 @@ export default function UploadPortal() {
 
             <Button
               onClick={handleSubmit}
-              disabled={files.length === 0 || files.some((f) => !f.done)}
+              disabled={submitting || files.length === 0 || files.some((f) => !f.done)}
               className="w-full h-11 bg-primary"
             >
-              Submit to {firm.firmName || firm.caName || "your CA"}
+              {submitting ? "Submitting..." : `Submit to ${firm.firmName || firm.caName || "your CA"}`}
             </Button>
 
             <p className="text-xs text-muted-foreground text-center">

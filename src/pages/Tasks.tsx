@@ -15,7 +15,7 @@ import { toast } from "sonner";
 
 // Keep these exports here so child components (AddTaskModal etc.) 
 // can still import them from this file if needed
-export { taskTypeGroups, taskTypeIcons, dueDateRules, staffMembers, financialYears, quarters, months } from "@/data/Tasks";
+export { taskTypeGroups, taskTypeIcons, dueDateRules, financialYears, quarters, months } from "@/data/Tasks";
 export type { Task, TaskType, TaskStatus, TaskPriority, ChecklistItem } from "@/data/Tasks";
 
 export default function Tasks() {

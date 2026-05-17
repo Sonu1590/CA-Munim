@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -87,21 +87,66 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
   const [compRegDate, setCompRegDate] = useState("");
   const [annualFees, setAnnualFees] = useState("");
   const [saving, setSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   const isCompanyType = ["Private Ltd", "LLP", "Public Ltd"].includes(clientType);
   const panCheck = validatePAN(panValue);
   const gstinCheck = validateGSTIN(gstinValue);
 
   const toggleService = (service: string) => {
+    setIsDirty(true);
     setSelectedServices((prev) =>
       prev.includes(service) ? prev.filter((s) => s !== service) : [...prev, service]
     );
   };
 
   const toggleMcaFiling = (filing: string) => {
+    setIsDirty(true);
     setSelectedMcaFilings((prev) =>
       prev.includes(filing) ? prev.filter((f) => f !== filing) : [...prev, filing]
     );
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const hasValue = [
+      clientType, fullName, panValue, gstinValue, phone, altPhone, email, address,
+      city, state, pin, dob, gstRegDate, compRegDate, annualFees,
+    ].some(Boolean) || selectedServices.length > 0 || selectedMcaFilings.length > 0;
+    setIsDirty(hasValue);
+  }, [
+    open, clientType, fullName, panValue, gstinValue, phone, altPhone, email, address,
+    city, state, pin, dob, gstRegDate, compRegDate, annualFees, selectedServices,
+    selectedMcaFilings,
+  ]);
+
+  const resetForm = () => {
+    setClientType("");
+    setSelectedServices([]);
+    setSelectedMcaFilings([]);
+    setFullName("");
+    setPanValue("");
+    setGstinValue("");
+    setPhone("");
+    setAltPhone("");
+    setEmail("");
+    setAddress("");
+    setCity("");
+    setState("");
+    setPin("");
+    setDob("");
+    setGstRegDate("");
+    setCompRegDate("");
+    setAnnualFees("");
+    setIsDirty(false);
+  };
+
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen && isDirty) {
+      if (!window.confirm("You have unsaved changes. Close anyway?")) return;
+    }
+    if (!newOpen) resetForm();
+    onOpenChange(newOpen);
   };
 
   const handleSave = async () => {
@@ -129,13 +174,14 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
         mca_filings: selectedMcaFilings,
         annual_fees: annualFees ? Number(annualFees) : 0,
       });
+      resetForm();
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] p-0">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="text-lg font-heading">Add New Client</DialogTitle>
@@ -457,7 +503,7 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
 
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-2 pb-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button variant="outline" onClick={() => handleOpenChange(false)}>
                 Cancel
               </Button>
               <Button

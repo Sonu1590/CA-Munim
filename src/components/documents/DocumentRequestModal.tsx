@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchClientsFromSupabase } from "@/data/Clients";
 import { documentRequestTypes } from "@/data/Documents";
+import { supabase } from "@/lib/supabase";
 import { MessageCircle, Link2, Copy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,6 +23,8 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
   const [dueDate, setDueDate] = useState("");
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [requestToken, setRequestToken] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -43,30 +46,84 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
   const isCustom = docType === "Custom";
   const client = clients.find((c) => c.id === clientId);
 
-  // Generate a deterministic upload token preview
-  const token = clientId && docType
-    ? btoa(`${clientId}-${docType}-${dueDate}`).replace(/=/g, "").slice(0, 16)
-    : "";
-  const uploadLink = token ? `${window.location.origin}/upload/${token}` : "";
+  useEffect(() => {
+    if (!clientId || !docType || !dueDate) {
+      setRequestToken("");
+      return;
+    }
 
-  const handleSend = () => {
+    const tokenArray = new Uint8Array(16);
+    crypto.getRandomValues(tokenArray);
+    setRequestToken(Array.from(tokenArray).map((b) => b.toString(16).padStart(2, "0")).join(""));
+  }, [clientId, docType, dueDate]);
+
+  const uploadLink = requestToken ? `${window.location.origin}/upload/${requestToken}` : "";
+
+  const handleSend = async () => {
     if (!clientId || !docType || !dueDate) {
       toast.error("Please fill all required fields");
       return;
     }
-    const docName = isCustom ? customLabel : docType;
-    toast.success("Document request sent via WhatsApp", {
-      description: `${client?.name} received the upload link. Task checklist will auto-update on submit.`,
-    });
-    onOpenChange(false);
-    setClientId("");
-    setDocType("");
-    setCustomLabel("");
-    setDueDate("");
-    void docName;
+    if (isCustom && !customLabel.trim()) {
+      toast.error("Please enter the custom document label");
+      return;
+    }
+
+    setSending(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: staffRow } = await supabase
+        .from("staff")
+        .select("firm_id")
+        .eq("auth_user_id", user.id)
+        .single();
+
+      if (!staffRow?.firm_id) throw new Error("Firm not found");
+
+      const token = requestToken || (() => {
+        const tokenArray = new Uint8Array(16);
+        crypto.getRandomValues(tokenArray);
+        return Array.from(tokenArray).map((b) => b.toString(16).padStart(2, "0")).join("");
+      })();
+
+      const { error: insertErr } = await supabase
+        .from("document_requests")
+        .insert({
+          firm_id: staffRow.firm_id,
+          client_id: clientId,
+          document_type: docType,
+          custom_label: isCustom ? customLabel.trim() : null,
+          due_date: dueDate,
+          upload_token: token,
+          status: "pending",
+        });
+
+      if (insertErr) throw insertErr;
+
+      const link = `${window.location.origin}/upload/${token}`;
+      await navigator.clipboard.writeText(link).catch(() => {});
+
+      toast.success("Document request created!", {
+        description: `Upload link copied to clipboard. Send it to ${client?.name ?? "client"} via WhatsApp.`,
+      });
+
+      onOpenChange(false);
+      setClientId("");
+      setDocType("");
+      setCustomLabel("");
+      setDueDate("");
+      setRequestToken("");
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to create document request");
+    } finally {
+      setSending(false);
+    }
   };
 
   const copyLink = () => {
+    if (!uploadLink) return;
     navigator.clipboard.writeText(uploadLink);
     toast.success("Upload link copied");
   };
@@ -133,10 +190,10 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSend} className="bg-[#25D366] hover:bg-[#25D366]/90 text-white gap-2">
-            <MessageCircle className="h-4 w-4" />
-            Send Request
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>Cancel</Button>
+          <Button onClick={handleSend} disabled={sending} className="bg-[#25D366] hover:bg-[#25D366]/90 text-white gap-2">
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+            {sending ? "Creating..." : "Send Request"}
           </Button>
         </DialogFooter>
       </DialogContent>

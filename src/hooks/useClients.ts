@@ -56,44 +56,8 @@ export interface ClientFormData {
 }
 
 // ── Raw Supabase row shape ───────────────────────────────────────────────────
-interface ClientRow {
-  id: string
-  name: string
-  client_type: string
-  pan: string
-  phone: string
-  email: string
-  gstin?: string
-  city: string
-  state: string
-  services_subscribed?: string[]
-  updated_at: string
-  annual_fees?: number
-  // joined counts from related tables
-  active_tasks_count?: number
-  pending_fees_amount?: number
-  fees_overdue?: boolean
-}
 
 // ── Transform DB row → Client interface the UI expects ──────────────────────
-function rowToClient(row: ClientRow): Client {
-  return {
-    id: row.id,
-    name: row.name,
-    type: row.client_type as ClientType,
-    pan: row.pan ?? '',
-    phone: row.phone ?? '',
-    email: row.email ?? '',
-    gstin: row.gstin,
-    activeTasks: row.active_tasks_count ?? 0,
-    pendingFees: row.pending_fees_amount ?? 0,
-    feesOverdue: row.fees_overdue ?? false,
-    lastActivity: row.updated_at?.split('T')[0] ?? '',
-    city: row.city ?? '',
-    state: row.state ?? '',
-    servicesSubscribed: row.services_subscribed ?? [],
-  }
-}
 
 // ── Main hook ────────────────────────────────────────────────────────────────
 export function useClients() {
@@ -125,6 +89,8 @@ export function useClients() {
           tasks(id, status),
           invoices(total, status)
         `)
+        .limit(500, { foreignTable: 'tasks' })
+        .limit(500, { foreignTable: 'invoices' })
         .eq('is_active', true)
         .order('name', { ascending: true })
 
@@ -135,6 +101,10 @@ export function useClients() {
         const activeTasks = (row.tasks ?? []).filter(
           (t: any) => t.status !== 'completed'
         ).length
+
+        if ((row.tasks ?? []).length >= 500 || (row.invoices ?? []).length >= 500) {
+          console.warn('useClients nested task/invoice rows reached the safety limit for client', row.id)
+        }
 
         const unpaidInvoices = (row.invoices ?? []).filter(
           (inv: any) => inv.status === 'sent' || inv.status === 'overdue'
@@ -201,8 +171,6 @@ if (!staffRow?.firm_id) {
   throw new Error('No firm linked to current user')
 }
 
-      if (staffErr) throw staffErr
-
       const { error: insertErr } = await supabase
         .from('clients')
         .insert({
@@ -253,6 +221,12 @@ if (!staffRow?.firm_id) {
   // ── Update client ──────────────────────────────────────────────────────────
   const updateClient = async (id: string, formData: Partial<ClientFormData>): Promise<boolean> => {
     try {
+      const clientExists = clients.find(c => c.id === id)
+      if (!clientExists) {
+        setError('Client not found in your firm')
+        return false
+      }
+
       const { error: updateErr } = await supabase
         .from('clients')
         .update({
