@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Task, taskTypeIcons } from "@/data/Tasks";
+import { Task } from "@/data/Tasks";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, parseISO, addMonths, subMonths, differenceInDays, isSameMonth } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TaskTypeIcon } from "./TaskTypeIcon";
 
 interface Props {
   tasks: Task[];
@@ -79,7 +80,7 @@ export function TaskCalendarView({ tasks }: Props) {
                   <div className="space-y-2">
                     {dayTasks.map((t) => (
                       <div key={t.id} className="flex items-center gap-2 text-xs">
-                        <span>{taskTypeIcons[t.taskType] || "⚡"}</span>
+                        <TaskTypeIcon taskType={t.taskType} className="h-3.5 w-3.5" />
                         <div>
                           <p className="font-medium">{t.taskType}</p>
                           <p className="text-muted-foreground">{t.clientName}</p>
