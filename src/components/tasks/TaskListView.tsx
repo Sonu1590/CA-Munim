@@ -1,4 +1,4 @@
-import { Task, taskTypeIcons } from "@/data/Tasks";
+import { Task } from "@/data/Tasks";
 import { Badge } from "@/components/ui/badge";
 import { format, differenceInDays, parseISO } from "date-fns";
 import {
@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TaskTypeIcon } from "./TaskTypeIcon";
 
 interface Props {
   tasks: Task[];
@@ -50,14 +51,13 @@ export function TaskListView({ tasks, onStatusChange }: Props) {
         </TableHeader>
         <TableBody>
           {tasks.map((task) => {
-            const icon = taskTypeIcons[task.taskType] || "⚡";
             const statusBadge = getStatusBadge(task.status);
             const dateColor = getDueDateColor(task.dueDate, task.status);
             return (
               <TableRow key={task.id}>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <span>{icon}</span>
+                    <TaskTypeIcon taskType={task.taskType} />
                     <span className="font-medium text-sm">{task.taskType}</span>
                   </div>
                 </TableCell>

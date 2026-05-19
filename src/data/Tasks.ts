@@ -46,14 +46,6 @@ export const taskTypeGroups = {
   Other: ["Bookkeeping", "Payroll", "GST Registration", "Company Incorporation", "Custom"] as TaskType[],
 }
 
-export const taskTypeIcons: Record<string, string> = {
-  "GSTR-1": "📊", "GSTR-3B": "📊", "GSTR-9": "📊", "GSTR-9C": "📊", "GSTR-4": "📊", "CMP-08": "📊",
-  "ITR Filing": "📋", "Advance Tax": "💰", "Tax Audit": "🔍", "Form 3CD": "📋", "Form 26QB": "📋",
-  "TDS Challan": "💳", "24Q": "📑", "26Q": "📑", "27Q": "📑", "27EQ": "📑",
-  "Form 16": "📄", "Form 16A": "📄", "Form 27D": "📄",
-  "MGT-7": "🏢", "AOC-4": "🏢", "DIR-3 KYC": "🏢", "ADT-1": "🏢", "INC-20A": "🏢", "PAS-3": "🏢",
-  "Bookkeeping": "📒", "Payroll": "💼", "GST Registration": "📝", "Company Incorporation": "🏗️", "Custom": "⚡",
-}
 
 export const dueDateRules: Record<string, string> = {
   "GSTR-1": "11th of following month",

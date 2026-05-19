@@ -8,7 +8,7 @@ import { taskTypeGroups, months } from "@/data/Tasks";
 import { useClients } from "@/hooks/useClients";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { AlertCircle, Check, Loader2 } from "lucide-react";
+import { AlertCircle, Check, ListChecks, Loader2 } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -245,7 +245,7 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
 
         {step === 4 && (
           <div className="text-center py-6 space-y-3">
-            <div className="text-4xl">📋</div>
+            <ListChecks className="h-10 w-10 mx-auto text-primary" />
             <p className="text-lg font-heading font-semibold">Ready to Generate</p>
             <p className="text-sm text-muted-foreground">
               <strong>{totalTasks}</strong> tasks will be created for <strong>{selectedClients.length}</strong> clients × <strong>{selectedMonths.length}</strong> months

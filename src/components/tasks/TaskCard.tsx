@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Task, taskTypeIcons } from "@/data/Tasks";
+import { Task } from "@/data/Tasks";
 import { Badge } from "@/components/ui/badge";
 import { format, differenceInDays, parseISO } from "date-fns";
 import {
@@ -12,6 +12,7 @@ import { MoreVertical, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TaskChecklistDrawer } from "./TaskChecklistDrawer";
 import { taskChecklistStore } from "@/lib/taskChecklistStore";
+import { TaskTypeIcon } from "./TaskTypeIcon";
 
 interface Props {
   task: Task;
@@ -37,7 +38,6 @@ function getPriorityBadge(priority: Task["priority"]) {
 }
 
 export function TaskCard({ task, onStatusChange }: Props) {
-  const icon = taskTypeIcons[task.taskType] || "⚡";
   const dateColor = getDueDateColor(task.dueDate, task.status);
   const priority = getPriorityBadge(task.priority);
   const [openChecklist, setOpenChecklist] = useState(false);
@@ -56,7 +56,7 @@ export function TaskCard({ task, onStatusChange }: Props) {
     <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2">
-          <span className="text-base">{icon}</span>
+          <TaskTypeIcon taskType={task.taskType} />
           <span className="text-sm font-heading font-semibold text-foreground">{task.taskType}</span>
         </div>
         <DropdownMenu>
