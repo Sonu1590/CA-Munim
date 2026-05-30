@@ -130,6 +130,14 @@ export const filingCategories: FilingCategory[] = [
 
 const toBool = (value: any) => typeof value === "boolean" ? value : String(value).toLowerCase() === "true";
 
+const toStaffRole = (value: any): StaffMember["role"] => {
+  if (value === "Senior CA" || value === "Article Clerk" || value === "Admin Staff") return value;
+  const normalized = String(value ?? "").toLowerCase();
+  if (normalized.includes("senior")) return "Senior CA";
+  if (normalized.includes("article") || normalized.includes("clerk") || normalized === "staff") return "Article Clerk";
+  return "Admin Staff";
+};
+
 const extractSupabaseError = (err: any): string => {
   if (!err) return "";
   if (typeof err === "string") return err;
@@ -298,7 +306,7 @@ export async function fetchStaffFromSupabase(): Promise<StaffMember[]> {
   return data.map((row: any) => ({
     id: row.id,
     name: row.name,
-    role: row.role,
+    role: toStaffRole(row.role),
     email: row.email,
     phone: row.phone,
     isActive: toBool(row.active),

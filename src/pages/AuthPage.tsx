@@ -10,6 +10,9 @@ import { toast } from "sonner";
 const getAuthErrorMessage = (error: any) => {
   const message = (error?.message ?? error?.error ?? String(error ?? "")).toString();
   const lower = message.toLowerCase();
+  if (lower.includes("email not confirmed") || lower.includes("not confirmed")) {
+    return "Please verify your email first. Check your inbox for the confirmation link.";
+  }
   if (lower.includes("already registered") || lower.includes("user already registered") || lower.includes("duplicate") || lower.includes("email")) {
     return "An account with this email already exists. Please sign in instead.";
   }
@@ -26,6 +29,9 @@ export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [firmName, setFirmName] = useState("");
+  const [icaiNumber, setIcaiNumber] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [infoMessage, setInfoMessage] = useState("");
@@ -96,23 +102,35 @@ export default function AuthPage() {
         if (error) throw error;
 
         if (!data.user) {
-          toast.success("Verification email sent. Please check your inbox and verify before signing in.");
           setInfoMessage("Verification email sent. Please verify your email before signing in.");
-          setEmail("");
           setPassword("");
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          toast.success("Verification email sent. Please check your inbox and verify before signing in.");
+          toast.info("Check your email for a confirmation link before signing in.");
           return;
         }
 
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
+        const profileUpdates = fullName.trim() || firmName.trim() || icaiNumber.trim()
+          ? {
+              name: firmName.trim() || fullName.trim() || normalizedEmail.split("@")[0],
+              ca_name: fullName.trim() || normalizedEmail.split("@")[0],
+              icai_number: icaiNumber.trim() || null,
+            }
+          : { name: normalizedEmail.split("@")[0] };
+
         await supabase
           .from("firms")
-          .update({ name: normalizedEmail.split("@")[0] })
+          .update(profileUpdates)
           .eq("email", normalizedEmail);
 
         toast.success("Account created! Complete your profile to get started.");
         setEmail("");
         setPassword("");
+        setFullName("");
+        setFirmName("");
+        setIcaiNumber("");
         navigate("/onboarding", { replace: true });
       }
     } catch (err: any) {
@@ -161,6 +179,9 @@ export default function AuthPage() {
             setMode("login");
             setEmail("");
             setPassword("");
+            setFullName("");
+            setFirmName("");
+            setIcaiNumber("");
             setInfoMessage("");
           }}
               className={`flex-1 text-sm font-medium py-1.5 rounded-md transition-colors ${
@@ -177,6 +198,9 @@ export default function AuthPage() {
               setMode("signup");
               setEmail("");
               setPassword("");
+              setFullName("");
+              setFirmName("");
+              setIcaiNumber("");
               setInfoMessage("");
             }}
               className={`flex-1 text-sm font-medium py-1.5 rounded-md transition-colors ${
@@ -190,6 +214,40 @@ export default function AuthPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === "signup" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="fullName">Your Name *</Label>
+                  <Input
+                    id="fullName"
+                    placeholder="CA Priya Sharma"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    autoComplete="name"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="firmName">Firm Name</Label>
+                  <Input
+                    id="firmName"
+                    placeholder="Sharma & Associates"
+                    value={firmName}
+                    onChange={(e) => setFirmName(e.target.value)}
+                    autoComplete="organization"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="icaiNumber">ICAI Membership Number</Label>
+                  <Input
+                    id="icaiNumber"
+                    placeholder="123456"
+                    value={icaiNumber}
+                    onChange={(e) => setIcaiNumber(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
             <div className="space-y-1.5">
               <Label htmlFor="email">Email Address</Label>
               <Input

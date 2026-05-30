@@ -16,6 +16,7 @@ import type { Session } from "@supabase/supabase-js";
 
 import Index from "./pages/Index.tsx";
 import Clients from "./pages/Clients.tsx";
+import ClientProfile from "./pages/ClientProfile.tsx";
 import Tasks from "./pages/Tasks.tsx";
 import Documents from "./pages/Documents.tsx";
 import WhatsApp from "./pages/WhatsApp.tsx";
@@ -191,6 +192,7 @@ function AppRoutes() {
         {[
           { path: "/", element: <Index /> },
           { path: "/clients", element: <Clients /> },
+          { path: "/clients/:id", element: <ClientProfile /> },
           { path: "/tasks", element: <Tasks /> },
           { path: "/documents", element: <Documents /> },
           { path: "/whatsapp", element: <WhatsApp /> },

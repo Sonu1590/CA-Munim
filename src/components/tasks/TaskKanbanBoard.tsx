@@ -5,6 +5,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 interface Props {
   tasks: Task[];
   onStatusChange: (taskId: string, status: Task["status"]) => void;
+  onEdit?: (task: Task) => void;
+  onDelete?: (task: Task) => void;
 }
 
 const columns: { key: Task["status"]; label: string; short: string; color: string }[] = [
@@ -17,10 +19,14 @@ function Column({
   col,
   tasks,
   onStatusChange,
+  onEdit,
+  onDelete,
 }: {
   col: (typeof columns)[number];
   tasks: Task[];
   onStatusChange: Props["onStatusChange"];
+  onEdit?: Props["onEdit"];
+  onDelete?: Props["onDelete"];
 }) {
   return (
     <div className="flex flex-col">
@@ -36,14 +42,14 @@ function Column({
           <p className="text-xs text-muted-foreground text-center py-8">No tasks</p>
         )}
         {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} onStatusChange={onStatusChange} />
+          <TaskCard key={task.id} task={task} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} />
         ))}
       </div>
     </div>
   );
 }
 
-export function TaskKanbanBoard({ tasks, onStatusChange }: Props) {
+export function TaskKanbanBoard({ tasks, onStatusChange, onEdit, onDelete }: Props) {
   const byStatus = (s: Task["status"]) => tasks.filter((t) => t.status === s);
 
   return (
@@ -51,7 +57,7 @@ export function TaskKanbanBoard({ tasks, onStatusChange }: Props) {
       {/* Desktop & tablet: 3-column board */}
       <div className="hidden md:grid grid-cols-3 gap-4">
         {columns.map((col) => (
-          <Column key={col.key} col={col} tasks={byStatus(col.key)} onStatusChange={onStatusChange} />
+          <Column key={col.key} col={col} tasks={byStatus(col.key)} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} />
         ))}
       </div>
 
@@ -74,7 +80,7 @@ export function TaskKanbanBoard({ tasks, onStatusChange }: Props) {
           </TabsList>
           {columns.map((col) => (
             <TabsContent key={col.key} value={col.key} className="mt-3">
-              <Column col={col} tasks={byStatus(col.key)} onStatusChange={onStatusChange} />
+              <Column col={col} tasks={byStatus(col.key)} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} />
             </TabsContent>
           ))}
         </Tabs>

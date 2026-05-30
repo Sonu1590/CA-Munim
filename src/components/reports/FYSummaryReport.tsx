@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Users, CheckCircle2, IndianRupee, TrendingUp, Loader2 } from "lucide-react";
 import { getFYSummary, type FYSummary } from "@/data/Reports";
 import { financialYears } from "@/data/Tasks";
+import { getCurrentFinancialYear } from "@/lib/indianTaxUtils";
 
 const chartConfig = {
   billed: { label: "Billed", color: "hsl(var(--primary))" },
@@ -13,7 +14,7 @@ const chartConfig = {
 };
 
 export function FYSummaryReport() {
-  const [fy, setFy] = useState("FY 2025-26");
+  const [fy, setFy] = useState(getCurrentFinancialYear);
   const [summary, setSummary] = useState<FYSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

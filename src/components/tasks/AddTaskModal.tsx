@@ -1,7 +1,7 @@
 // src/components/tasks/AddTaskModal.tsx
 
-import { useState } from "react";
-import { format } from "date-fns";
+import { useEffect, useState } from "react";
+import { format, parseISO } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useStaff } from "@/hooks/useStaff";
@@ -36,17 +36,21 @@ import { cn } from "@/lib/utils";
 
 import { useClients } from "@/hooks/useClients";
 import { TaskFormData } from "@/hooks/useTasks";
+import { getCurrentFinancialYear } from "@/lib/indianTaxUtils";
+import type { Task } from "@/data/Tasks";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave?: (data: TaskFormData) => Promise<void>;
+  onSave?: (data: TaskFormData) => Promise<void | boolean> | void | boolean;
+  task?: Task | null;
 }
 
 export function AddTaskModal({
   open,
   onOpenChange,
   onSave,
+  task,
 }: Props) {
   const { clients, loading: clientsLoading } = useClients();
   const { staff, loading: staffLoading } = useStaff();
@@ -55,7 +59,7 @@ export function AddTaskModal({
   const [customName, setCustomName] = useState("");
 
   const [financialYear, setFinancialYear] =
-    useState("FY 2025-26");
+    useState(getCurrentFinancialYear());
 
   const [period, setPeriod] = useState("Q1");
 
@@ -71,13 +75,31 @@ export function AddTaskModal({
     setClient("");
     setTaskType("");
     setCustomName("");
-    setFinancialYear("FY 2025-26");
+    setFinancialYear(getCurrentFinancialYear());
     setPeriod("Q1");
     setDueDate(undefined);
     setPriority("medium");
     setNotes("");
     setAssignedTo("");
   };
+
+  useEffect(() => {
+    if (!open) return;
+    if (!task) {
+      resetForm();
+      return;
+    }
+
+    setClient(task.clientId ?? "");
+    setTaskType(task.taskType ?? "");
+    setCustomName(task.customTaskName ?? "");
+    setFinancialYear(task.financialYear || getCurrentFinancialYear());
+    setPeriod((task as any).period ?? task.quarter ?? task.month ?? "Q1");
+    setDueDate(task.dueDate ? parseISO(task.dueDate) : undefined);
+    setPriority(task.priority ?? "medium");
+    setNotes(task.notes ?? "");
+    setAssignedTo((task as any).assignedToId ?? "");
+  }, [open, task]);
 
   const handleClose = (value: boolean) => {
     if (!value) {
@@ -117,7 +139,8 @@ export function AddTaskModal({
 
       console.log("FINAL TASK INSERT", payload);
 
-      await onSave(payload);
+      const result = await onSave(payload);
+      if (result === false) return;
 
       toast.success("Task created successfully");
 
@@ -137,7 +160,7 @@ export function AddTaskModal({
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-heading">
-            Create New Task
+            {task ? "Edit Task" : "Create New Task"}
           </DialogTitle>
         </DialogHeader>
 
@@ -151,6 +174,7 @@ export function AddTaskModal({
               <Select
                 value={client}
                 onValueChange={setClient}
+                disabled={!!task}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select client" />
@@ -428,7 +452,7 @@ export function AddTaskModal({
             </Button>
 
             <Button onClick={handleSave}>
-              Create Task
+              {task ? "Update Task" : "Create Task"}
             </Button>
           </div>
         </div>

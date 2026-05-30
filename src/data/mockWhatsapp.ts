@@ -139,17 +139,22 @@ export async function fetchMessageTemplatesFromSupabase(): Promise<MessageTempla
   }));
 }
 
-export async function saveMessageTemplateToSupabase(template: MessageTemplate): Promise<MessageTemplate> {
+export async function saveMessageTemplateToSupabase(template: Omit<MessageTemplate, "id"> & { id?: string }): Promise<MessageTemplate> {
+  const payload: Record<string, any> = {
+    name: template.name,
+    category: template.category,
+    body: template.body,
+    variables: template.variables,
+    is_default: template.isDefault,
+  };
+
+  if (template.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(template.id)) {
+    payload.id = template.id;
+  }
+
   const { data, error } = await supabase
     .from("message_templates")
-    .upsert({
-      id: template.id,
-      name: template.name,
-      category: template.category,
-      body: template.body,
-      variables: template.variables,
-      is_default: template.isDefault,
-    }, { onConflict: "id" })
+    .upsert(payload, { onConflict: "id" })
     .select()
     .single();
 

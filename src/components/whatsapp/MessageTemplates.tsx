@@ -62,8 +62,8 @@ export function MessageTemplates() {
       return;
     }
     const vars = (editTemplate.body?.match(/\{\{(\w+)\}\}/g) || []).map((v) => v.replace(/\{|\}/g, ""));
-    const templateToSave: MessageTemplate = {
-      id: editTemplate.id ?? `t-${Date.now()}`,
+    const templateToSave = {
+      id: editTemplate.id,
       name: editTemplate.name,
       category: editTemplate.category as TemplateCategory,
       body: editTemplate.body,

@@ -8,6 +8,7 @@ import { getComplianceData, type FilingStatus, type ClientComplianceRow } from "
 import { financialYears } from "@/data/Tasks";
 import { downloadCsv, slugifyFileName } from "@/lib/downloads";
 import { toast } from "sonner";
+import { getCurrentFinancialYear } from "@/lib/indianTaxUtils";
 
 const statusIcon: Record<FilingStatus, { label: string; className: string }> = {
   filed: { label: "✅ Filed", className: "bg-green-100 text-green-800 border-green-200" },
@@ -17,7 +18,7 @@ const statusIcon: Record<FilingStatus, { label: string; className: string }> = {
 };
 
 export function ComplianceStatusReport() {
-  const [fy, setFy] = useState("FY 2025-26");
+  const [fy, setFy] = useState(getCurrentFinancialYear);
   const [data, setData] = useState<ClientComplianceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

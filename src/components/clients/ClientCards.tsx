@@ -1,4 +1,4 @@
-import { Client } from "@/data/Clients";
+import { Client } from "@/hooks/useClients";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 interface ClientCardsProps {
   clients: Client[];
   onEdit: (client: Client) => void;
+  onView?: (client: Client) => void;
 }
 
 const typeBadgeColor: Record<string, string> = {
@@ -21,7 +22,7 @@ const typeBadgeColor: Record<string, string> = {
   Trust: "bg-emerald-100 text-emerald-700",
 };
 
-export function ClientCards({ clients, onEdit }: ClientCardsProps) {
+export function ClientCards({ clients, onEdit, onView }: ClientCardsProps) {
   return (
     <div className="md:hidden space-y-3">
       {clients.map((client, i) => (
@@ -31,7 +32,7 @@ export function ClientCards({ clients, onEdit }: ClientCardsProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.04 }}
         >
-          <Card className="card-shadow">
+          <Card className="card-shadow cursor-pointer" onClick={() => onView?.(client)}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between mb-2">
                 <div>
@@ -51,6 +52,7 @@ export function ClientCards({ clients, onEdit }: ClientCardsProps) {
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 text-[hsl(var(--whatsapp))]"
+                    onClick={(event) => event.stopPropagation()}
                   >
                     <MessageCircle className="h-4 w-4" />
                   </Button>
@@ -58,11 +60,17 @@ export function ClientCards({ clients, onEdit }: ClientCardsProps) {
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
-                    onClick={() => onEdit(client)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onEdit(client);
+                    }}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(event) => {
+                    event.stopPropagation();
+                    onView?.(client);
+                  }}>
                     <Eye className="h-4 w-4" />
                   </Button>
                 </div>

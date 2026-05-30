@@ -13,6 +13,8 @@ import { toast } from "sonner";
 
 const roleIcons = { "Senior CA": ShieldCheck, "Article Clerk": Shield, "Admin Staff": ShieldAlert };
 const roleColors = { "Senior CA": "bg-primary/10 text-primary", "Article Clerk": "bg-accent/10 text-accent", "Admin Staff": "bg-muted text-muted-foreground" };
+const getRole = (role: StaffMember["role"] | string): StaffMember["role"] =>
+  role === "Senior CA" || role === "Article Clerk" || role === "Admin Staff" ? role : "Admin Staff";
 
 export function StaffManagement() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
@@ -90,7 +92,8 @@ export function StaffManagement() {
         ) : staff.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">No staff members found.</div>
         ) : staff.map((member) => {
-          const RoleIcon = roleIcons[member.role];
+          const role = getRole(member.role);
+          const RoleIcon = roleIcons[role];
           return (
             <Card key={member.id} className={!member.isActive ? "opacity-60" : ""}>
               <CardContent className="p-4">
@@ -102,8 +105,8 @@ export function StaffManagement() {
                     <div>
                       <p className="font-medium">{member.name}</p>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <Badge variant="secondary" className={`gap-1 text-xs ${roleColors[member.role]}`}>
-                          <RoleIcon className="h-3 w-3" />{member.role}
+                        <Badge variant="secondary" className={`gap-1 text-xs ${roleColors[role]}`}>
+                          <RoleIcon className="h-3 w-3" />{role}
                         </Badge>
                         <span className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" />{member.email}</span>
                         <span className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" />{member.phone}</span>

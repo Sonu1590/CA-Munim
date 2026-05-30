@@ -53,11 +53,15 @@ export function validateGSTIN(gstin: string) {
 // Returns "FY YYYY-YY" for a given Date
 export function getFinancialYear(date: Date | string | null | undefined, fallback = "-"): string {
   if (!date) return fallback;
-  const d = typeof date === "string" ? new Date(date) : date;
+  const d = typeof date === "string" ? new Date(`${date}T00:00:00`) : date;
   if (isNaN(d.getTime())) return fallback;
   const month = d.getMonth(); // 0=Jan
   const year = d.getFullYear();
   const startYear = month >= 3 ? year : year - 1; // April = 3
   const endYY = String((startYear + 1) % 100).padStart(2, "0");
   return `FY ${startYear}-${endYY}`;
+}
+
+export function getCurrentFinancialYear(date = new Date()): string {
+  return getFinancialYear(date, "");
 }
