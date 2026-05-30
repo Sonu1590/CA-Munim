@@ -9,6 +9,7 @@ import { useClients } from "@/hooks/useClients";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { AlertCircle, Check, ListChecks, Loader2 } from "lucide-react";
+import { getCurrentFinancialYear } from "@/lib/indianTaxUtils";
 
 interface Props {
   open: boolean;
@@ -23,6 +24,7 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
+  const currentFY = getCurrentFinancialYear();
 
   const toggleClient = (id: string) => {
     setSelectedClients((prev) =>
@@ -55,7 +57,8 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
 
   const calculateDueDate = (type: string, month: string) => {
     const monthIndex = months.indexOf(month);
-    const periodYear = monthIndex <= 8 ? 2025 : 2026;
+    const fyStart = Number(currentFY.match(/FY (\d{4})-/)?.[1] ?? new Date().getFullYear());
+    const periodYear = monthIndex <= 8 ? fyStart : fyStart + 1;
     const periodMonth = monthIndex <= 8 ? monthIndex + 3 : monthIndex - 9;
     const nextMonth = new Date(periodYear, periodMonth + 1, 1);
 
@@ -65,19 +68,19 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
     if (type === "GSTR-1") return dateForDay(11);
     if (type === "GSTR-3B") return dateForDay(20);
     if (type === "TDS Challan") {
-      if (month === "March") return "2026-04-30";
+      if (month === "March") return `${fyStart + 1}-04-30`;
       return dateForDay(7);
     }
     if (["24Q", "26Q", "27Q", "27EQ"].includes(type)) {
       if (["June", "September", "December"].includes(month)) return dateForDay(31);
-      if (month === "March") return "2026-05-31";
+      if (month === "March") return `${fyStart + 1}-05-31`;
     }
-    if (type === "GSTR-9" || type === "GSTR-9C") return "2026-12-31";
-    if (type === "GSTR-4") return "2026-04-30";
+    if (type === "GSTR-9" || type === "GSTR-9C") return `${fyStart + 1}-12-31`;
+    if (type === "GSTR-4") return `${fyStart + 1}-04-30`;
     if (type === "CMP-08") return dateForDay(18);
-    if (type === "ITR Filing") return "2026-07-31";
-    if (type === "Tax Audit" || type === "Form 3CD") return "2026-09-30";
-    if (type === "DIR-3 KYC") return "2025-09-30";
+    if (type === "ITR Filing") return `${fyStart + 1}-07-31`;
+    if (type === "Tax Audit" || type === "Form 3CD") return `${fyStart + 1}-09-30`;
+    if (type === "DIR-3 KYC") return `${fyStart}-09-30`;
     return dateForDay(20);
   };
 
@@ -107,7 +110,7 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
             firm_id: staffRow.firm_id,
             client_id: clientId,
             task_type: taskType,
-            financial_year: "FY 2025-26",
+            financial_year: currentFY,
             period: month,
             due_date: calculateDueDate(taskType, month),
             status: "pending",

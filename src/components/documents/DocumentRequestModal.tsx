@@ -28,6 +28,7 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
 
   useEffect(() => {
     if (open) {
+      setClientId(preselectedClientId || "");
       const loadClients = async () => {
         setLoading(true);
         try {
@@ -41,7 +42,7 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
       };
       loadClients();
     }
-  }, [open]);
+  }, [open, preselectedClientId]);
 
   const isCustom = docType === "Custom";
   const client = clients.find((c) => c.id === clientId);
@@ -171,7 +172,7 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
 
           <div className="space-y-2">
             <Label>Submission Due Date</Label>
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <Input id="documentDueDate" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </div>
 
           {clientId && docType && dueDate && (

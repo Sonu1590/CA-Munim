@@ -10,6 +10,8 @@ import { defaultTemplates, fetchMessageTemplatesFromSupabase, MessageTemplate, T
 import { fetchClientsFromSupabase, type Client } from "@/data/Clients";
 import { Send, ChevronRight, ChevronLeft, Search, Clock, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { getCurrentFinancialYear } from "@/lib/indianTaxUtils";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -37,6 +39,7 @@ export function BulkSender() {
   const [clientsLoading, setClientsLoading] = useState(true);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [clientsError, setClientsError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   const template = templates.find((t) => t.id === selectedTemplate);
 
@@ -90,33 +93,83 @@ export function BulkSender() {
   };
 
   const toggleAll = () => {
-    if (selectedClients.length === searchedClients.length) setSelectedClients([]);
-    else setSelectedClients(searchedClients.map((c) => c.id));
+    const visibleIds = searchedClients.map((c) => c.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedClients.includes(id));
+    setSelectedClients((prev) =>
+      allVisibleSelected
+        ? prev.filter((id) => !visibleIds.includes(id))
+        : Array.from(new Set([...prev, ...visibleIds])),
+    );
   };
 
-  const renderPreview = (clientName: string) => {
+  const renderPreview = (client: Client) => {
     if (!template) return "";
+    const replacements: Record<string, string> = {
+      client_name: client.name,
+      firm_name: "Sharma & Associates",
+      ca_name: "CA Rajesh Sharma",
+      ca_phone: "9876543210",
+      due_date: new Date().toLocaleDateString("en-IN"),
+      filing_type: client.servicesSubscribed[0] ?? "Compliance filing",
+      doc_name: "N/A",
+      document_list: "N/A",
+      upload_link: "N/A",
+      amount: client.pendingFees ? client.pendingFees.toLocaleString("en-IN") : "0",
+      financial_year: getCurrentFinancialYear().replace("FY ", ""),
+      invoice_number: "N/A",
+      service_description: client.servicesSubscribed.join(", ") || "Professional services",
+      upi_id: "N/A",
+      ack_number: "N/A",
+      filing_date: new Date().toLocaleDateString("en-IN"),
+      payment_date: new Date().toLocaleDateString("en-IN"),
+      receipt_number: "N/A",
+      instalment_number: "N/A",
+      percentage: "N/A",
+      year: String(new Date().getFullYear()),
+    };
+
     return template.body
-      .replace(/\{\{client_name\}\}/g, clientName)
-      .replace(/\{\{firm_name\}\}/g, "Sharma & Associates")
-      .replace(/\{\{ca_name\}\}/g, "CA Rajesh Sharma")
-      .replace(/\{\{ca_phone\}\}/g, "9876543210")
-      .replace(/\{\{due_date\}\}/g, "20/04/2025")
-      .replace(/\{\{filing_type\}\}/g, "GSTR-3B")
-      .replace(/\{\{amount\}\}/g, "15,000")
-      .replace(/\{\{financial_year\}\}/g, "2024-25")
-      .replace(/\{\{\w+\}\}/g, "[...]");
+      .replace(/\{\{(\w+)\}\}/g, (_match, key) => replacements[key] ?? "N/A");
   };
 
-  const handleSend = () => {
-    toast.success(`${scheduleType === "now" ? "Sent" : "Scheduled"} ${selectedClients.length} messages!`, {
-      description: scheduleType === "later" ? `Scheduled for ${scheduleDate} at ${scheduleTime}` : undefined,
-    });
-    setStep(1);
-    setSelectedTemplate("");
-    setSelectedClients([]);
-    setRecipientFilter("all");
-    setScheduleType("now");
+  const handleSend = async () => {
+    if (!template) return;
+
+    const recipients = selectedClients
+      .map((id) => clients.find((client) => client.id === id))
+      .filter(Boolean) as Client[];
+
+    setSending(true);
+    try {
+      const { error } = await supabase.from("whatsapp_sent_messages").insert(
+        recipients.map((client) => ({
+          client_id: client.id,
+          client_name: client.name,
+          phone: client.phone,
+          template_name: template.name,
+          message: renderPreview(client),
+          status: scheduleType === "now" ? "sent" : "sent",
+          sent_at: scheduleType === "later" && scheduleDate
+            ? new Date(`${scheduleDate}T${scheduleTime}`).toISOString()
+            : new Date().toISOString(),
+        })),
+      );
+
+      if (error) throw error;
+
+      toast.success(`${scheduleType === "now" ? "Sent" : "Scheduled"} ${selectedClients.length} messages!`, {
+        description: scheduleType === "later" ? `Scheduled for ${scheduleDate} at ${scheduleTime}` : undefined,
+      });
+      setStep(1);
+      setSelectedTemplate("");
+      setSelectedClients([]);
+      setRecipientFilter("all");
+      setScheduleType("now");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Unable to record WhatsApp messages");
+    } finally {
+      setSending(false);
+    }
   };
 
   const canNext = () => {
@@ -210,7 +263,7 @@ export function BulkSender() {
             ) : (
               <>
                 <div className="flex items-center gap-2 pb-2 border-b border-border">
-                  <Checkbox checked={selectedClients.length === searchedClients.length && searchedClients.length > 0} onCheckedChange={toggleAll} />
+                  <Checkbox checked={searchedClients.length > 0 && searchedClients.every((c) => selectedClients.includes(c.id))} onCheckedChange={toggleAll} />
                   <span className="text-sm font-medium">Select All ({searchedClients.length})</span>
                   <Badge className="ml-auto">{selectedClients.length} selected</Badge>
                 </div>
@@ -247,7 +300,7 @@ export function BulkSender() {
               return (
                 <div key={id} className="rounded-xl bg-[#dcf8c6] p-3 text-sm border border-[#25D366]/20">
                   <p className="font-medium text-xs text-[#25D366] mb-1">To: {client.name} ({client.phone})</p>
-                  <p className="whitespace-pre-wrap text-xs">{renderPreview(client.name)}</p>
+                  <p className="whitespace-pre-wrap text-xs">{renderPreview(client)}</p>
                 </div>
               );
             })}
@@ -312,9 +365,9 @@ export function BulkSender() {
                 <span className="font-medium">{scheduleType === "now" ? "Immediately" : `${scheduleDate} at ${scheduleTime}`}</span>
               </div>
             </div>
-            <Button onClick={handleSend} className="w-full bg-[#25D366] hover:bg-[#25D366]/90 text-white gap-2 h-11">
+            <Button onClick={handleSend} disabled={sending} className="w-full bg-[#25D366] hover:bg-[#25D366]/90 text-white gap-2 h-11">
               <Send className="h-4 w-4" />
-              {scheduleType === "now" ? `Send to ${selectedClients.length} Clients` : `Schedule for ${selectedClients.length} Clients`}
+              {sending ? "Recording..." : scheduleType === "now" ? `Send to ${selectedClients.length} Clients` : `Schedule for ${selectedClients.length} Clients`}
             </Button>
           </CardContent>
         </Card>

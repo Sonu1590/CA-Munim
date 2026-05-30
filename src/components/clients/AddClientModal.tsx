@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { ClientFormData, ClientType } from "@/hooks/useClients";
+import { Client, ClientFormData, ClientType } from "@/hooks/useClients";
 import { validatePAN, validateGSTIN } from "@/lib/indianTaxUtils";
 import { FYHint } from "@/components/common/FYHint";
 import { CheckCircle2, XCircle } from "lucide-react";
@@ -27,7 +27,8 @@ import { CheckCircle2, XCircle } from "lucide-react";
 interface AddClientModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave?: (formData: ClientFormData) => Promise<void> | void;
+  onSave?: (formData: ClientFormData) => Promise<boolean | void> | boolean | void;
+  client?: Client | null;
 }
 
 const clientTypes: ClientType[] = [
@@ -68,7 +69,7 @@ const rocJurisdictions = [
 
 const mcaFilings = ["MGT-7", "AOC-4", "DIR-3 KYC", "ADT-1", "INC-20A", "PAS-3"];
 
-export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalProps) {
+export function AddClientModal({ open, onOpenChange, onSave, client }: AddClientModalProps) {
   const [clientType, setClientType] = useState<string>("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedMcaFilings, setSelectedMcaFilings] = useState<string[]>([]);
@@ -88,6 +89,7 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
   const [annualFees, setAnnualFees] = useState("");
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isCompanyType = ["Private Ltd", "LLP", "Public Ltd"].includes(clientType);
   const panCheck = validatePAN(panValue);
@@ -139,7 +141,32 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
     setCompRegDate("");
     setAnnualFees("");
     setIsDirty(false);
+    setError(null);
   };
+
+  useEffect(() => {
+    if (!open) return;
+
+    setClientType(client?.type ?? "");
+    setSelectedServices(client?.servicesSubscribed ?? []);
+    setSelectedMcaFilings([]);
+    setFullName(client?.name ?? "");
+    setPanValue(client?.pan ?? "");
+    setGstinValue(client?.gstin ?? "");
+    setPhone(client?.phone ?? "");
+    setAltPhone(client?.alt_phone ?? "");
+    setEmail(client?.email ?? "");
+    setAddress(client?.address ?? "");
+    setCity(client?.city ?? "");
+    setState(client?.state ?? "");
+    setPin("");
+    setDob(client?.date_of_birth ?? "");
+    setGstRegDate(client?.gst_reg_date ?? "");
+    setCompRegDate("");
+    setAnnualFees(client?.annual_fees ? String(client.annual_fees) : "");
+    setError(null);
+    setIsDirty(false);
+  }, [open, client]);
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen && isDirty) {
@@ -150,6 +177,12 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
   };
 
   const handleSave = async () => {
+    setError(null);
+    if (!dob) {
+      setError("Date of Birth / Incorporation is required.");
+      return;
+    }
+
     if (!onSave) {
       onOpenChange(false);
       return;
@@ -157,13 +190,14 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
 
     setSaving(true);
     try {
-      await onSave({
+      const result = await onSave({
         name: fullName.trim(),
         type: (clientType || "Individual") as ClientType,
         pan: panValue,
         phone,
         alt_phone: altPhone,
         email,
+        date_of_birth: dob,
         address,
         city,
         state,
@@ -174,7 +208,13 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
         mca_filings: selectedMcaFilings,
         annual_fees: annualFees ? Number(annualFees) : 0,
       });
+      if (result === false) {
+        setError("Could not save client. Please check the details and try again.");
+        return;
+      }
       resetForm();
+    } catch (err: any) {
+      setError(err?.message ?? "Could not save client. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -184,7 +224,7 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] p-0">
         <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="text-lg font-heading">Add New Client</DialogTitle>
+          <DialogTitle className="text-lg font-heading">{client ? "Edit Client" : "Add New Client"}</DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[75vh] px-6 pb-6">
           <div className="space-y-6 pt-4">
@@ -214,7 +254,7 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
                   <Input id="fatherName" placeholder="Optional" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="dob">Date of Birth / Incorporation</Label>
+                  <Label htmlFor="dob">Date of Birth / Incorporation *</Label>
                   <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
                   <FYHint date={dob} />
                 </div>
@@ -502,6 +542,11 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
             </section>
 
             {/* Actions */}
+            {error && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
             <div className="flex justify-end gap-3 pt-2 pb-2">
               <Button variant="outline" onClick={() => handleOpenChange(false)}>
                 Cancel
@@ -511,7 +556,7 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
                 onClick={handleSave}
                 disabled={saving}
               >
-                {saving ? "Saving..." : "Save Client"}
+                {saving ? "Saving..." : client ? "Update Client" : "Save Client"}
               </Button>
             </div>
           </div>

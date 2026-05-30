@@ -12,8 +12,13 @@ export interface Client {
   type: ClientType
   pan: string
   phone: string
+  alt_phone?: string
   email: string
+  address?: string
   gstin?: string
+  date_of_birth?: string
+  gst_reg_date?: string
+  annual_fees?: number
   activeTasks: number
   pendingFees: number
   feesOverdue: boolean
@@ -30,6 +35,7 @@ export interface ClientFormData {
   phone: string
   alt_phone?: string
   email: string
+  date_of_birth?: string
   address?: string
   city: string
   state: string
@@ -79,8 +85,12 @@ export function useClients() {
           client_type,
           pan,
           phone,
+          alt_phone,
           email,
+          date_of_birth,
+          address,
           gstin,
+          gst_reg_date,
           city,
           state,
           services_subscribed,
@@ -124,8 +134,13 @@ export function useClients() {
           type: row.client_type as ClientType,
           pan: row.pan ?? '',
           phone: row.phone ?? '',
+          alt_phone: row.alt_phone ?? '',
           email: row.email ?? '',
+          date_of_birth: row.date_of_birth ?? '',
+          address: row.address ?? '',
           gstin: row.gstin,
+          gst_reg_date: row.gst_reg_date ?? '',
+          annual_fees: row.annual_fees ?? 0,
           activeTasks,
           pendingFees,
           feesOverdue,
@@ -152,6 +167,10 @@ export function useClients() {
   // ── Add client ─────────────────────────────────────────────────────────────
   const addClient = async (formData: ClientFormData): Promise<boolean> => {
     try {
+      if (!formData.date_of_birth) {
+        throw new Error('Date of Birth / Incorporation is required')
+      }
+
       // Get firm_id from current user's staff record
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
@@ -181,12 +200,13 @@ if (!staffRow?.firm_id) {
           phone: formData.phone,
           alt_phone: formData.alt_phone,
           email: formData.email,
+          date_of_birth: formData.date_of_birth,
           address: formData.address,
           city: formData.city,
           state: formData.state,
           pin: formData.pin,
           gstin: formData.gstin?.toUpperCase(),
-          gst_reg_date: formData.gst_reg_date,
+          gst_reg_date: formData.gst_reg_date || null,
           gst_turnover_category: formData.gst_turnover_category,
           gst_filing_freq: formData.gst_filing_freq,
           tan: formData.tan?.toUpperCase(),
@@ -213,7 +233,6 @@ if (!staffRow?.firm_id) {
       return true
     } catch (err: any) {
       console.error('addClient error:', err)
-      setError(err.message)
       return false
     }
   }
@@ -223,7 +242,6 @@ if (!staffRow?.firm_id) {
     try {
       const clientExists = clients.find(c => c.id === id)
       if (!clientExists) {
-        setError('Client not found in your firm')
         return false
       }
 
@@ -234,10 +252,14 @@ if (!staffRow?.firm_id) {
           client_type: formData.type,
           pan: formData.pan?.toUpperCase(),
           phone: formData.phone,
+          alt_phone: formData.alt_phone,
           email: formData.email,
+          date_of_birth: formData.date_of_birth,
+          address: formData.address,
           city: formData.city,
           state: formData.state,
           gstin: formData.gstin?.toUpperCase(),
+          gst_reg_date: formData.gst_reg_date || null,
           services_subscribed: formData.services_subscribed,
           annual_fees: formData.annual_fees,
           notes: formData.notes,
@@ -251,7 +273,6 @@ if (!staffRow?.firm_id) {
       return true
     } catch (err: any) {
       console.error('updateClient error:', err)
-      setError(err.message)
       return false
     }
   }
@@ -270,7 +291,6 @@ if (!staffRow?.firm_id) {
       return true
     } catch (err: any) {
       console.error('deleteClient error:', err)
-      setError(err.message)
       return false
     }
   }
