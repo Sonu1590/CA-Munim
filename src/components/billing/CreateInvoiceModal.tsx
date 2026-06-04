@@ -11,7 +11,8 @@ import { useBilling } from "@/hooks/useBilling";
 import { supabase } from "@/lib/supabase";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import { getCurrentFinancialYear } from "@/lib/indianTaxUtils";
+import { useFinancialYear } from "@/context/financialYear";
+import { financialYears as availableFinancialYears } from "@/data/Tasks";
 
 interface CreateInvoiceModalProps {
   open: boolean;
@@ -27,9 +28,10 @@ interface LineItem {
 }
 
 export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvoiceModalProps) {
+  const { selectedFY } = useFinancialYear();
   const [clientId, setClientId] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split("T")[0]);
-  const [fy, setFy] = useState(getCurrentFinancialYear());
+  const [fy, setFy] = useState(selectedFY);
   const [gstEnabled, setGstEnabled] = useState(true);
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const [sendEmail, setSendEmail] = useState(false);
@@ -45,6 +47,12 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
 
   const selectedClient = clients.find((c) => c.id === clientId);
   const isSameState = selectedClient && firmState ? selectedClient.state === firmState : true;
+
+  useEffect(() => {
+    setFy(selectedFY);
+  }, [selectedFY]);
+
+  const availableFYs = [selectedFY, ...availableFinancialYears.filter((year) => year !== selectedFY)];
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -66,6 +74,14 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
   const igst = gstEnabled && !isSameState ? subtotal * 0.18 : 0;
   const grandTotal = subtotal + cgst + sgst + igst;
 
+  // ── Generate preview invoice number matching backend format ──────────────────
+  const generateInvoiceNumberPreview = (): string => {
+    const fyParts = fy.split('-');
+    const startYear = fyParts[0];
+    const endYear = fyParts[1]?.slice(-2) || fyParts[0];
+    return `INV-${startYear}${endYear}-0001`;
+  };
+
   const addLineItem = () => {
     setLineItems([...lineItems, { id: Date.now().toString(), description: "", sacCode: "998231", amount: "" }]);
   };
@@ -82,7 +98,7 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
   const resetForm = () => {
     setClientId("");
     setInvoiceDate(new Date().toISOString().split("T")[0]);
-    setFy(getCurrentFinancialYear());
+    setFy(selectedFY);
     setGstEnabled(true);
     setSendWhatsApp(true);
     setSendEmail(false);
@@ -148,7 +164,7 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
             </div>
             <div>
               <Label className="text-xs">Invoice Number</Label>
-              <Input value="INV-2526-0008" disabled className="font-mono text-xs bg-muted" />
+              <Input value={generateInvoiceNumberPreview()} disabled className="font-mono text-xs bg-muted" />
             </div>
             <div>
               <Label className="text-xs">Invoice Date</Label>
@@ -159,9 +175,11 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
               <Select value={fy} onValueChange={setFy}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="FY 2026-27">FY 2026-27</SelectItem>
-                  <SelectItem value="FY 2025-26">FY 2025-26</SelectItem>
-                  <SelectItem value="FY 2024-25">FY 2024-25</SelectItem>
+                  {availableFYs.map((year) => (
+                    <SelectItem key={year} value={year}>
+                      {year}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

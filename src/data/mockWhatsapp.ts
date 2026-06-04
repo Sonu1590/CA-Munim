@@ -140,12 +140,16 @@ export async function fetchMessageTemplatesFromSupabase(): Promise<MessageTempla
 }
 
 export async function saveMessageTemplateToSupabase(template: Omit<MessageTemplate, "id"> & { id?: string }): Promise<MessageTemplate> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
   const payload: Record<string, any> = {
     name: template.name,
     category: template.category,
     body: template.body,
     variables: template.variables,
     is_default: template.isDefault,
+    user_id: user.id,
   };
 
   if (template.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(template.id)) {

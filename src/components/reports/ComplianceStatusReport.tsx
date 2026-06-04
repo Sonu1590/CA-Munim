@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,7 @@ import { getComplianceData, type FilingStatus, type ClientComplianceRow } from "
 import { financialYears } from "@/data/Tasks";
 import { downloadCsv, slugifyFileName } from "@/lib/downloads";
 import { toast } from "sonner";
-import { getCurrentFinancialYear } from "@/lib/indianTaxUtils";
+import { useFinancialYear } from "@/context/financialYear";
 
 const statusIcon: Record<FilingStatus, { label: string; className: string }> = {
   filed: { label: "✅ Filed", className: "bg-green-100 text-green-800 border-green-200" },
@@ -18,7 +18,7 @@ const statusIcon: Record<FilingStatus, { label: string; className: string }> = {
 };
 
 export function ComplianceStatusReport() {
-  const [fy, setFy] = useState(getCurrentFinancialYear);
+  const { selectedFY: fy, setSelectedFY: setFy } = useFinancialYear();
   const [data, setData] = useState<ClientComplianceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

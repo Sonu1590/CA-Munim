@@ -39,6 +39,34 @@ export const documentRequestTypes = [
   "GST Registration Certificate", "Partnership Deed", "MOA / AOA",
 ];
 
+export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  bank_statement: "Bank Statement",
+  salary_slips: "Salary Slips",
+  last_year_itr: "Last Year ITR",
+  gst_purchase_invoices: "GST Purchase Invoices",
+  gst_sale_invoices: "GST Sale Invoices",
+  investment_proofs: "Investment Proofs",
+  home_loan_certificate: "Home Loan Certificate",
+  capital_gains_statement: "Capital Gains Statement",
+  rent_receipts: "Rent Receipts",
+  insurance_premium_receipt: "Insurance Premium Receipt",
+  pan_card_copy: "PAN Card Copy",
+  aadhaar_card_copy: "Aadhaar Card Copy",
+  balance_sheet: "Balance Sheet",
+  profit_loss_statement: "Profit & Loss Statement",
+  trial_balance: "Trial Balance",
+  gst_registration_certificate: "GST Registration Certificate",
+  partnership_deed: "Partnership Deed",
+  moa_aoa: "MOA / AOA",
+  form_16: "Form 16",
+};
+
+export function resolveDocumentTypeLabel(type: string | null | undefined, customLabel?: string | null): string {
+  if (customLabel?.trim()) return customLabel.trim();
+  if (!type) return "";
+  return DOCUMENT_TYPE_LABELS[type] ?? type;
+}
+
 export const mockDocuments: Document[] = []
 
 export const mockDocumentRequests: DocumentRequest[] = []
@@ -97,7 +125,7 @@ export async function fetchDocumentRequestsFromSupabase(): Promise<DocumentReque
     id: row.id,
     clientId: row.client_id ?? '',
     clientName: row.clients?.name ?? 'Unknown Client',
-    documentType: row.document_type ?? '',
+    documentType: resolveDocumentTypeLabel(row.document_type, row.custom_label),
     customLabel: row.custom_label,
     dueDate: row.due_date ?? '',
     status: row.status as "pending" | "submitted" | "overdue",
