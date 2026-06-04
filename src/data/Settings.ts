@@ -157,6 +157,13 @@ const getFirmProfileError = (err: any) => {
 };
 
 const getStaffError = (err: any, fallback = "Unable to load staff members.") => {
+  // Check for unique constraint violation (duplicate email)
+  if (err.code === '23505' || (err.message && err.message.includes('duplicate key'))) {
+    if (err.message && err.message.includes('staff_email')) {
+      return new Error("A staff member with this email already exists.");
+    }
+  }
+  
   const message = extractSupabaseError(err).toLowerCase();
   if (message.includes("row-level security") || message.includes("policy") || message.includes("permission denied")) {
     return new Error("Unable to load staff because of permissions. Please contact your firm admin.");

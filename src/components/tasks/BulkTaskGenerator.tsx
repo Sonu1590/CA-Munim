@@ -9,7 +9,7 @@ import { useClients } from "@/hooks/useClients";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { AlertCircle, Check, ListChecks, Loader2 } from "lucide-react";
-import { getCurrentFinancialYear } from "@/lib/indianTaxUtils";
+import { useFinancialYear } from "@/context/financialYear";
 
 interface Props {
   open: boolean;
@@ -18,13 +18,13 @@ interface Props {
 }
 
 export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
+  const { selectedFY: currentFY } = useFinancialYear();
   const { clients, loading: clientsLoading, error: clientsError } = useClients();
   const [step, setStep] = useState(1);
   const [taskType, setTaskType] = useState("");
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
-  const currentFY = getCurrentFinancialYear();
 
   const toggleClient = (id: string) => {
     setSelectedClients((prev) =>

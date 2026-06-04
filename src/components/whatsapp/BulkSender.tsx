@@ -11,7 +11,7 @@ import { fetchClientsFromSupabase, type Client } from "@/data/Clients";
 import { Send, ChevronRight, ChevronLeft, Search, Clock, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import { getCurrentFinancialYear } from "@/lib/indianTaxUtils";
+import { useFinancialYear } from "@/context/financialYear";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -24,6 +24,7 @@ const recipientFilters = [
 ];
 
 export function BulkSender() {
+  const { selectedFY } = useFinancialYear();
   const [step, setStep] = useState<Step>(1);
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [recipientFilter, setRecipientFilter] = useState("all");
@@ -115,7 +116,7 @@ export function BulkSender() {
       document_list: "N/A",
       upload_link: "N/A",
       amount: client.pendingFees ? client.pendingFees.toLocaleString("en-IN") : "0",
-      financial_year: getCurrentFinancialYear().replace("FY ", ""),
+      financial_year: selectedFY.replace("FY ", ""),
       invoice_number: "N/A",
       service_description: client.servicesSubscribed.join(", ") || "Professional services",
       upi_id: "N/A",

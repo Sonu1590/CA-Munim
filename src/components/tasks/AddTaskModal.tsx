@@ -1,6 +1,6 @@
 // src/components/tasks/AddTaskModal.tsx
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -36,7 +36,8 @@ import { cn } from "@/lib/utils";
 
 import { useClients } from "@/hooks/useClients";
 import { TaskFormData } from "@/hooks/useTasks";
-import { getCurrentFinancialYear } from "@/lib/indianTaxUtils";
+import { useFinancialYear } from "@/context/financialYear";
+import { financialYears } from "@/data/Tasks";
 import type { Task } from "@/data/Tasks";
 
 interface Props {
@@ -54,12 +55,12 @@ export function AddTaskModal({
 }: Props) {
   const { clients, loading: clientsLoading } = useClients();
   const { staff, loading: staffLoading } = useStaff();
+  const { selectedFY } = useFinancialYear();
   const [client, setClient] = useState("");
   const [taskType, setTaskType] = useState("");
   const [customName, setCustomName] = useState("");
 
-  const [financialYear, setFinancialYear] =
-    useState(getCurrentFinancialYear());
+  const [financialYear, setFinancialYear] = useState(selectedFY);
 
   const [period, setPeriod] = useState("Q1");
 
@@ -75,7 +76,7 @@ export function AddTaskModal({
     setClient("");
     setTaskType("");
     setCustomName("");
-    setFinancialYear(getCurrentFinancialYear());
+    setFinancialYear(selectedFY);
     setPeriod("Q1");
     setDueDate(undefined);
     setPriority("medium");
@@ -83,23 +84,33 @@ export function AddTaskModal({
     setAssignedTo("");
   };
 
+  const availableFYs = [selectedFY, ...financialYears.filter((year) => year !== selectedFY)];
+
   useEffect(() => {
     if (!open) return;
     if (!task) {
-      resetForm();
+      setClient("");
+      setTaskType("");
+      setCustomName("");
+      setFinancialYear(selectedFY);
+      setPeriod("Q1");
+      setDueDate(undefined);
+      setPriority("medium");
+      setNotes("");
+      setAssignedTo("");
       return;
     }
 
     setClient(task.clientId ?? "");
     setTaskType(task.taskType ?? "");
     setCustomName(task.customTaskName ?? "");
-    setFinancialYear(task.financialYear || getCurrentFinancialYear());
+    setFinancialYear(task.financialYear || selectedFY);
     setPeriod((task as any).period ?? task.quarter ?? task.month ?? "Q1");
     setDueDate(task.dueDate ? parseISO(task.dueDate) : undefined);
     setPriority(task.priority ?? "medium");
     setNotes(task.notes ?? "");
     setAssignedTo((task as any).assignedToId ?? "");
-  }, [open, task]);
+  }, [open, task, selectedFY]);
 
   const handleClose = (value: boolean) => {
     if (!value) {
@@ -272,17 +283,11 @@ export function AddTaskModal({
                 </SelectTrigger>
 
                 <SelectContent>
-                  <SelectItem value="FY 2024-25">
-                    FY 2024-25
-                  </SelectItem>
-
-                  <SelectItem value="FY 2025-26">
-                    FY 2025-26
-                  </SelectItem>
-
-                  <SelectItem value="FY 2026-27">
-                    FY 2026-27
-                  </SelectItem>
+                  {availableFYs.map((year) => (
+                    <SelectItem key={year} value={year}>
+                      {year}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -6,7 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Users, CheckCircle2, IndianRupee, TrendingUp, Loader2 } from "lucide-react";
 import { getFYSummary, type FYSummary } from "@/data/Reports";
 import { financialYears } from "@/data/Tasks";
-import { getCurrentFinancialYear } from "@/lib/indianTaxUtils";
+import { useFinancialYear } from "@/context/financialYear";
 
 const chartConfig = {
   billed: { label: "Billed", color: "hsl(var(--primary))" },
@@ -14,7 +14,7 @@ const chartConfig = {
 };
 
 export function FYSummaryReport() {
-  const [fy, setFy] = useState(getCurrentFinancialYear);
+  const { selectedFY: fy, setSelectedFY: setFy } = useFinancialYear();
   const [summary, setSummary] = useState<FYSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

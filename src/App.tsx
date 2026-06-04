@@ -29,6 +29,7 @@ import NotFound from "./pages/NotFound.tsx";
 import AuthPage from "./pages/AuthPage.tsx";
 import OnboardingPage from "./pages/OnboardingPage.tsx";
 import { GlobalSearch } from "./components/common/GlobalSearch";
+import { FinancialYearProvider } from "@/context/financialYear";
 
 const queryClient = new QueryClient();
 
@@ -223,6 +224,15 @@ function AppRoutes() {
           />
         ))}
 
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute status={status}>
+              <Navigate to="/" replace />
+            </ProtectedRoute>
+          }
+        />
+
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
@@ -236,7 +246,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AppRoutes />
+        <FinancialYearProvider>
+          <AppRoutes />
+        </FinancialYearProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
