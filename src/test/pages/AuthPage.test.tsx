@@ -9,6 +9,7 @@ vi.mock("sonner", () => ({
   toast: {
     error: vi.fn(),
     success: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -223,6 +224,17 @@ describe("AuthPage", () => {
       expect(mockSupabase.auth.signUp).toHaveBeenCalledWith({
         email: "newca@example.com",
         password: "strongpass123",
+        options: {
+          data: {
+            full_name: "newca",
+            name: "newca",
+            ca_name: "newca",
+            firm_name: "",
+            icai_number: null,
+            practice_type: "solo",
+          },
+          emailRedirectTo: `${window.location.origin}/onboarding`,
+        },
       });
     });
 

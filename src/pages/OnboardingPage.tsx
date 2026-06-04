@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,32 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
 
   // Field-level errors
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadSignupMetadata = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!mounted || !user) return;
+
+      const metadata = user.user_metadata ?? {};
+      const metadataCaName = String(metadata.ca_name || metadata.full_name || metadata.name || "").trim();
+      const metadataFirmName = String(metadata.firm_name || "").trim();
+      const metadataIcaiNumber = String(metadata.icai_number || "").replace(/\D/g, "").slice(0, 6);
+      const metadataPracticeType = metadata.practice_type === "solo" ? "solo" : metadataFirmName ? "firm" : null;
+
+      if (metadataCaName) setCaName((current) => current || metadataCaName);
+      if (metadataFirmName) setFirmName((current) => current || metadataFirmName);
+      if (metadataIcaiNumber) setIcaiNumber((current) => current || metadataIcaiNumber);
+      if (metadataPracticeType) setPracticeType((current) => current ?? metadataPracticeType);
+    };
+
+    loadSignupMetadata();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};

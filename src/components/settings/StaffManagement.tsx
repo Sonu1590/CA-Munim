@@ -15,6 +15,18 @@ const roleIcons = { "Senior CA": ShieldCheck, "Article Clerk": Shield, "Admin St
 const roleColors = { "Senior CA": "bg-primary/10 text-primary", "Article Clerk": "bg-accent/10 text-accent", "Admin Staff": "bg-muted text-muted-foreground" };
 const getRole = (role: StaffMember["role"] | string): StaffMember["role"] =>
   role === "Senior CA" || role === "Article Clerk" || role === "Admin Staff" ? role : "Admin Staff";
+const getInitials = (name: string) =>
+  (name || "Staff Member")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+const formatJoinedDate = (date: string) => {
+  const parsed = new Date(date);
+  return Number.isNaN(parsed.getTime()) ? "Not available" : parsed.toLocaleDateString("en-IN");
+};
 
 export function StaffManagement() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
@@ -22,6 +34,7 @@ export function StaffManagement() {
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newStaff, setNewStaff] = useState({ name: "", role: "Article Clerk" as StaffMember["role"], email: "", phone: "" });
+  const staffList = Array.isArray(staff) ? staff : [];
 
   useEffect(() => {
     const loadStaff = async () => {
@@ -29,9 +42,10 @@ export function StaffManagement() {
       setError(null);
       try {
         const data = await fetchStaffFromSupabase();
-        setStaff(data);
+        setStaff(Array.isArray(data) ? data : []);
       } catch (err: any) {
         setError(err.message ?? "Unable to load staff members");
+        setStaff([]);
       } finally {
         setLoading(false);
       }
@@ -54,13 +68,13 @@ export function StaffManagement() {
   };
 
   const handleAdd = async () => {
-    if (!newStaff.name || !newStaff.email) { toast.error("Name and email are required"); return; }
+    if (!newStaff.name.trim() || !newStaff.email.trim()) { toast.error("Name and email are required"); return; }
     try {
       const member = await addStaffToSupabase({
-        name: newStaff.name,
+        name: newStaff.name.trim(),
         role: newStaff.role,
-        email: newStaff.email,
-        phone: newStaff.phone,
+        email: newStaff.email.trim(),
+        phone: newStaff.phone.trim(),
         isActive: true,
       });
       setStaff((prev) => [...prev, member]);
@@ -79,7 +93,7 @@ export function StaffManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2"><Users className="h-5 w-5 text-primary" />Staff Members</h3>
-          <p className="text-sm text-muted-foreground">{staff.filter((s) => s.isActive).length} active, {staff.filter((s) => !s.isActive).length} inactive</p>
+          <p className="text-sm text-muted-foreground">{staffList.filter((s) => s.isActive).length} active, {staffList.filter((s) => !s.isActive).length} inactive</p>
         </div>
         <Button onClick={() => setShowAddModal(true)} className="gap-2"><Plus className="h-4 w-4" />Add Staff</Button>
       </div>
@@ -89,30 +103,31 @@ export function StaffManagement() {
           <div className="flex items-center justify-center py-16 text-muted-foreground gap-2"><Loader2 className="h-5 w-5 animate-spin" />Loading staff...</div>
         ) : error ? (
           <div className="text-center py-8 text-destructive">{error}</div>
-        ) : staff.length === 0 ? (
+        ) : staffList.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">No staff members found.</div>
-        ) : staff.map((member) => {
+        ) : staffList.map((member) => {
           const role = getRole(member.role);
           const RoleIcon = roleIcons[role];
+          const memberName = member.name || "Staff Member";
           return (
             <Card key={member.id} className={!member.isActive ? "opacity-60" : ""}>
               <CardContent className="p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-start gap-3">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
-                      {member.name.split(" ").map((n) => n[0]).join("")}
+                      {getInitials(memberName)}
                     </div>
                     <div>
-                      <p className="font-medium">{member.name}</p>
+                      <p className="font-medium">{memberName}</p>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
                         <Badge variant="secondary" className={`gap-1 text-xs ${roleColors[role]}`}>
                           <RoleIcon className="h-3 w-3" />{role}
                         </Badge>
-                        <span className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" />{member.email}</span>
-                        <span className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" />{member.phone}</span>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" />{member.email || "No email"}</span>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" />{member.phone || "No phone"}</span>
                       </div>
                       <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                        <span>Joined: {new Date(member.joinedDate).toLocaleDateString("en-IN")}</span>
+                        <span>Joined: {formatJoinedDate(member.joinedDate)}</span>
                         <span className="text-green-600">{member.tasksCompleted} completed</span>
                         <span className="text-orange-500">{member.tasksPending} pending</span>
                       </div>
