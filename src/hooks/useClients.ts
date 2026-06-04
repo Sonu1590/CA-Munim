@@ -61,9 +61,16 @@ export interface ClientFormData {
   notes?: string
 }
 
-// ── Raw Supabase row shape ───────────────────────────────────────────────────
-
-// ── Transform DB row → Client interface the UI expects ──────────────────────
+function mapClientDbError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes('date_of_birth') && lower.includes('does not exist')) {
+    return 'Clients could not be loaded because the database is missing the date_of_birth column. Apply the latest Supabase migration (supabase/migrations/20260530120000_add_date_of_birth_to_clients.sql) and try again.';
+  }
+  if (lower.includes('permission denied') || lower.includes('row-level security')) {
+    return 'You do not have permission to view clients. Please sign in again or contact your firm admin.';
+  }
+  return 'Failed to load clients. Please try again or contact support if the problem continues.';
+}
 
 // ── Main hook ────────────────────────────────────────────────────────────────
 export function useClients() {
@@ -154,7 +161,8 @@ export function useClients() {
       setClients(shaped)
     } catch (err: any) {
       console.error('useClients fetch error:', err)
-      setError(err.message ?? 'Failed to load clients')
+      const raw = err?.message ?? ''
+      setError(raw ? mapClientDbError(raw) : 'Failed to load clients')
     } finally {
       setLoading(false)
     }

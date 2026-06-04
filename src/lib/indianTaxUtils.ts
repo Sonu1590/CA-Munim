@@ -4,7 +4,7 @@ export const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 export const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 
 const PAN_ENTITY_MAP: Record<string, string> = {
-  P: "Individual",
+  P: "Individual / Person",
   C: "Company",
   H: "HUF",
   F: "Firm / LLP",
@@ -16,12 +16,65 @@ const PAN_ENTITY_MAP: Record<string, string> = {
   G: "Government",
 };
 
-export function validatePAN(pan: string) {
+/** Expected 4th PAN character for each client type (Income Tax entity codes). */
+export const CLIENT_TYPE_PAN_CHAR: Record<string, string> = {
+  Individual: "P",
+  "Sole Proprietor": "P",
+  HUF: "H",
+  Partnership: "F",
+  LLP: "F",
+  "Private Ltd": "C",
+  "Public Ltd": "C",
+  Trust: "T",
+  Society: "T",
+  AOP: "A",
+  BOI: "B",
+};
+
+export type PanValidationResult = {
+  isValid: boolean;
+  entityType: string | null;
+  entityChar: string | null;
+  value: string;
+  /** Set when PAN format is valid but 4th char does not match selected client type. */
+  clientTypeMismatch: string | null;
+  /** Set when format is valid but 4th char is not a known entity code. */
+  unknownEntityCode: string | null;
+};
+
+export function getPanEntityLabel(char: string): string | null {
+  return PAN_ENTITY_MAP[char] ?? null;
+}
+
+export function validatePAN(pan: string, clientType?: string): PanValidationResult {
   const value = pan.trim().toUpperCase();
   const isValid = PAN_REGEX.test(value);
-  const entityChar = value[3];
-  const entityType = isValid ? PAN_ENTITY_MAP[entityChar] ?? "Unknown" : null;
-  return { isValid, entityType, value };
+  const entityChar = isValid ? value[3] : null;
+  const entityType = entityChar ? getPanEntityLabel(entityChar) : null;
+
+  let unknownEntityCode: string | null = null;
+  if (isValid && entityChar && !entityType) {
+    unknownEntityCode = `4th character '${entityChar}' is not a valid PAN entity code. Use P (Individual), C (Company), H (HUF), F (Firm), A (AOP), T (Trust), or B (BOI).`;
+  }
+
+  let clientTypeMismatch: string | null = null;
+  if (isValid && entityChar && clientType) {
+    const expectedChar = CLIENT_TYPE_PAN_CHAR[clientType];
+    if (expectedChar && entityChar !== expectedChar) {
+      const expectedLabel = PAN_ENTITY_MAP[expectedChar] ?? expectedChar;
+      const foundLabel = entityType ?? `code '${entityChar}'`;
+      clientTypeMismatch = `For ${clientType}, PAN 4th character should be '${expectedChar}' (${expectedLabel}), not '${entityChar}' (${foundLabel}).`;
+    }
+  }
+
+  return {
+    isValid,
+    entityType,
+    entityChar,
+    value,
+    clientTypeMismatch,
+    unknownEntityCode,
+  };
 }
 
 // GST state codes (first 2 digits of GSTIN)
