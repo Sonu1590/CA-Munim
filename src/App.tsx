@@ -63,8 +63,16 @@ function AppRoutes() {
    * Creates missing firms + staff rows when the signup trigger fails.
    * Silent — never throws, never blocks the user.
    */
-  const bootstrapMissingRecords = async (userId: string, email: string): Promise<void> => {
+  const bootstrapMissingRecords = async (session: Session): Promise<void> => {
     try {
+      const userId = session.user.id;
+      const email = session.user.email ?? "";
+      const metadata = session.user.user_metadata ?? {};
+      const caName = String(metadata.ca_name || metadata.full_name || metadata.name || email.split("@")[0] || "").trim();
+      const firmName = String(metadata.firm_name || "").trim();
+      const displayName = firmName || caName || email.split("@")[0];
+      const icaiNumber = String(metadata.icai_number || "").trim();
+      const practiceType = metadata.practice_type === "solo" ? "solo" : "firm";
       let firmId: string | null = null;
 
       const { data: existingFirm } = await supabase
@@ -78,7 +86,14 @@ function AppRoutes() {
       } else {
         const { data: newFirm } = await supabase
           .from("firms")
-          .insert({ name: email.split("@")[0], email, onboarding_complete: false })
+          .insert({
+            name: displayName,
+            ca_name: caName || null,
+            icai_number: icaiNumber || null,
+            email,
+            practice_type: practiceType,
+            onboarding_complete: false,
+          })
           .select("id")
           .single();
         firmId = newFirm?.id ?? null;
@@ -87,7 +102,7 @@ function AppRoutes() {
       if (!firmId) return;
 
       await supabase.from("staff").upsert(
-        { firm_id: firmId, name: email.split("@")[0], email, auth_user_id: userId, role: "admin", active: true },
+        { firm_id: firmId, name: caName || email.split("@")[0], email, auth_user_id: userId, role: "admin", active: true },
         { onConflict: "auth_user_id" }
       );
     } catch (err) {
@@ -121,7 +136,7 @@ function AppRoutes() {
 
       if (!data) {
         // Trigger failed — bootstrap silently then go to onboarding
-        await bootstrapMissingRecords(session.user.id, session.user.email ?? "");
+        await bootstrapMissingRecords(session);
         setStatus("onboarding");
         return;
       }

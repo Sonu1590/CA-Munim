@@ -61,6 +61,11 @@ export interface ClientFormData {
   notes?: string
 }
 
+export interface ClientMutationResult {
+  success: boolean
+  error?: string
+}
+
 function mapClientDbError(message: string): string {
   const lower = message.toLowerCase();
   if (lower.includes('date_of_birth') && lower.includes('does not exist')) {
@@ -73,6 +78,32 @@ function mapClientDbError(message: string): string {
 }
 
 // ── Main hook ────────────────────────────────────────────────────────────────
+function mapClientMutationError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err ?? '')
+  const lower = raw.toLowerCase()
+
+  if (lower.includes('date of birth') || lower.includes('date_of_birth')) {
+    return 'Date of Birth / Incorporation is required.'
+  }
+  if (lower.includes('invalid input syntax for type date') || lower.includes('date/time field value out of range')) {
+    return 'Enter a valid Date of Birth / Incorporation.'
+  }
+  if (lower.includes('not authenticated')) {
+    return 'Please sign in again before saving the client.'
+  }
+  if (lower.includes('firm')) {
+    return 'Your account is not linked to a firm. Please complete setup or contact support.'
+  }
+  if (lower.includes('permission denied') || lower.includes('row-level security')) {
+    return 'You do not have permission to save clients. Please contact your firm admin.'
+  }
+  if (lower.includes('duplicate key') || lower.includes('unique constraint')) {
+    return 'A client with these details already exists.'
+  }
+
+  return 'Could not save client. Please check the details and try again.'
+}
+
 export function useClients() {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
@@ -173,9 +204,9 @@ export function useClients() {
   }, [fetchClients])
 
   // ── Add client ─────────────────────────────────────────────────────────────
-  const addClient = async (formData: ClientFormData): Promise<boolean> => {
+  const addClient = async (formData: ClientFormData): Promise<ClientMutationResult> => {
     try {
-      if (!formData.date_of_birth) {
+      if (!formData.date_of_birth?.trim()) {
         throw new Error('Date of Birth / Incorporation is required')
       }
 
@@ -238,19 +269,23 @@ if (!staffRow?.firm_id) {
       if (insertErr) throw insertErr
 
       await fetchClients() // refresh list
-      return true
+      return { success: true }
     } catch (err: any) {
       console.error('addClient error:', err)
-      return false
+      return { success: false, error: mapClientMutationError(err) }
     }
   }
 
   // ── Update client ──────────────────────────────────────────────────────────
-  const updateClient = async (id: string, formData: Partial<ClientFormData>): Promise<boolean> => {
+  const updateClient = async (id: string, formData: Partial<ClientFormData>): Promise<ClientMutationResult> => {
     try {
       const clientExists = clients.find(c => c.id === id)
       if (!clientExists) {
-        return false
+        return { success: false, error: 'Client could not be found. Refresh the list and try again.' }
+      }
+
+      if (formData.date_of_birth !== undefined && !formData.date_of_birth.trim()) {
+        throw new Error('Date of Birth / Incorporation is required')
       }
 
       const { error: updateErr } = await supabase
@@ -278,10 +313,10 @@ if (!staffRow?.firm_id) {
       if (updateErr) throw updateErr
 
       await fetchClients()
-      return true
+      return { success: true }
     } catch (err: any) {
       console.error('updateClient error:', err)
-      return false
+      return { success: false, error: mapClientMutationError(err) }
     }
   }
 

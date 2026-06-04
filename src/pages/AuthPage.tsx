@@ -25,6 +25,22 @@ const getAuthErrorMessage = (error: any) => {
   return message || "Something went wrong. Please try again.";
 };
 
+const buildSignupMetadata = (email: string, fullName: string, firmName: string, icaiNumber: string) => {
+  const caName = fullName.trim();
+  const organizationName = firmName.trim();
+  const icai = icaiNumber.trim();
+  const emailPrefix = email.split("@")[0];
+
+  return {
+    full_name: caName || emailPrefix,
+    name: caName || emailPrefix,
+    ca_name: caName || emailPrefix,
+    firm_name: organizationName,
+    icai_number: icai || null,
+    practice_type: organizationName ? "firm" : "solo",
+  };
+};
+
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
@@ -98,7 +114,15 @@ export default function AuthPage() {
           return;
         }
 
-        const { data, error } = await supabase.auth.signUp({ email: normalizedEmail, password });
+        const signupMetadata = buildSignupMetadata(normalizedEmail, fullName, firmName, icaiNumber);
+        const { data, error } = await supabase.auth.signUp({
+          email: normalizedEmail,
+          password,
+          options: {
+            data: signupMetadata,
+            emailRedirectTo: `${window.location.origin}/onboarding`,
+          },
+        });
         if (error) throw error;
 
         if (!data.user) {
@@ -110,13 +134,12 @@ export default function AuthPage() {
           return;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
         const profileUpdates = fullName.trim() || firmName.trim() || icaiNumber.trim()
           ? {
               name: firmName.trim() || fullName.trim() || normalizedEmail.split("@")[0],
               ca_name: fullName.trim() || normalizedEmail.split("@")[0],
               icai_number: icaiNumber.trim() || null,
+              practice_type: firmName.trim() ? "firm" : "solo",
             }
           : { name: normalizedEmail.split("@")[0] };
 

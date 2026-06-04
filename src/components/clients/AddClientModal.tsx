@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Client, ClientFormData, ClientType } from "@/hooks/useClients";
+import { Client, ClientFormData, ClientMutationResult, ClientType } from "@/hooks/useClients";
 import { validatePAN, validateGSTIN } from "@/lib/indianTaxUtils";
 import { FYHint } from "@/components/common/FYHint";
 import { DatePickerField } from "@/components/ui/date-picker-field";
@@ -28,7 +28,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 interface AddClientModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave?: (formData: ClientFormData) => Promise<boolean | void> | boolean | void;
+  onSave?: (formData: ClientFormData) => Promise<ClientMutationResult | boolean | void> | ClientMutationResult | boolean | void;
   client?: Client | null;
 }
 
@@ -209,8 +209,12 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
         mca_filings: selectedMcaFilings,
         annual_fees: annualFees ? Number(annualFees) : 0,
       });
-      if (result === false) {
-        setError("Could not save client. Please check the details and try again.");
+      if (result === false || (typeof result === "object" && result !== null && "success" in result && !result.success)) {
+        setError(
+          typeof result === "object" && result !== null && "error" in result && result.error
+            ? result.error
+            : "Could not save client. Please check the details and try again."
+        );
         return;
       }
       resetForm();

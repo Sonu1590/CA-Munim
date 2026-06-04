@@ -156,6 +156,33 @@ const getFirmProfileError = (err: any) => {
   return new Error(extractSupabaseError(err) || "Unable to load firm profile.");
 };
 
+const getStaffError = (err: any, fallback = "Unable to load staff members.") => {
+  const message = extractSupabaseError(err).toLowerCase();
+  if (message.includes("row-level security") || message.includes("policy") || message.includes("permission denied")) {
+    return new Error("Unable to load staff because of permissions. Please contact your firm admin.");
+  }
+  return new Error(extractSupabaseError(err) || fallback);
+};
+
+async function getCurrentFirmId(): Promise<string> {
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError) throw getStaffError(authError, "Unable to verify your session.");
+  if (!user) throw new Error("Please sign in again to manage staff.");
+
+  const { data: staffRow, error: staffError } = await supabase
+    .from("staff")
+    .select("firm_id")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+
+  if (staffError) throw getStaffError(staffError, "Unable to identify your firm.");
+  if (!staffRow?.firm_id) {
+    throw new Error("Your account is not linked to a firm. Please complete setup or contact support.");
+  }
+
+  return staffRow.firm_id;
+}
+
 export async function fetchFirmProfileFromSupabase(): Promise<FirmProfile> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -296,19 +323,23 @@ export async function saveFirmProfileToSupabase(profile: FirmProfile): Promise<F
 }
 
 export async function fetchStaffFromSupabase(): Promise<StaffMember[]> {
+  const firmId = await getCurrentFirmId();
+
   const { data, error } = await supabase
     .from("staff")
     .select(`id, name, role, email, phone, active, created_at`)
+    .eq("firm_id", firmId)
     .order("created_at", { ascending: false });
 
-  if (error || !data) return mockStaff;
+  if (error) throw getStaffError(error);
+  if (!Array.isArray(data)) return [];
 
   return data.map((row: any) => ({
     id: row.id,
-    name: row.name,
+    name: row.name ?? "",
     role: toStaffRole(row.role),
-    email: row.email,
-    phone: row.phone,
+    email: row.email ?? "",
+    phone: row.phone ?? "",
     isActive: toBool(row.active),
     joinedDate: row.created_at?.split('T')[0] ?? new Date().toISOString().split("T")[0],
     tasksCompleted: Number(0), // Not in schema
@@ -317,35 +348,26 @@ export async function fetchStaffFromSupabase(): Promise<StaffMember[]> {
 }
 
 export async function addStaffToSupabase(staff: Omit<StaffMember, "id" | "joinedDate" | "tasksCompleted" | "tasksPending">): Promise<StaffMember> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-
-  // Get the current user's firm_id
-  const { data: staffData } = await supabase
-    .from('staff')
-    .select('firm_id')
-    .eq('auth_user_id', user.id)
-    .single();
-
-  if (!staffData) throw new Error('Unable to determine firm');
+  const firmId = await getCurrentFirmId();
 
   const { data, error } = await supabase.from("staff").insert([{
-    firm_id: staffData.firm_id,
+    firm_id: firmId,
     name: staff.name,
     role: staff.role,
     email: staff.email,
     phone: staff.phone,
     active: staff.isActive,
-  }]).select().single();
+  }]).select("id, name, role, email, phone, active, created_at").single();
 
-  if (error || !data) throw error;
+  if (error) throw getStaffError(error, "Unable to add staff member.");
+  if (!data) throw new Error("Unable to add staff member.");
 
   return {
     id: data.id,
-    name: data.name,
-    role: data.role,
-    email: data.email,
-    phone: data.phone,
+    name: data.name ?? "",
+    role: toStaffRole(data.role),
+    email: data.email ?? "",
+    phone: data.phone ?? "",
     isActive: toBool(data.active),
     joinedDate: data.created_at?.split('T')[0] ?? new Date().toISOString().split("T")[0],
     tasksCompleted: 0,
@@ -354,8 +376,15 @@ export async function addStaffToSupabase(staff: Omit<StaffMember, "id" | "joined
 }
 
 export async function updateStaffActiveStatus(id: string, isActive: boolean): Promise<void> {
-  const { error } = await supabase.from("staff").update({ active: isActive }).eq("id", id);
-  if (error) throw error;
+  const firmId = await getCurrentFirmId();
+
+  const { error } = await supabase
+    .from("staff")
+    .update({ active: isActive })
+    .eq("id", id)
+    .eq("firm_id", firmId);
+
+  if (error) throw getStaffError(error, "Unable to update staff status.");
 }
 
 export async function fetchInvoiceSettingsFromSupabase(): Promise<InvoiceSettings> {
