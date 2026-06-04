@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { Client, ClientFormData, ClientType } from "@/hooks/useClients";
 import { validatePAN, validateGSTIN } from "@/lib/indianTaxUtils";
 import { FYHint } from "@/components/common/FYHint";
+import { DatePickerField } from "@/components/ui/date-picker-field";
 import { CheckCircle2, XCircle } from "lucide-react";
 
 interface AddClientModalProps {
@@ -92,7 +93,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
   const [error, setError] = useState<string | null>(null);
 
   const isCompanyType = ["Private Ltd", "LLP", "Public Ltd"].includes(clientType);
-  const panCheck = validatePAN(panValue);
+  const panCheck = validatePAN(panValue, clientType || undefined);
   const gstinCheck = validateGSTIN(gstinValue);
 
   const toggleService = (service: string) => {
@@ -255,7 +256,15 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="dob">Date of Birth / Incorporation *</Label>
-                  <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+                  <DatePickerField
+                    id="dob"
+                    value={dob}
+                    onChange={(value) => {
+                      setIsDirty(true);
+                      setDob(value);
+                    }}
+                    placeholder="dd/mm/yyyy"
+                  />
                   <FYHint date={dob} />
                 </div>
                 <div className="space-y-1.5">
@@ -277,13 +286,21 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                       )
                     )}
                   </div>
-                  {panCheck.isValid && panCheck.entityType && (
+                  {panValue.length === 10 && panCheck.isValid && panCheck.entityType && !panCheck.clientTypeMismatch && (
                     <p className="text-[11px] text-muted-foreground mt-1">
                       Entity type: <span className="font-medium text-primary">{panCheck.entityType}</span>
                     </p>
                   )}
+                  {panValue.length === 10 && panCheck.isValid && panCheck.unknownEntityCode && (
+                    <p className="text-[11px] text-destructive mt-1">{panCheck.unknownEntityCode}</p>
+                  )}
+                  {panValue.length === 10 && panCheck.clientTypeMismatch && (
+                    <p className="text-[11px] text-destructive mt-1">{panCheck.clientTypeMismatch}</p>
+                  )}
                   {!panCheck.isValid && panValue.length === 10 && (
-                    <p className="text-[11px] text-destructive mt-1">Invalid PAN format</p>
+                    <p className="text-[11px] text-destructive mt-1">
+                      Invalid PAN format (expected AAAAA9999A — 5 letters, 4 digits, 1 letter)
+                    </p>
                   )}
                 </div>
                 <div className="space-y-1.5">
@@ -366,7 +383,15 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="gstRegDate">GST Registration Date</Label>
-                  <Input id="gstRegDate" type="date" value={gstRegDate} onChange={(e) => setGstRegDate(e.target.value)} />
+                  <DatePickerField
+                    id="gstRegDate"
+                    value={gstRegDate}
+                    onChange={(value) => {
+                      setIsDirty(true);
+                      setGstRegDate(value);
+                    }}
+                    placeholder="dd/mm/yyyy"
+                  />
                   <FYHint date={gstRegDate} />
                 </div>
                 <div className="space-y-1.5">
@@ -448,7 +473,15 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="compRegDate">Registration Date</Label>
-                      <Input id="compRegDate" type="date" value={compRegDate} onChange={(e) => setCompRegDate(e.target.value)} />
+                      <DatePickerField
+                        id="compRegDate"
+                        value={compRegDate}
+                        onChange={(value) => {
+                          setIsDirty(true);
+                          setCompRegDate(value);
+                        }}
+                        placeholder="dd/mm/yyyy"
+                      />
                       <FYHint date={compRegDate} />
                     </div>
                     <div className="space-y-1.5">
