@@ -30,6 +30,8 @@ import AuthPage from "./pages/AuthPage.tsx";
 import OnboardingPage from "./pages/OnboardingPage.tsx";
 import { GlobalSearch } from "./components/common/GlobalSearch";
 import { FinancialYearProvider } from "@/context/financialYear";
+import AuthCallback from "./pages/AuthCallback.tsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -232,6 +234,8 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>
