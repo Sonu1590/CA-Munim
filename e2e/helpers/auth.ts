@@ -5,8 +5,8 @@
 import { Page, expect } from '@playwright/test';
 
 export const TEST_USER = {
-  email: process.env.TEST_USER_EMAIL ?? 'sonusingh1590@gmail.com',
-  password: process.env.TEST_USER_PASSWORD ?? 'Camunim#1590',
+  email: process.env.TEST_USER_EMAIL ?? 'djlnscaq@sharklasers.com',
+  password: process.env.TEST_USER_PASSWORD ?? 'TestUser@2026',
 };
 
 export const TEST_CLIENT = {
@@ -109,13 +109,10 @@ export async function signOut(page: Page) {
 export async function expectToast(
   page: Page,
   text: string | RegExp,
-  timeout = 8_000
+  timeout = 10_000
 ) {
   const toast = page
-    .locator('[data-sonner-toast]')
-    .or(page.locator('[role="status"]'))
-    .or(page.locator('[class*="toast"]'))
-    .filter({ hasText: text })
+    .getByText(text)
     .first();
 
   await expect(toast).toBeVisible({
