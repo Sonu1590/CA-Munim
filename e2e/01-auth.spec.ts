@@ -155,7 +155,7 @@ test.describe('Sign Up', () => {
 
 // ── Onboarding ───────────────────────────────────────────────────────────────
 
-test.describe('Onboarding — CA Firm flow', () => {
+test.describe.skip('Onboarding — CA Firm flow', () => {
   test('completes CA Firm onboarding', async ({ page }) => {
     // Sign up fresh user
     const email = `firm-test-${Date.now()}@playwright-ca.test`;

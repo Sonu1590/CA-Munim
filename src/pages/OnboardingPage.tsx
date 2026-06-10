@@ -307,7 +307,7 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
               <Field id="caName" label="Your Full Name" required error={errors.caName}>
                 <Input
                   id="caName"
-                  placeholder={practiceType === "firm" ? "e.g. CA Rajesh Sharma" : "e.g. CA Sonu Singh"}
+                  placeholder={practiceType === "firm" ? "e.g. CA Rajesh Sharma" : "e.g. CA First Name  Last Name"}
                   value={caName}
                   onChange={(e) => { setCaName(e.target.value); setErrors(p => ({...p, caName: ""})); }}
                   className={errors.caName ? "border-destructive" : ""}

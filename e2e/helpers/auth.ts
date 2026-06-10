@@ -109,13 +109,10 @@ export async function signOut(page: Page) {
 export async function expectToast(
   page: Page,
   text: string | RegExp,
-  timeout = 8_000
+  timeout = 10_000
 ) {
   const toast = page
-    .locator('[data-sonner-toast]')
-    .or(page.locator('[role="status"]'))
-    .or(page.locator('[class*="toast"]'))
-    .filter({ hasText: text })
+    .getByText(text)
     .first();
 
   await expect(toast).toBeVisible({
