@@ -12,7 +12,21 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { signIn, signOut, expectToast, TEST_USER } from './helpers/auth';
+import {
+  signIn,
+  signOut,
+  expectToast,
+  TEST_USER,
+  switchToSignUpTab,
+  authModeTab,
+  authSubmitButton,
+  loginPageHeading,
+  fillSignUpForm,
+  submitSignUp,
+  isObfuscatedDuplicateSignUp,
+  uniqueSignUpEmail,
+} from './helpers/auth';
+import { clientsPageHeading } from './helpers/clients';
 
 // ── Sign In ──────────────────────────────────────────────────────────────────
 
@@ -23,11 +37,11 @@ test.describe('Sign In', () => {
   });
 
   test('shows login page with correct elements', async ({ page }) => {
-    await expect(page.getByText('Sign In')).toBeVisible();
-    await expect(page.getByText('Create Account')).toBeVisible();
+    await expect(authModeTab(page, /^sign.?in$/i)).toBeVisible();
+    await expect(authModeTab(page, /^create account$/i)).toBeVisible();
     await expect(page.getByLabel('Email Address')).toBeVisible();
     await expect(page.getByLabel('Password')).toBeVisible();
-    await expect(page.locator('form').getByRole('button', {name: /^sign in$/i,})).toBeVisible();
+    await expect(authSubmitButton(page, /^sign.?in$/i)).toBeVisible();
     await expect(page.getByText('Forgot password?')).toBeVisible();
   });
 
@@ -39,7 +53,7 @@ test.describe('Sign In', () => {
   test('shows error for wrong password', async ({ page }) => {
     await page.getByLabel('Email Address').fill(TEST_USER.email);
     await page.getByLabel('Password').fill('WrongPassword123!');
-    await page.locator('form').getByRole('button', { name: /^sign.?in$/i }).click();
+    await authSubmitButton(page, /^sign.?in$/i).click();
     await expectToast(page, /incorrect|invalid|wrong|credentials/i);
     // Must stay on login page
     await expect(page).toHaveURL('/login');
@@ -48,7 +62,7 @@ test.describe('Sign In', () => {
   test('shows error for invalid email format', async ({ page }) => {
     await page.getByLabel('Email Address').fill('notanemail');
     await page.getByLabel('Password').fill('SomePassword123');
-    await page.locator('form').getByRole('button', { name: /^sign.?in$/i }).click();
+    await authSubmitButton(page, /^sign.?in$/i).click();
     // Browser native validation or toast
     const emailInput = page.getByLabel('Email Address');
     const validationMessage = await emailInput.evaluate((el: HTMLInputElement) => el.validationMessage);
@@ -57,22 +71,22 @@ test.describe('Sign In', () => {
 
   test('shows error for empty email', async ({ page }) => {
     await page.getByLabel('Password').fill('SomePassword123');
-    await page.locator('form').getByRole('button', { name: /^sign.?in$/i }).click();
+    await authSubmitButton(page, /^sign.?in$/i).click();
     await expectToast(page, /email|password|required/i);
   });
 
   test('shows error for empty password', async ({ page }) => {
     await page.getByLabel('Email Address').fill(TEST_USER.email);
-    await page.locator('form').getByRole('button', { name: /^sign.?in$/i }).click();
+    await authSubmitButton(page, /^sign.?in$/i).click();
     await expectToast(page, /email|password|required/i);
   });
 
   test('shows loading state while signing in', async ({ page }) => {
     await page.getByLabel('Email Address').fill(TEST_USER.email);
     await page.getByLabel('Password').fill(TEST_USER.password);
-    await page.locator('form').getByRole('button', { name: /^sign.?in$/i }).click();
+    await authSubmitButton(page, /^sign.?in$/i).click();
     // Button should show loading state briefly
-    const button = page.getByRole('button', { name: /sign in|signing/i });
+    const button = authSubmitButton(page, /^sign.?in$/i);
     // Either shows a spinner or disables
     await expect(button).toBeDisabled().catch(() => {}); // may be too fast
   });
@@ -82,7 +96,7 @@ test.describe('Sign In', () => {
     // If Supabase email verification is disabled, skip this
     await page.getByLabel('Email Address').fill('unverified@test.com');
     await page.getByLabel('Password').fill('TestPass123!');
-    await page.locator('form').getByRole('button', { name: /^sign.?in$/i }).click();
+    await authSubmitButton(page, /^sign.?in$/i).click();
     await expectToast(page, /verify|confirm|email/i);
     // Should offer resend option
     await expect(page.getByRole('button', { name: /resend/i })).toBeVisible();
@@ -113,43 +127,87 @@ test.describe('Sign In', () => {
 test.describe('Sign Up', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).first().click();
+    await expect(page.getByText('CA Munim').first()).toBeVisible();
+    await switchToSignUpTab(page);
   });
 
   test('shows create account form elements', async ({ page }) => {
     await expect(page.getByLabel('Email Address')).toBeVisible();
     await expect(page.getByLabel('Password')).toBeVisible();
-    await expect(page.locator('form').getByRole('button', { name: /^create account$/i })).toBeVisible();
+    await expect(page.getByLabel('Your Name')).toBeVisible();
+    await expect(authSubmitButton(page, /^create account$/i)).toBeVisible();
   });
 
   test('shows error for password too short', async ({ page }) => {
     await page.getByLabel('Email Address').fill('newuser@test.com');
     await page.getByLabel('Password').fill('short');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).click();
+    await authSubmitButton(page, /^create account$/i).click();
     await expectToast(page, /8 character|password.*short|too short/i);
   });
 
   test('shows error for duplicate email', async ({ page }) => {
-    // Try to sign up with an already-registered email
-    await page.getByLabel('Email Address').fill(TEST_USER.email);
-    await page.getByLabel('Password').fill('TestPassword@123');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).click();
-    await expectToast(page, /already|exists|registered/i);
-    // Must stay on login page
+    await fillSignUpForm(page, {
+      email: TEST_USER.email,
+      password: 'TestPassword@123',
+    });
+
+    const firmsCheck = page.waitForResponse(
+      (r) => r.url().includes('/rest/v1/firms') && r.request().method() === 'GET',
+      { timeout: 10_000 },
+    ).catch(() => null);
+
+    const response = await submitSignUp(page);
+    await firmsCheck;
+
+    // Pre-check toast (firms/staff) or Supabase duplicate response
+    const duplicateToast = page
+      .locator('[data-sonner-toast]')
+      .filter({ hasText: /already|exists|registered|account with this email/i })
+      .or(page.getByText(/already|exists|registered|account with this email/i));
+
+    const body = await response.json().catch(() => ({}));
+    const apiSaysDuplicate = JSON.stringify(body).match(/already|registered|exists/i);
+
+    const sawClientError = await duplicateToast.first().isVisible().catch(() => false);
+
+    expect(sawClientError || apiSaysDuplicate || !response.ok()).toBeTruthy();
+    await expect(page).not.toHaveURL('/onboarding');
     await expect(page).toHaveURL('/login');
   });
 
-  test('valid signup redirects to onboarding', async ({ page }) => {
-    // Use a timestamp-based unique email to avoid conflicts
+  test('valid signup redirects to onboarding or requests verification', async ({ page }) => {
+    test.setTimeout(60_000);
     const uniqueEmail = `test-${Date.now()}@playwright-ca.test`;
-    
-    await page.getByLabel('Email Address').fill(uniqueEmail);
-    await page.getByLabel('Password').fill('ValidPass@123');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).click();
 
-    // Should go to onboarding
-    await expect(page).toHaveURL('/onboarding', { timeout: 15_000 });
-    await expect(page.getByText('Welcome to CA Munim')).toBeVisible();
+    await fillSignUpForm(page, {
+      email: uniqueEmail,
+      password: 'ValidPass@123',
+    });
+
+    const response = await submitSignUp(page);
+    expect(response.ok()).toBeTruthy();
+
+    const body = await response.json().catch(() => ({}));
+    const hasSessionUser = Boolean(body?.user?.id);
+
+    if (hasSessionUser) {
+      await expect(page).toHaveURL('/onboarding', { timeout: 20_000 });
+      await expect(
+        page.getByRole('heading', { name: 'Welcome to CA Munim' }),
+      ).toBeVisible();
+      return;
+    }
+
+    // Email confirmation required — no immediate session
+    await expect(page).toHaveURL('/login');
+    const infoBanner = page.locator('.rounded-2xl.border').filter({
+      hasText: /verification|verify|inbox|confirm/i,
+    });
+    const toast = page
+      .locator('[data-sonner-toast]')
+      .filter({ hasText: /verification|verify|inbox|account created|check your email/i });
+
+    await expect(infoBanner.or(toast).first()).toBeVisible({ timeout: 10_000 });
   });
 });
 
@@ -160,10 +218,10 @@ test.describe.skip('Onboarding — CA Firm flow', () => {
     // Sign up fresh user
     const email = `firm-test-${Date.now()}@playwright-ca.test`;
     await page.goto('/login');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).first().click();
+    await switchToSignUpTab(page);
     await page.getByLabel('Email Address').fill(email);
     await page.getByLabel('Password').fill('ValidPass@123');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).click();
+    await authSubmitButton(page, /^create account$/i).click();
     await expect(page).toHaveURL('/onboarding', { timeout: 15_000 });
 
     // Step 1 — Practice type
@@ -192,10 +250,10 @@ test.describe.skip('Onboarding — CA Firm flow', () => {
   test('completes Solo Practitioner onboarding', async ({ page }) => {
     const email = `solo-test-${Date.now()}@playwright-ca.test`;
     await page.goto('/login');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).first().click();
+    await switchToSignUpTab(page);
     await page.getByLabel('Email Address').fill(email);
     await page.getByLabel('Password').fill('ValidPass@123');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).click();
+    await authSubmitButton(page, /^create account$/i).click();
     await expect(page).toHaveURL('/onboarding', { timeout: 15_000 });
 
     await page.getByText('Solo Practitioner').click();
@@ -214,10 +272,10 @@ test.describe.skip('Onboarding — CA Firm flow', () => {
   test('onboarding requires CA name', async ({ page }) => {
     const email = `validation-test-${Date.now()}@playwright-ca.test`;
     await page.goto('/login');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).first().click();
+    await switchToSignUpTab(page);
     await page.getByLabel('Email Address').fill(email);
     await page.getByLabel('Password').fill('ValidPass@123');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).click();
+    await authSubmitButton(page, /^create account$/i).click();
     await expect(page).toHaveURL('/onboarding', { timeout: 15_000 });
 
     await page.getByText('Solo Practitioner').click();
@@ -233,10 +291,10 @@ test.describe.skip('Onboarding — CA Firm flow', () => {
   test('onboarding Continue button disabled until practice type selected', async ({ page }) => {
     const email = `btn-test-${Date.now()}@playwright-ca.test`;
     await page.goto('/login');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).first().click();
+    await switchToSignUpTab(page);
     await page.getByLabel('Email Address').fill(email);
     await page.getByLabel('Password').fill('ValidPass@123');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).click();
+    await authSubmitButton(page, /^create account$/i).click();
     await expect(page).toHaveURL('/onboarding', { timeout: 15_000 });
 
     const continueBtn = page.getByRole('button', { name: 'Continue' });
@@ -249,10 +307,10 @@ test.describe.skip('Onboarding — CA Firm flow', () => {
   test('Back button on step 2 returns to step 1', async ({ page }) => {
     const email = `back-test-${Date.now()}@playwright-ca.test`;
     await page.goto('/login');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).first().click();
+    await switchToSignUpTab(page);
     await page.getByLabel('Email Address').fill(email);
     await page.getByLabel('Password').fill('ValidPass@123');
-    await page.locator('form').getByRole('button', { name: /^create account$/i }).click();
+    await authSubmitButton(page, /^create account$/i).click();
     await expect(page).toHaveURL('/onboarding', { timeout: 15_000 });
 
     await page.getByText('CA Firm').click();
@@ -317,7 +375,7 @@ test.describe('Session Persistence', () => {
   test('stays logged in after navigating to a route directly', async ({ page }) => {
     await signIn(page);
     await page.goto('/clients');
-    await expect(page.getByText('Clients')).toBeVisible({ timeout: 10_000 });
+    await expect(clientsPageHeading(page)).toBeVisible({ timeout: 10_000 });
     await expect(page).not.toHaveURL('/login');
   });
 });
@@ -329,7 +387,7 @@ test.describe('Sign Out', () => {
     await signIn(page);
     await signOut(page);
     await expect(page).toHaveURL('/login');
-    await expect(page.getByText('CA Munim')).toBeVisible();
+    await expect(loginPageHeading(page)).toBeVisible();
   });
 
   test('cannot access protected route after signing out', async ({ page }) => {

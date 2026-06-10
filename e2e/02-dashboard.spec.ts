@@ -16,6 +16,13 @@
 import { test, expect } from '@playwright/test';
 import { signIn } from './helpers/auth';
 import { getCurrentFY } from './helpers/utils';
+import {
+  metricCard,
+  metricCardValue,
+  dashboardSectionHeading,
+  globalSearchDialog,
+} from './helpers/dashboard';
+import { clientDialog } from './helpers/clients';
 
 test.describe('Dashboard', () => {
   test.beforeEach(async ({ page }) => {
@@ -37,16 +44,14 @@ test.describe('Dashboard', () => {
     await expect(page.locator('.animate-spin')).not.toBeVisible({ timeout: 10_000 });
     
     // Values should be numbers or ₹ amounts — not "—" or "Loading"
-    const totalClients = page.locator('text=Total Clients').locator('..').locator('..');
-    const value = await totalClients.locator('p').first().textContent();
+    const value = await metricCardValue(page, 'Total Clients').textContent();
     expect(value).not.toBe('—');
     expect(value).not.toMatch(/loading/i);
   });
 
   test('pending fees shows ₹ symbol', async ({ page }) => {
     await expect(page.locator('.animate-spin')).not.toBeVisible({ timeout: 10_000 });
-    const feesCard = page.locator('text=Pending Fees').locator('../..');
-    const value = await feesCard.locator('p').first().textContent();
+    const value = await metricCardValue(page, 'Pending Fees').textContent();
     expect(value).toMatch(/₹/);
   });
 
@@ -54,8 +59,7 @@ test.describe('Dashboard', () => {
     await expect(page.locator('.animate-spin')).not.toBeVisible({ timeout: 10_000 });
     // If there are overdue tasks, a red indicator should appear
     // This test passes regardless — just ensures no crash
-    const overdueCard = page.locator('text=Overdue Tasks').locator('../..');
-    await expect(overdueCard).toBeVisible();
+    await expect(metricCard(page, 'Overdue Tasks')).toBeVisible();
   });
 
   // ── Compliance Alerts ───────────────────────────────────────────────────
@@ -87,12 +91,12 @@ test.describe('Dashboard', () => {
   // ── Recent Activity ─────────────────────────────────────────────────────
 
   test('recent activity section is visible', async ({ page }) => {
-    await expect(page.getByText('Recent Activity')).toBeVisible();
+    await expect(dashboardSectionHeading(page, 'Recent Activity')).toBeVisible();
   });
 
   test('recent activity shows empty state or real items', async ({ page }) => {
     await expect(page.locator('.animate-spin')).not.toBeVisible({ timeout: 10_000 });
-    const activity = page.locator('text=Recent Activity').locator('../..');
+    const activity = dashboardSectionHeading(page, 'Recent Activity').locator('..');
     // Either shows activity items or empty state
     await expect(activity).toBeVisible();
   });
@@ -118,7 +122,9 @@ test.describe('Dashboard', () => {
   test('quick action "Add Client" opens client modal', async ({ page }) => {
     await page.getByRole('button', { name: /Add.*Client|Add Client/i }).first().click();
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText('Add New Client').or(page.getByText('Client Details'))).toBeVisible();
+    await expect(
+      clientDialog(page).getByRole('heading', { name: 'Add New Client' }),
+    ).toBeVisible();
   });
 
   // ── Sidebar Navigation ──────────────────────────────────────────────────
@@ -191,10 +197,10 @@ test.describe('Dashboard', () => {
   test('global search shows empty state when no data', async ({ page }) => {
     await page.keyboard.press('Control+k');
     await expect(page.getByRole('dialog')).toBeVisible();
-    await page.getByPlaceholder(/search/i).fill('xyzxyzxyz_nonexistent_query');
-    await expect(page.getByText('No results found').or(
-      page.getByText(/no data|no clients|no tasks/i)
-    )).toBeVisible({ timeout: 5_000 });
+    await globalSearchDialog(page).getByPlaceholder(/search/i).fill('xyzxyzxyz_nonexistent_query');
+    await expect(
+      globalSearchDialog(page).getByText(/no results found/i),
+    ).toBeVisible({ timeout: 5_000 });
   });
 
   // ── Mobile Layout ───────────────────────────────────────────────────────
@@ -226,8 +232,10 @@ test.describe('Dashboard', () => {
     });
     await page.reload();
     // Should show loading then content, not crash
-    await expect(page.getByText('Dashboard').or(
-      page.locator('.animate-spin')
-    )).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByRole('heading', { name: 'Dashboard' }).or(
+        page.getByText('Loading dashboard...'),
+      ).first(),
+    ).toBeVisible({ timeout: 20_000 });
   });
 });

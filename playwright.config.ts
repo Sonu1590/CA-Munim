@@ -1,7 +1,4 @@
 import { defineConfig, devices } from '@playwright/test';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 export default defineConfig({
   testDir: './e2e',
@@ -18,7 +15,7 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:8081',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:8080',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
@@ -48,7 +45,7 @@ export default defineConfig({
   // Start the local dev server automatically before tests
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:8081',
+    url: 'http://localhost:8080',
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },

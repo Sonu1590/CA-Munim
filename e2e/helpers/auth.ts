@@ -41,6 +41,67 @@ export const TEST_INVOICE = {
   amount: '5000',
 };
 
+/** Mode tab above the auth form (type="button"), not the form submit control. */
+export function authModeTab(page: Page, name: RegExp) {
+  return page
+    .getByRole('button', { name })
+    .and(page.locator('button[type="button"]'));
+}
+
+/** Form submit button for the active auth mode. */
+export function authSubmitButton(page: Page, name: RegExp) {
+  return page.locator('form').getByRole('button', { name });
+}
+
+export async function switchToSignUpTab(page: Page) {
+  await authModeTab(page, /^create account$/i).click();
+  await expect(authSubmitButton(page, /^create account$/i)).toBeVisible();
+}
+
+export async function switchToSignInTab(page: Page) {
+  await authModeTab(page, /^sign.?in$/i).click();
+  await expect(authSubmitButton(page, /^sign.?in$/i)).toBeVisible();
+}
+
+export function loginPageHeading(page: Page) {
+  return page.getByRole('heading', { name: 'CA Munim' });
+}
+
+export async function fillSignUpForm(
+  page: Page,
+  options: { email: string; password: string; fullName?: string },
+) {
+  const { email, password, fullName = 'Playwright Test User' } = options;
+  await page.getByLabel('Your Name').fill(fullName);
+  await page.getByLabel('Email Address').fill(email);
+  await page.getByLabel('Password').fill(password);
+}
+
+/** Submit sign-up and wait for the Supabase auth API response. */
+export async function submitSignUp(page: Page) {
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().includes('/auth/v1/signup') && r.request().method() === 'POST',
+      { timeout: 20_000 },
+    ),
+    authSubmitButton(page, /^create account$/i).click(),
+  ]);
+  return response;
+}
+
+/** Supabase may return 200 with an empty identities array for duplicate signups. */
+export function isObfuscatedDuplicateSignUp(body: { user?: { identities?: unknown[] } }) {
+  return (
+    Array.isArray(body?.user?.identities) &&
+    body.user!.identities!.length === 0
+  );
+}
+
+export function uniqueSignUpEmail(prefix = 'pw-signup') {
+  const domain = TEST_USER.email.split('@')[1] ?? 'sharklasers.com';
+  return `${prefix}-${Date.now()}@${domain}`;
+}
+
 export async function signIn(
   page: Page,
   email = TEST_USER.email,
@@ -52,13 +113,7 @@ export async function signIn(
     page.getByText('CA Munim').first()
   ).toBeVisible({ timeout: 10_000 });
 
-  const signInTab = page
-    .getByRole('button', { name: /^sign.?in$/i })
-    .first();
-
-  if (await signInTab.isVisible()) {
-    await signInTab.click();
-  }
+  await switchToSignInTab(page);
 
   const emailInput = page.locator('input[type="email"]').first();
   await emailInput.fill(email);
@@ -69,12 +124,7 @@ export async function signIn(
 
   await passwordInput.fill(password);
 
-  await page
-    .locator('form')
-    .getByRole('button', {
-      name: /^sign.?in$/i,
-    })
-    .click();
+  await authSubmitButton(page, /^sign.?in$/i).click();
 
   await page.waitForLoadState('networkidle');
 
@@ -111,13 +161,9 @@ export async function expectToast(
   text: string | RegExp,
   timeout = 10_000
 ) {
-  const toast = page
-    .getByText(text)
-    .first();
-
-  await expect(toast).toBeVisible({
-    timeout,
-  });
+  const sonnerToast = page.locator('[data-sonner-toast]').filter({ hasText: text });
+  const textMatch = page.getByText(text);
+  await expect(sonnerToast.or(textMatch).first()).toBeVisible({ timeout });
 }
 
 export async function waitForLoading(
