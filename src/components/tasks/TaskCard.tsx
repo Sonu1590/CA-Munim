@@ -17,6 +17,8 @@ import { TaskTypeIcon } from "./TaskTypeIcon";
 interface Props {
   task: Task;
   onStatusChange: (taskId: string, status: Task["status"]) => void;
+  onEdit?: (task: Task) => void;
+  onDelete?: (task: Task) => void;
 }
 
 function getDueDateColor(dueDate: string, status: string) {
@@ -37,7 +39,7 @@ function getPriorityBadge(priority: Task["priority"]) {
   return map[priority];
 }
 
-export function TaskCard({ task, onStatusChange }: Props) {
+export function TaskCard({ task, onStatusChange, onEdit, onDelete }: Props) {
   const dateColor = getDueDateColor(task.dueDate, task.status);
   const priority = getPriorityBadge(task.priority);
   const [openChecklist, setOpenChecklist] = useState(false);
@@ -66,6 +68,12 @@ export function TaskCard({ task, onStatusChange }: Props) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onEdit?.(task)}>
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={() => onDelete?.(task)}>
+              Delete
+            </DropdownMenuItem>
             {task.status !== "pending" && (
               <DropdownMenuItem onClick={() => onStatusChange(task.id, "pending")}>
                 Move to Pending

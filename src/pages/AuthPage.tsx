@@ -10,6 +10,9 @@ import { toast } from "sonner";
 const getAuthErrorMessage = (error: any) => {
   const message = (error?.message ?? error?.error ?? String(error ?? "")).toString();
   const lower = message.toLowerCase();
+  if (lower.includes("email not confirmed") || lower.includes("not confirmed")) {
+    return "Please verify your email first. Check your inbox for the confirmation link.";
+  }
   if (lower.includes("already registered") || lower.includes("user already registered") || lower.includes("duplicate") || lower.includes("email")) {
     return "An account with this email already exists. Please sign in instead.";
   }
@@ -22,10 +25,29 @@ const getAuthErrorMessage = (error: any) => {
   return message || "Something went wrong. Please try again.";
 };
 
+const buildSignupMetadata = (email: string, fullName: string, firmName: string, icaiNumber: string) => {
+  const caName = fullName.trim();
+  const organizationName = firmName.trim();
+  const icai = icaiNumber.trim();
+  const emailPrefix = email.split("@")[0];
+
+  return {
+    full_name: caName || emailPrefix,
+    name: caName || emailPrefix,
+    ca_name: caName || emailPrefix,
+    firm_name: organizationName,
+    icai_number: icai || null,
+    practice_type: organizationName ? "firm" : "solo",
+  };
+};
+
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [firmName, setFirmName] = useState("");
+  const [icaiNumber, setIcaiNumber] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [infoMessage, setInfoMessage] = useState("");
@@ -92,27 +114,46 @@ export default function AuthPage() {
           return;
         }
 
-        const { data, error } = await supabase.auth.signUp({ email: normalizedEmail, password });
+        const signupMetadata = buildSignupMetadata(normalizedEmail, fullName, firmName, icaiNumber);
+        const { data, error } = await supabase.auth.signUp({
+          email: normalizedEmail,
+          password,
+          options: {
+            data: signupMetadata,
+            emailRedirectTo: `${window.location.origin}/onboarding`,
+          },
+        });
         if (error) throw error;
 
         if (!data.user) {
-          toast.success("Verification email sent. Please check your inbox and verify before signing in.");
           setInfoMessage("Verification email sent. Please verify your email before signing in.");
-          setEmail("");
           setPassword("");
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          toast.success("Verification email sent. Please check your inbox and verify before signing in.");
+          toast.info("Check your email for a confirmation link before signing in.");
           return;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const profileUpdates = fullName.trim() || firmName.trim() || icaiNumber.trim()
+          ? {
+              name: firmName.trim() || fullName.trim() || normalizedEmail.split("@")[0],
+              ca_name: fullName.trim() || normalizedEmail.split("@")[0],
+              icai_number: icaiNumber.trim() || null,
+              practice_type: firmName.trim() ? "firm" : "solo",
+            }
+          : { name: normalizedEmail.split("@")[0] };
 
         await supabase
           .from("firms")
-          .update({ name: normalizedEmail.split("@")[0] })
+          .update(profileUpdates)
           .eq("email", normalizedEmail);
 
         toast.success("Account created! Complete your profile to get started.");
         setEmail("");
         setPassword("");
+        setFullName("");
+        setFirmName("");
+        setIcaiNumber("");
         navigate("/onboarding", { replace: true });
       }
     } catch (err: any) {
@@ -161,6 +202,9 @@ export default function AuthPage() {
             setMode("login");
             setEmail("");
             setPassword("");
+            setFullName("");
+            setFirmName("");
+            setIcaiNumber("");
             setInfoMessage("");
           }}
               className={`flex-1 text-sm font-medium py-1.5 rounded-md transition-colors ${
@@ -177,6 +221,9 @@ export default function AuthPage() {
               setMode("signup");
               setEmail("");
               setPassword("");
+              setFullName("");
+              setFirmName("");
+              setIcaiNumber("");
               setInfoMessage("");
             }}
               className={`flex-1 text-sm font-medium py-1.5 rounded-md transition-colors ${
@@ -190,6 +237,40 @@ export default function AuthPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === "signup" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="fullName">Your Name *</Label>
+                  <Input
+                    id="fullName"
+                    placeholder="CA Priya Sharma"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    autoComplete="name"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="firmName">Firm Name</Label>
+                  <Input
+                    id="firmName"
+                    placeholder="Sharma & Associates"
+                    value={firmName}
+                    onChange={(e) => setFirmName(e.target.value)}
+                    autoComplete="organization"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="icaiNumber">ICAI Membership Number</Label>
+                  <Input
+                    id="icaiNumber"
+                    placeholder="123456"
+                    value={icaiNumber}
+                    onChange={(e) => setIcaiNumber(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
             <div className="space-y-1.5">
               <Label htmlFor="email">Email Address</Label>
               <Input
@@ -269,7 +350,8 @@ export default function AuthPage() {
               onClick={async () => {
                 if (!email) { toast.error("Enter your email address first."); return; }
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                  redirectTo: window.location.origin + "/reset-password",
+                  redirectTo: `${window.location.origin}/auth/callback`,
+                  
                 });
                 if (error) toast.error(error.message);
                 else toast.success("Password reset email sent. Check your inbox.");
