@@ -10,7 +10,8 @@
       ]
     },
     "skipLibCheck": true,
-    "strictNullChecks": false
+    "strictNullChecks": false,
+    "types": ["node", "playwright"]  
   },
   "files": [],
   "references": [

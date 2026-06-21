@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -23,22 +23,22 @@ export default function Billing() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadInvoices = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await fetchInvoicesFromSupabase();
-        setInvoices(data);
-      } catch (err: any) {
-        setError(err?.message ?? "Failed to load invoices.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadInvoices();
+  const loadInvoices = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchInvoicesFromSupabase();
+      setInvoices(data);
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to load invoices.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadInvoices();
+  }, [loadInvoices]);
 
   const filtered = useMemo(() => {
     return invoices.filter((inv) => {
@@ -126,7 +126,7 @@ export default function Billing() {
           </TabsContent>
         </Tabs>
 
-        <CreateInvoiceModal open={createOpen} onOpenChange={setCreateOpen} />
+        <CreateInvoiceModal open={createOpen} onOpenChange={setCreateOpen} onCreated={loadInvoices} />
         <RecordPaymentModal
           open={!!paymentInvoice}
           onOpenChange={(open) => !open && setPaymentInvoice(null)}

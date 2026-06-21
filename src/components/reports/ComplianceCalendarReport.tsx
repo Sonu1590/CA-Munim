@@ -15,16 +15,7 @@ import {
 } from "@/data/Tasks";
 import { downloadHtmlReport, slugifyFileName } from "@/lib/downloads";
 import { toast } from "sonner";
-
-function getCurrentFY(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  if (month >= 4) {
-    return `FY ${year}-${String(year + 1).slice(-2)}`;
-  }
-  return `FY ${year - 1}-${String(year).slice(-2)}`;
-}
+import { useFinancialYear } from "@/context/financialYear";
 
 function parseDueDate(isoDate: string) {
   const raw = isoDate?.trim() ?? "";
@@ -43,8 +34,8 @@ function ruleHint(taskType: string): string | undefined {
 }
 
 export function ComplianceCalendarReport() {
+  const { selectedFY: financialYear, setSelectedFY: setFinancialYear } = useFinancialYear();
   const [clientId, setClientId] = useState("");
-  const [financialYear, setFinancialYear] = useState(getCurrentFY);
   const [clients, setClients] = useState<{ id: string; name: string; servicesSubscribed?: string[] }[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingClients, setLoadingClients] = useState(true);

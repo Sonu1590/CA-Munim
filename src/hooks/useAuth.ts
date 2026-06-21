@@ -8,6 +8,12 @@ export interface AuthState {
   loading: boolean
 }
 
+interface SignUpProfile {
+  fullName?: string
+  firmName?: string
+  icaiNumber?: string
+}
+
 export function useAuth() {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
@@ -69,8 +75,9 @@ export function useAuth() {
     return false
   }
 
-  const signUp = async (email: string, password: string) => {
-    const duplicate = await emailAlreadyExists(email)
+  const signUp = async (email: string, password: string, profile: SignUpProfile = {}) => {
+    const normalizedEmail = email.trim().toLowerCase()
+    const duplicate = await emailAlreadyExists(normalizedEmail)
     if (duplicate) {
       return {
         data: null,
@@ -78,7 +85,25 @@ export function useAuth() {
       }
     }
 
-    const { data, error } = await supabase.auth.signUp({ email, password })
+    const caName = profile.fullName?.trim() || normalizedEmail.split('@')[0]
+    const firmName = profile.firmName?.trim() || ''
+    const icaiNumber = profile.icaiNumber?.trim() || ''
+
+    const { data, error } = await supabase.auth.signUp({
+      email: normalizedEmail,
+      password,
+      options: {
+        data: {
+          full_name: caName,
+          name: caName,
+          ca_name: caName,
+          firm_name: firmName,
+          icai_number: icaiNumber || null,
+          practice_type: firmName ? 'firm' : 'solo',
+        },
+        emailRedirectTo: `${window.location.origin}/onboarding`,
+      },
+    })
 
     if (error) return { data, error }
 
@@ -90,8 +115,11 @@ export function useAuth() {
           .from('firms')
           .insert({
             id: data.user.id, // Use auth user ID as firm ID
-            name: 'My CA Firm', // Placeholder name
-            email: email,
+            name: firmName || caName,
+            ca_name: caName,
+            icai_number: icaiNumber || null,
+            email: normalizedEmail,
+            practice_type: firmName ? 'firm' : 'solo',
             onboarding_complete: false,
             created_at: new Date().toISOString(),
           })
@@ -106,8 +134,8 @@ export function useAuth() {
           .from('staff')
           .insert({
             firm_id: data.user.id,
-            name: email.split('@')[0], // Use email prefix as name placeholder
-            email: email,
+            name: caName,
+            email: normalizedEmail,
             auth_user_id: data.user.id,
             role: 'admin',
             active: true,

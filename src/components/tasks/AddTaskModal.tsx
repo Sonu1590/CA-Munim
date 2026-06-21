@@ -1,7 +1,7 @@
 // src/components/tasks/AddTaskModal.tsx
 
-import { useState } from "react";
-import { format } from "date-fns";
+import { useEffect, useMemo, useState } from "react";
+import { format, parseISO } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useStaff } from "@/hooks/useStaff";
@@ -36,26 +36,31 @@ import { cn } from "@/lib/utils";
 
 import { useClients } from "@/hooks/useClients";
 import { TaskFormData } from "@/hooks/useTasks";
+import { useFinancialYear } from "@/context/financialYear";
+import { financialYears } from "@/data/Tasks";
+import type { Task } from "@/data/Tasks";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave?: (data: TaskFormData) => Promise<void>;
+  onSave?: (data: TaskFormData) => Promise<void | boolean> | void | boolean;
+  task?: Task | null;
 }
 
 export function AddTaskModal({
   open,
   onOpenChange,
   onSave,
+  task,
 }: Props) {
   const { clients, loading: clientsLoading } = useClients();
   const { staff, loading: staffLoading } = useStaff();
+  const { selectedFY } = useFinancialYear();
   const [client, setClient] = useState("");
   const [taskType, setTaskType] = useState("");
   const [customName, setCustomName] = useState("");
 
-  const [financialYear, setFinancialYear] =
-    useState("FY 2025-26");
+  const [financialYear, setFinancialYear] = useState(selectedFY);
 
   const [period, setPeriod] = useState("Q1");
 
@@ -71,13 +76,41 @@ export function AddTaskModal({
     setClient("");
     setTaskType("");
     setCustomName("");
-    setFinancialYear("FY 2025-26");
+    setFinancialYear(selectedFY);
     setPeriod("Q1");
     setDueDate(undefined);
     setPriority("medium");
     setNotes("");
     setAssignedTo("");
   };
+
+  const availableFYs = [selectedFY, ...financialYears.filter((year) => year !== selectedFY)];
+
+  useEffect(() => {
+    if (!open) return;
+    if (!task) {
+      setClient("");
+      setTaskType("");
+      setCustomName("");
+      setFinancialYear(selectedFY);
+      setPeriod("Q1");
+      setDueDate(undefined);
+      setPriority("medium");
+      setNotes("");
+      setAssignedTo("");
+      return;
+    }
+
+    setClient(task.clientId ?? "");
+    setTaskType(task.taskType ?? "");
+    setCustomName(task.customTaskName ?? "");
+    setFinancialYear(task.financialYear || selectedFY);
+    setPeriod((task as any).period ?? task.quarter ?? task.month ?? "Q1");
+    setDueDate(task.dueDate ? parseISO(task.dueDate) : undefined);
+    setPriority(task.priority ?? "medium");
+    setNotes(task.notes ?? "");
+    setAssignedTo((task as any).assignedToId ?? "");
+  }, [open, task, selectedFY]);
 
   const handleClose = (value: boolean) => {
     if (!value) {
@@ -117,7 +150,8 @@ export function AddTaskModal({
 
       console.log("FINAL TASK INSERT", payload);
 
-      await onSave(payload);
+      const result = await onSave(payload);
+      if (result === false) return;
 
       toast.success("Task created successfully");
 
@@ -137,7 +171,7 @@ export function AddTaskModal({
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-heading">
-            Create New Task
+            {task ? "Edit Task" : "Create New Task"}
           </DialogTitle>
         </DialogHeader>
 
@@ -151,6 +185,7 @@ export function AddTaskModal({
               <Select
                 value={client}
                 onValueChange={setClient}
+                disabled={!!task}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select client" />
@@ -248,17 +283,11 @@ export function AddTaskModal({
                 </SelectTrigger>
 
                 <SelectContent>
-                  <SelectItem value="FY 2024-25">
-                    FY 2024-25
-                  </SelectItem>
-
-                  <SelectItem value="FY 2025-26">
-                    FY 2025-26
-                  </SelectItem>
-
-                  <SelectItem value="FY 2026-27">
-                    FY 2026-27
-                  </SelectItem>
+                  {availableFYs.map((year) => (
+                    <SelectItem key={year} value={year}>
+                      {year}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -428,7 +457,7 @@ export function AddTaskModal({
             </Button>
 
             <Button onClick={handleSave}>
-              Create Task
+              {task ? "Update Task" : "Create Task"}
             </Button>
           </div>
         </div>

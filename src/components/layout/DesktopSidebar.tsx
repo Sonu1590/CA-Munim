@@ -4,13 +4,15 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useFinancialYear } from "@/context/financialYear";
 
 const navItems = [
   { label: "Dashboard", icon: Home, path: "/" },
   { label: "Clients", icon: Users, path: "/clients" },
   { label: "Tasks & Deadlines", icon: ClipboardList, path: "/tasks" },
   { label: "Documents", icon: FolderOpen, path: "/documents" },
-  { label: "WhatsApp Center", icon: MessageCircle, path: "/whatsapp" },
+  { label: "WhatsApp Center", icon: MessageCircle, path: "/whatsapp", beta: true },
   { label: "Billing & Fees", icon: Receipt, path: "/billing" },
   { label: "Reports", icon: BarChart3, path: "/reports" },
   { label: "Penalty Calculator", icon: Calculator, path: "/penalty-calculator" },
@@ -35,18 +37,9 @@ function getInitials(name: string): string {
 }
 
 // Current FY label — auto-calculated
-function getCurrentFY(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1; // 1-based
-  if (month >= 4) {
-    return `FY ${year}-${String(year + 1).slice(-2)}`;
-  }
-  return `FY ${year - 1}-${String(year).slice(-2)}`;
-}
-
 export function DesktopSidebar() {
   const navigate = useNavigate();
+  const { selectedFY, setSelectedFY, availableFinancialYears } = useFinancialYear();
   const [firm, setFirm] = useState<FirmInfo>({
     firmName: "",
     caName: "",
@@ -125,9 +118,21 @@ export function DesktopSidebar() {
         <p className="text-sm text-muted-foreground mt-0.5 truncate">
           {loaded ? (firm.firmName || firm.caName || "Your practice") : "Loading..."}
         </p>
-        <span className="inline-block mt-2 text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-md">
-          {getCurrentFY()}
-        </span>
+        <div className="inline-flex items-center gap-2 mt-2">
+          <span className="text-xs text-muted-foreground">FY</span>
+          <Select value={selectedFY} onValueChange={setSelectedFY}>
+            <SelectTrigger className="h-8 min-w-[120px] rounded-full border border-primary/20 bg-primary/10 px-3 text-xs font-semibold text-primary">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableFinancialYears.map((fy) => (
+                <SelectItem key={fy} value={fy}>
+                  {fy}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Navigation */}
@@ -147,7 +152,14 @@ export function DesktopSidebar() {
             }
           >
             <item.icon className="h-5 w-5 shrink-0" />
-            <span>{item.label}</span>
+            <span className="flex items-center gap-2">
+              {item.label}
+              {item.beta ? (
+                <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
+                  Beta
+                </span>
+              ) : null}
+            </span>
           </NavLink>
         ))}
       </nav>
