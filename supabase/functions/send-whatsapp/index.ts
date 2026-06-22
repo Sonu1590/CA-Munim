@@ -9,8 +9,8 @@ serve(async (req) => {
   try {
     const { phoneNumbers, templateName } = await req.json()
     
-    const META_TOKEN = Deno.env.get('META_ACCESS_TOKEN')
-    const PHONE_ID = Deno.env.get('PHONE_NUMBER_ID')
+    const META_TOKEN = Deno.env.get('WHATSAPP_ACCESS_TOKEN')
+    const PHONE_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')
 
     // Loop through the array of client phone numbers from your React app
     const results = await Promise.all(phoneNumbers.map(async (phone: string) => {
