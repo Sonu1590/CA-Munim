@@ -294,9 +294,14 @@ export async function sendBulkWhatsAppMessages(
   const failed = results.filter((result: any) => !result.success);
   if (!edgeData?.success || failed.length > 0) {
     const reason = failed[0]?.error;
+    
+    // ADD THIS LOG: This will print the exact Meta error in your F12 Console
+    console.error("META API EXACT ERROR:", reason);
+
+    // FIX THE TOAST: Tell it to read the `.message` property instead of the whole object
     throw new Error(
       reason
-        ? `${failed.length} message(s) failed: ${reason}`
+        ? `${failed.length} message(s) failed: ${reason.message || JSON.stringify(reason)}`
         : "WhatsApp did not confirm that all messages were sent.",
     );
   }
