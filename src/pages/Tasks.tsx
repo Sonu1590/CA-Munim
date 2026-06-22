@@ -23,8 +23,9 @@ export default function Tasks() {
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<any | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);  
-  const { tasks, loading, error, updateTaskStatus, refetch, addTask } = useTasks();
+  const { tasks, loading, error, updateTaskStatus, refetch, addTask, updateTask, deleteTask } = useTasks();
 
   // ── Map Supabase task shape → shape that child components expect ─────────
   // useTasks returns a slightly different shape than mockTasks.
@@ -41,6 +42,7 @@ export default function Tasks() {
       priority: t.priority,
       status: t.status,
       assignedTo: t.assignedToName ?? "Unassigned",
+      assignedToId: t.assignedTo,
       assignedInitials: t.assignedToName
         ? t.assignedToName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
         : "?",
@@ -48,6 +50,7 @@ export default function Tasks() {
       docsTotal: (t.documentChecklist ?? []).length,
       notes: t.notes,
       documentChecklist: t.documentChecklist,
+      period: t.period,
     }));
   }, [tasks]);
 
@@ -65,6 +68,17 @@ export default function Tasks() {
   // Status change — writes to Supabase, then optimistically updates UI
   const handleStatusChange = async (taskId: string, status: "pending" | "in_progress" | "completed") => {
     await updateTaskStatus(taskId, status);
+  };
+
+  const handleEditTask = (task: any) => {
+    setEditingTask(task);
+    setAddOpen(true);
+  };
+
+  const handleDeleteTask = async (task: any) => {
+    if (!window.confirm(`Delete task "${task.customTaskName || task.taskType}" for ${task.clientName}?`)) return;
+    const success = await deleteTask(task.id);
+    if (success) toast.success("Task deleted");
   };
 
   const stats = {
@@ -120,7 +134,10 @@ export default function Tasks() {
               <Zap className="h-4 w-4" /> Bulk Generate
             </Button>
             <Button
-              onClick={() => setAddOpen(true)}
+              onClick={() => {
+                setEditingTask(null);
+                setAddOpen(true);
+              }}
               size="sm"
               className="gap-1.5 bg-accent hover:bg-accent/90 text-white"
             >
@@ -177,7 +194,10 @@ export default function Tasks() {
             <p className="text-sm">Add your first task to get started.</p>
             <Button
               className="bg-accent text-white hover:bg-accent/90 mt-2"
-              onClick={() => setAddOpen(true)}
+              onClick={() => {
+                setEditingTask(null);
+                setAddOpen(true);
+              }}
             >
               <Plus className="h-4 w-4 mr-1" /> Add First Task
             </Button>
@@ -188,10 +208,10 @@ export default function Tasks() {
         {normalisedTasks.length > 0 && (
           <>
             {view === "kanban" && (
-              <TaskKanbanBoard tasks={filteredTasks} onStatusChange={handleStatusChange} />
+              <TaskKanbanBoard tasks={filteredTasks} onStatusChange={handleStatusChange} onEdit={handleEditTask} onDelete={handleDeleteTask} />
             )}
             {view === "list" && (
-              <TaskListView tasks={filteredTasks} onStatusChange={handleStatusChange} />
+              <TaskListView tasks={filteredTasks} onStatusChange={handleStatusChange} onEdit={handleEditTask} onDelete={handleDeleteTask} />
             )}
             {view === "calendar" && <TaskCalendarView tasks={filteredTasks} />}
           </>
@@ -200,19 +220,28 @@ export default function Tasks() {
         {/* Modals */}
         <AddTaskModal
           open={addOpen}
-          onOpenChange={setAddOpen}
+          task={editingTask}
+          onOpenChange={(open) => {
+            setAddOpen(open);
+            if (!open) setEditingTask(null);
+          }}
           onSave={async (taskData) => {
-            const success = await addTask(taskData);
+            const success = editingTask
+              ? await updateTask(editingTask.id, taskData)
+              : await addTask(taskData);
 
             if (success) {
               await refetch();
 
-              toast.success("Task created successfully");
+              toast.success(editingTask ? "Task updated successfully" : "Task created successfully");
 
               setAddOpen(false);
+              setEditingTask(null);
             } else {
-              toast.error("Failed to create task");
+              toast.error(editingTask ? "Failed to update task" : "Failed to create task");
             }
+
+            return success;
          }}
         />
         <BulkTaskGenerator

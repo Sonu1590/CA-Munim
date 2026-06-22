@@ -16,6 +16,7 @@ import type { Session } from "@supabase/supabase-js";
 
 import Index from "./pages/Index.tsx";
 import Clients from "./pages/Clients.tsx";
+import ClientProfile from "./pages/ClientProfile.tsx";
 import Tasks from "./pages/Tasks.tsx";
 import Documents from "./pages/Documents.tsx";
 import WhatsApp from "./pages/WhatsApp.tsx";
@@ -28,6 +29,9 @@ import NotFound from "./pages/NotFound.tsx";
 import AuthPage from "./pages/AuthPage.tsx";
 import OnboardingPage from "./pages/OnboardingPage.tsx";
 import { GlobalSearch } from "./components/common/GlobalSearch";
+import { FinancialYearProvider } from "@/context/financialYear";
+import AuthCallback from "./pages/AuthCallback.tsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -62,8 +66,16 @@ function AppRoutes() {
    * Creates missing firms + staff rows when the signup trigger fails.
    * Silent — never throws, never blocks the user.
    */
-  const bootstrapMissingRecords = async (userId: string, email: string): Promise<void> => {
+  const bootstrapMissingRecords = async (session: Session): Promise<void> => {
     try {
+      const userId = session.user.id;
+      const email = session.user.email ?? "";
+      const metadata = session.user.user_metadata ?? {};
+      const caName = String(metadata.ca_name || metadata.full_name || metadata.name || email.split("@")[0] || "").trim();
+      const firmName = String(metadata.firm_name || "").trim();
+      const displayName = firmName || caName || email.split("@")[0];
+      const icaiNumber = String(metadata.icai_number || "").trim();
+      const practiceType = metadata.practice_type === "solo" ? "solo" : "firm";
       let firmId: string | null = null;
 
       const { data: existingFirm } = await supabase
@@ -77,7 +89,14 @@ function AppRoutes() {
       } else {
         const { data: newFirm } = await supabase
           .from("firms")
-          .insert({ name: email.split("@")[0], email, onboarding_complete: false })
+          .insert({
+            name: displayName,
+            ca_name: caName || null,
+            icai_number: icaiNumber || null,
+            email,
+            practice_type: practiceType,
+            onboarding_complete: false,
+          })
           .select("id")
           .single();
         firmId = newFirm?.id ?? null;
@@ -86,7 +105,7 @@ function AppRoutes() {
       if (!firmId) return;
 
       await supabase.from("staff").upsert(
-        { firm_id: firmId, name: email.split("@")[0], email, auth_user_id: userId, role: "admin", active: true },
+        { firm_id: firmId, name: caName || email.split("@")[0], email, auth_user_id: userId, role: "admin", active: true },
         { onConflict: "auth_user_id" }
       );
     } catch (err) {
@@ -120,7 +139,7 @@ function AppRoutes() {
 
       if (!data) {
         // Trigger failed — bootstrap silently then go to onboarding
-        await bootstrapMissingRecords(session.user.id, session.user.email ?? "");
+        await bootstrapMissingRecords(session);
         setStatus("onboarding");
         return;
       }
@@ -191,6 +210,7 @@ function AppRoutes() {
         {[
           { path: "/", element: <Index /> },
           { path: "/clients", element: <Clients /> },
+          { path: "/clients/:id", element: <ClientProfile /> },
           { path: "/tasks", element: <Tasks /> },
           { path: "/documents", element: <Documents /> },
           { path: "/whatsapp", element: <WhatsApp /> },
@@ -206,6 +226,17 @@ function AppRoutes() {
           />
         ))}
 
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute status={status}>
+              <Navigate to="/" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
@@ -219,7 +250,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AppRoutes />
+        <FinancialYearProvider>
+          <AppRoutes />
+        </FinancialYearProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

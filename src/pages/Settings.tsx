@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Component, type ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +25,25 @@ const settingsTabs = [
   { value: "subscription", label: "Plans", icon: CreditCard },
   { value: "export", label: "Export", icon: FileSpreadsheet },
 ];
+
+class SettingsTabErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error("Settings tab crashed:", error);
+  }
+
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -69,7 +88,11 @@ export default function Settings() {
           </div>
 
           <TabsContent value="firm"><FirmProfileSettings /></TabsContent>
-          <TabsContent value="staff"><StaffManagement /></TabsContent>
+          <TabsContent value="staff">
+            <SettingsTabErrorBoundary fallback={<div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">Failed to load staff settings.</div>}>
+              <StaffManagement />
+            </SettingsTabErrorBoundary>
+          </TabsContent>
           <TabsContent value="whatsapp"><WhatsAppConfig /></TabsContent>
           <TabsContent value="compliance"><ComplianceCalendarSettings /></TabsContent>
           <TabsContent value="invoice"><InvoiceSettingsPanel /></TabsContent>

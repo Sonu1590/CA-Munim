@@ -14,6 +14,8 @@ import { TaskTypeIcon } from "./TaskTypeIcon";
 interface Props {
   tasks: Task[];
   onStatusChange: (taskId: string, status: Task["status"]) => void;
+  onEdit?: (task: Task) => void;
+  onDelete?: (task: Task) => void;
 }
 
 function getStatusBadge(status: Task["status"]) {
@@ -33,7 +35,7 @@ function getDueDateColor(dueDate: string, status: string) {
   return "text-foreground";
 }
 
-export function TaskListView({ tasks, onStatusChange }: Props) {
+export function TaskListView({ tasks, onStatusChange, onEdit, onDelete }: Props) {
   return (
     <div className="border border-border rounded-xl overflow-hidden bg-card">
       <Table>
@@ -92,6 +94,8 @@ export function TaskListView({ tasks, onStatusChange }: Props) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onEdit?.(task)}>Edit</DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" onClick={() => onDelete?.(task)}>Delete</DropdownMenuItem>
                       {task.status !== "pending" && (
                         <DropdownMenuItem onClick={() => onStatusChange(task.id, "pending")}>Move to Pending</DropdownMenuItem>
                       )}

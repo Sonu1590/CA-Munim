@@ -1,4 +1,4 @@
-import { Client } from "@/data/Clients";
+import { Client } from "@/hooks/useClients";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import { MessageCircle, Pencil, Eye } from "lucide-react";
 interface ClientListTableProps {
   clients: Client[];
   onEdit: (client: Client) => void;
+  onView: (client: Client) => void;
 }
 
 const typeBadgeColor: Record<string, string> = {
@@ -30,9 +31,9 @@ const typeBadgeColor: Record<string, string> = {
   BOI: "bg-rose-100 text-rose-700",
 };
 
-export function ClientListTable({ clients, onEdit }: ClientListTableProps) {
+export function ClientListTable({ clients, onEdit, onView }: ClientListTableProps) {
   return (
-    <div className="hidden md:block">
+    <div className="hidden md:block overflow-x-auto rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -42,12 +43,12 @@ export function ClientListTable({ clients, onEdit }: ClientListTableProps) {
             <TableHead className="text-center">Active Tasks</TableHead>
             <TableHead className="text-right">Pending Fees</TableHead>
             <TableHead>Last Activity</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="sticky right-0 z-10 bg-background text-right shadow-[-8px_0_12px_-12px_rgba(0,0,0,0.45)]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {clients.map((client) => (
-            <TableRow key={client.id} className="group">
+            <TableRow key={client.id} className="group cursor-pointer" onClick={() => onView(client)}>
               <TableCell>
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{client.name}</span>
@@ -89,13 +90,14 @@ export function ClientListTable({ clients, onEdit }: ClientListTableProps) {
                   year: "numeric",
                 })}
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="sticky right-0 z-10 bg-background text-right shadow-[-8px_0_12px_-12px_rgba(0,0,0,0.45)] group-hover:bg-muted/50">
                 <div className="flex items-center justify-end gap-1">
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-[hsl(var(--whatsapp))] hover:text-[hsl(var(--whatsapp))] hover:bg-[hsl(var(--whatsapp))]/10"
                     title="WhatsApp"
+                    onClick={(event) => event.stopPropagation()}
                   >
                     <MessageCircle className="h-4 w-4" />
                   </Button>
@@ -104,7 +106,10 @@ export function ClientListTable({ clients, onEdit }: ClientListTableProps) {
                     size="icon"
                     className="h-8 w-8"
                     title="Edit"
-                    onClick={() => onEdit(client)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onEdit(client);
+                    }}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -113,6 +118,10 @@ export function ClientListTable({ clients, onEdit }: ClientListTableProps) {
                     size="icon"
                     className="h-8 w-8"
                     title="View"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onView(client);
+                    }}
                   >
                     <Eye className="h-4 w-4" />
                   </Button>

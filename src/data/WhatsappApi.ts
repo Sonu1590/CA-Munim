@@ -139,17 +139,26 @@ export async function fetchMessageTemplatesFromSupabase(): Promise<MessageTempla
   }));
 }
 
-export async function saveMessageTemplateToSupabase(template: MessageTemplate): Promise<MessageTemplate> {
+export async function saveMessageTemplateToSupabase(template: Omit<MessageTemplate, "id"> & { id?: string }): Promise<MessageTemplate> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const payload: Record<string, any> = {
+    name: template.name,
+    category: template.category,
+    body: template.body,
+    variables: template.variables,
+    is_default: template.isDefault,
+    user_id: user.id,
+  };
+
+  if (template.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(template.id)) {
+    payload.id = template.id;
+  }
+
   const { data, error } = await supabase
     .from("message_templates")
-    .upsert({
-      id: template.id,
-      name: template.name,
-      category: template.category,
-      body: template.body,
-      variables: template.variables,
-      is_default: template.isDefault,
-    }, { onConflict: "id" })
+    .upsert(payload, { onConflict: "id" })
     .select()
     .single();
 
@@ -173,7 +182,7 @@ export async function deleteMessageTemplateFromSupabase(id: string): Promise<voi
 export async function fetchSentMessagesFromSupabase(): Promise<SentMessage[]> {
   const { data, error } = await supabase
     .from("whatsapp_sent_messages")
-    .select(`id, client_id, client_name, phone, template_name, message, sent_at, status, fail_reason`)
+    .select(`id, client_id, phone, template_name, message, sent_at, status, clients(name)`)
     .order("sent_at", { ascending: false });
 
   if (error) {
@@ -184,20 +193,20 @@ export async function fetchSentMessagesFromSupabase(): Promise<SentMessage[]> {
   return (data ?? []).map((row: any) => ({
     id: row.id,
     clientId: row.client_id,
-    clientName: row.client_name,
+    clientName: row.clients?.name ?? "Unknown Client",
     phone: row.phone,
     templateName: row.template_name,
     message: row.message,
     sentAt: row.sent_at,
     status: row.status,
-    failReason: row.fail_reason,
+    failReason: undefined,
   }));
 }
 
 export async function fetchReceivedMessagesFromSupabase(): Promise<ReceivedMessage[]> {
   const { data, error } = await supabase
     .from("whatsapp_received_messages")
-    .select(`id, client_id, client_name, phone, message, received_at, is_read`)
+    .select(`id, client_id, phone, message, received_at, is_read, clients(name)`)
     .order("received_at", { ascending: false });
 
   if (error) {
@@ -208,7 +217,7 @@ export async function fetchReceivedMessagesFromSupabase(): Promise<ReceivedMessa
   return (data ?? []).map((row: any) => ({
     id: row.id,
     clientId: row.client_id,
-    clientName: row.client_name,
+    clientName: row.clients?.name ?? "Unknown Client",
     phone: row.phone,
     message: row.message,
     receivedAt: row.received_at,
@@ -222,4 +231,73 @@ export async function markReceivedMessageRead(id: string): Promise<void> {
     .update({ is_read: true })
     .eq("id", id);
   if (error) throw error;
+}
+
+/**
+ * LIVE META API INTEGRATION
+ * This function calls the secure Supabase Edge Function to dispatch 
+ * the messages via WhatsApp Cloud API, then logs the outbound messages 
+ * to your database so the Delivery Status UI updates instantly.
+ */
+export async function sendBulkWhatsAppMessages(
+  clients: { id: string; name: string; phone: string }[],
+  template: MessageTemplate,
+  compiledMessages: Record<string, string> // Map of clientId -> final text (for DB logging)
+): Promise<void> {
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error("Authentication required to send messages.");
+
+  // STEP 1: Dispatch to Meta via Secure Edge Function
+  const { data: edgeData, error: edgeError } = await supabase.functions.invoke('send-whatsapp', {
+    body: {
+      phoneNumbers: clients.map(c => c.phone),
+      // NOTE FOR HACKATHON SANDBOX: 
+      // Meta's sandbox only allows pre-approved templates like "hello_world".
+      // In production, change this to: templateName: template.name
+      templateName: "hello_world",
+      languageCode: "en_US",
+    }
+  });
+
+  if (edgeError) {
+    console.error("Edge Function Error:", edgeError);
+    let detail = "Failed to communicate with WhatsApp API.";
+    const response = (edgeError as any)?.context;
+    if (response instanceof Response) {
+      const body = await response.clone().json().catch(() => null);
+      if (body?.error) detail = body.error;
+    }
+    throw new Error(detail);
+  }
+
+  const results = Array.isArray(edgeData?.results) ? edgeData.results : [];
+  const resultByPhone = new Map(results.map((result: any) => [result.phone, result]));
+
+  // STEP 2: Log the dispatched messages to the database to update the UI
+  const logsToInsert = clients.map(client => ({
+    client_id: client.id,
+    phone: client.phone,
+    template_name: template.name,
+    message: compiledMessages[client.id] || "Document request sent.",
+    status: resultByPhone.get(client.phone)?.success ? "sent" : "failed",
+  }));
+
+  const { error: dbError } = await supabase
+    .from("whatsapp_sent_messages")
+    .insert(logsToInsert);
+
+  if (dbError) {
+    console.error("Database Logging Error:", dbError);
+    throw new Error("Messages sent, but failed to log to database.");
+  }
+
+  const failed = results.filter((result: any) => !result.success);
+  if (!edgeData?.success || failed.length > 0) {
+    const reason = failed[0]?.error;
+    throw new Error(
+      reason
+        ? `${failed.length} message(s) failed: ${reason}`
+        : "WhatsApp did not confirm that all messages were sent.",
+    );
+  }
 }
