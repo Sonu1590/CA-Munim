@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { defaultTemplates, fetchMessageTemplatesFromSupabase, MessageTemplate, TemplateCategory } from "@/data/mockWhatsapp";
+import { defaultTemplates, fetchMessageTemplatesFromSupabase, MessageTemplate, sendBulkWhatsAppMessages,TemplateCategory } from "@/data/WhatsappApi";
 import { fetchClientsFromSupabase, type Client } from "@/data/Clients";
 import { Send, ChevronRight, ChevronLeft, Search, Clock, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -142,32 +142,32 @@ export function BulkSender() {
 
     setSending(true);
     try {
-      const { error } = await supabase.from("whatsapp_sent_messages").insert(
-        recipients.map((client) => ({
-          client_id: client.id,
-          client_name: client.name,
-          phone: client.phone,
-          template_name: template.name,
-          message: renderPreview(client),
-          status: scheduleType === "now" ? "sent" : "sent",
-          sent_at: scheduleType === "later" && scheduleDate
-            ? new Date(`${scheduleDate}T${scheduleTime}`).toISOString()
-            : new Date().toISOString(),
-        })),
-      );
+      // 1. Generate the compiled messages mapping for the database logs
+      const compiledTexts: Record<string, string> = {};
+      recipients.forEach(client => {
+        compiledTexts[client.id] = renderPreview(client);
+      });
 
-      if (error) throw error;
+      // 2. Call the live Meta API bridge
+      await sendBulkWhatsAppMessages(
+        recipients,
+        template,
+        compiledTexts
+      );
 
       toast.success(`${scheduleType === "now" ? "Sent" : "Scheduled"} ${selectedClients.length} messages!`, {
         description: scheduleType === "later" ? `Scheduled for ${scheduleDate} at ${scheduleTime}` : undefined,
       });
+      
+      // Reset state on success
       setStep(1);
       setSelectedTemplate("");
       setSelectedClients([]);
       setRecipientFilter("all");
       setScheduleType("now");
+      
     } catch (err: any) {
-      toast.error(err?.message ?? "Unable to record WhatsApp messages");
+      toast.error(err?.message ?? "Unable to send WhatsApp messages");
     } finally {
       setSending(false);
     }

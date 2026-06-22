@@ -8,7 +8,7 @@ import { MessageTemplates } from "@/components/whatsapp/MessageTemplates";
 import { BulkSender } from "@/components/whatsapp/BulkSender";
 import { DeliveryStatus } from "@/components/whatsapp/DeliveryStatus";
 import { ReceivedMessages } from "@/components/whatsapp/ReceivedMessages";
-import { fetchReceivedMessagesFromSupabase } from "@/data/mockWhatsapp";
+import { fetchReceivedMessagesFromSupabase } from "@/data/WhatsappApi";
 
 export default function WhatsApp() {
   const [searchParams] = useSearchParams();
