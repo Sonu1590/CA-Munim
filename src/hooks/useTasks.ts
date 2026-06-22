@@ -220,6 +220,27 @@ if (!staffRow?.firm_id) {
     }
   }
 
+  const deleteTask = async (id: string): Promise<boolean> => {
+    const previousTasks = tasks
+    setTasks(prev => prev.filter(task => task.id !== id))
+
+    try {
+      const { error: deleteErr } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', id)
+
+      if (deleteErr) throw deleteErr
+      return true
+    } catch (err: any) {
+      console.error('deleteTask error:', err)
+      setTasks(previousTasks)
+      setError(err.message)
+      toast.error('Failed to delete task. Please try again.')
+      return false
+    }
+  }
+
   // Overdue count — useful for dashboard badge
   const overdueCount = tasks.filter(
     t => t.status !== 'completed' && new Date(t.dueDate) < new Date()
@@ -243,6 +264,7 @@ if (!staffRow?.firm_id) {
     dueThisWeek,
     addTask,
     updateTask,
+    deleteTask,
     updateTaskStatus,
     refetch: fetchTasks,
   }

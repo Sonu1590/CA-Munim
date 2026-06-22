@@ -7,13 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useClients } from "@/hooks/useClients";
+import { useBilling } from "@/hooks/useBilling";
 import { supabase } from "@/lib/supabase";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { useFinancialYear } from "@/context/financialYear";
+import { financialYears as availableFinancialYears } from "@/data/Tasks";
 
 interface CreateInvoiceModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreated?: () => Promise<void> | void;
 }
 
 interface LineItem {
@@ -23,16 +27,19 @@ interface LineItem {
   amount: string;
 }
 
-export function CreateInvoiceModal({ open, onOpenChange }: CreateInvoiceModalProps) {
+export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvoiceModalProps) {
+  const { selectedFY } = useFinancialYear();
   const [clientId, setClientId] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split("T")[0]);
-  const [fy, setFy] = useState("FY 2025-26");
+  const [fy, setFy] = useState(selectedFY);
   const [gstEnabled, setGstEnabled] = useState(true);
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const [sendEmail, setSendEmail] = useState(false);
   const [notes, setNotes] = useState("");
   const [firmState, setFirmState] = useState("");
   const { clients } = useClients();
+  const { createInvoice } = useBilling();
+  const [submitting, setSubmitting] = useState(false);
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: "1", description: "", sacCode: "998231", amount: "" },
     
@@ -40,6 +47,12 @@ export function CreateInvoiceModal({ open, onOpenChange }: CreateInvoiceModalPro
 
   const selectedClient = clients.find((c) => c.id === clientId);
   const isSameState = selectedClient && firmState ? selectedClient.state === firmState : true;
+
+  useEffect(() => {
+    setFy(selectedFY);
+  }, [selectedFY]);
+
+  const availableFYs = [selectedFY, ...availableFinancialYears.filter((year) => year !== selectedFY)];
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -61,6 +74,14 @@ export function CreateInvoiceModal({ open, onOpenChange }: CreateInvoiceModalPro
   const igst = gstEnabled && !isSameState ? subtotal * 0.18 : 0;
   const grandTotal = subtotal + cgst + sgst + igst;
 
+  // ── Generate preview invoice number matching backend format ──────────────────
+  const generateInvoiceNumberPreview = (): string => {
+    const fyParts = fy.split('-');
+    const startYear = fyParts[0];
+    const endYear = fyParts[1]?.slice(-2) || fyParts[0];
+    return `INV-${startYear}${endYear}-0001`;
+  };
+
   const addLineItem = () => {
     setLineItems([...lineItems, { id: Date.now().toString(), description: "", sacCode: "998231", amount: "" }]);
   };
@@ -74,11 +95,50 @@ export function CreateInvoiceModal({ open, onOpenChange }: CreateInvoiceModalPro
     setLineItems(lineItems.map((li) => (li.id === id ? { ...li, [field]: value } : li)));
   };
 
-  const handleSubmit = () => {
+  const resetForm = () => {
+    setClientId("");
+    setInvoiceDate(new Date().toISOString().split("T")[0]);
+    setFy(selectedFY);
+    setGstEnabled(true);
+    setSendWhatsApp(true);
+    setSendEmail(false);
+    setNotes("");
+    setLineItems([{ id: "1", description: "", sacCode: "998231", amount: "" }]);
+  };
+
+  const handleSubmit = async () => {
     if (!clientId) return toast.error("Please select a client");
     if (lineItems.some((li) => !li.description || !li.amount)) return toast.error("Please fill all line items");
-    toast.success("Invoice created successfully!");
-    onOpenChange(false);
+
+    setSubmitting(true);
+    try {
+      const invoiceId = await createInvoice({
+        client_id: clientId,
+        invoice_date: invoiceDate,
+        financial_year: fy,
+        line_items: lineItems.map((li) => ({
+          description: li.description.trim(),
+          sacCode: li.sacCode.trim(),
+          amount: Number(li.amount),
+        })),
+        notes,
+        send_whatsapp: sendWhatsApp,
+      }, "", firmState);
+
+      if (!invoiceId) {
+        toast.error("Could not create invoice. Please try again.");
+        return;
+      }
+
+      await onCreated?.();
+      toast.success("Invoice created successfully!");
+      resetForm();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Could not create invoice. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -104,7 +164,7 @@ export function CreateInvoiceModal({ open, onOpenChange }: CreateInvoiceModalPro
             </div>
             <div>
               <Label className="text-xs">Invoice Number</Label>
-              <Input value="INV-2526-0008" disabled className="font-mono text-xs bg-muted" />
+              <Input value={generateInvoiceNumberPreview()} disabled className="font-mono text-xs bg-muted" />
             </div>
             <div>
               <Label className="text-xs">Invoice Date</Label>
@@ -115,8 +175,11 @@ export function CreateInvoiceModal({ open, onOpenChange }: CreateInvoiceModalPro
               <Select value={fy} onValueChange={setFy}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="FY 2025-26">FY 2025-26</SelectItem>
-                  <SelectItem value="FY 2024-25">FY 2024-25</SelectItem>
+                  {availableFYs.map((year) => (
+                    <SelectItem key={year} value={year}>
+                      {year}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -232,9 +295,9 @@ export function CreateInvoiceModal({ open, onOpenChange }: CreateInvoiceModalPro
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button className="bg-accent text-accent-foreground hover:bg-accent/90" onClick={handleSubmit}>
-              Create Invoice
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
+            <Button className="bg-accent text-accent-foreground hover:bg-accent/90" onClick={handleSubmit} disabled={submitting}>
+              {submitting ? "Creating..." : "Create Invoice"}
             </Button>
           </div>
         </div>

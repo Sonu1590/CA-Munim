@@ -6,7 +6,7 @@ interface Props {
 }
 
 export function FYHint({ date, className = "" }: Props) {
-  const fy = getFinancialYear(date);
+  const fy = getFinancialYear(date, "");
   if (!fy) return null;
   return (
     <p className={`text-[11px] text-muted-foreground mt-1 ${className}`}>

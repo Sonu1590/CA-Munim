@@ -26,9 +26,10 @@ export default function Clients() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
 
   // ── Real data from Supabase ──────────────────────────────────────────────
-  const { clients, loading, error, addClient, refetch } = useClients();
+  const { clients, loading, error, addClient, updateClient, refetch } = useClients();
 
   const filtered = useMemo(() => {
     return clients.filter((c) => {
@@ -41,8 +42,19 @@ export default function Clients() {
     });
   }, [clients, search, typeFilter]);
 
-  const handleEdit = (_client: Client) => {
+  const openAddClient = () => {
+    setEditingClient(null);
     setModalOpen(true);
+  };
+
+  const handleEdit = (client: Client) => {
+    setEditingClient(client);
+    setModalOpen(true);
+  };
+
+  const handleView = (client: Client) => {
+    window.history.pushState(null, "", `/clients/${client.id}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
   // ── Loading state ────────────────────────────────────────────────────────
@@ -83,7 +95,7 @@ export default function Clients() {
           </div>
           <Button
             className="bg-accent text-accent-foreground hover:bg-accent/90 w-full sm:w-auto"
-            onClick={() => setModalOpen(true)}
+            onClick={openAddClient}
           >
             <Plus className="h-4 w-4 mr-1" />
             Add Client
@@ -122,7 +134,7 @@ export default function Clients() {
                 <p className="text-sm">Add your first client to get started.</p>
                 <Button
                   className="bg-accent text-accent-foreground hover:bg-accent/90 mt-2"
-                  onClick={() => setModalOpen(true)}
+                  onClick={openAddClient}
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   Add First Client
@@ -134,17 +146,33 @@ export default function Clients() {
           </div>
         ) : (
           <>
-            <ClientListTable clients={filtered} onEdit={handleEdit} />
-            <ClientCards clients={filtered} onEdit={handleEdit} />
+            <ClientListTable clients={filtered} onEdit={handleEdit} onView={handleView} />
+            <ClientCards clients={filtered} onEdit={handleEdit} onView={handleView} />
           </>
         )}
 
         <AddClientModal
           open={modalOpen}
-          onOpenChange={setModalOpen}
+          client={editingClient}
+          onOpenChange={(open) => {
+            setModalOpen(open);
+            if (!open) setEditingClient(null);
+          }}
           onSave={async (formData) => {
-            const success = await addClient(formData);
-            if (success) setModalOpen(false);
+            const result = editingClient
+              ? await updateClient(editingClient.id, formData)
+              : await addClient(formData);
+            const success = result === true || (typeof result === "object" && result !== null && result.success);
+            const message = typeof result === "object" && result !== null ? result.error : undefined;
+
+            if (success) {
+              toast.success(editingClient ? "Client updated" : "Client added");
+              setModalOpen(false);
+              setEditingClient(null);
+            } else {
+              toast.error(message ?? "Could not save client. Please check the details and try again.");
+            }
+            return result;
           }}
         />
       </div>

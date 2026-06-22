@@ -19,15 +19,17 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { ClientFormData, ClientType } from "@/hooks/useClients";
+import { Client, ClientFormData, ClientMutationResult, ClientType } from "@/hooks/useClients";
 import { validatePAN, validateGSTIN } from "@/lib/indianTaxUtils";
 import { FYHint } from "@/components/common/FYHint";
+import { DatePickerField } from "@/components/ui/date-picker-field";
 import { CheckCircle2, XCircle } from "lucide-react";
 
 interface AddClientModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave?: (formData: ClientFormData) => Promise<void> | void;
+  onSave?: (formData: ClientFormData) => Promise<ClientMutationResult | boolean | void> | ClientMutationResult | boolean | void;
+  client?: Client | null;
 }
 
 const clientTypes: ClientType[] = [
@@ -68,7 +70,7 @@ const rocJurisdictions = [
 
 const mcaFilings = ["MGT-7", "AOC-4", "DIR-3 KYC", "ADT-1", "INC-20A", "PAS-3"];
 
-export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalProps) {
+export function AddClientModal({ open, onOpenChange, onSave, client }: AddClientModalProps) {
   const [clientType, setClientType] = useState<string>("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedMcaFilings, setSelectedMcaFilings] = useState<string[]>([]);
@@ -88,9 +90,10 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
   const [annualFees, setAnnualFees] = useState("");
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isCompanyType = ["Private Ltd", "LLP", "Public Ltd"].includes(clientType);
-  const panCheck = validatePAN(panValue);
+  const panCheck = validatePAN(panValue, clientType || undefined);
   const gstinCheck = validateGSTIN(gstinValue);
 
   const toggleService = (service: string) => {
@@ -139,7 +142,32 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
     setCompRegDate("");
     setAnnualFees("");
     setIsDirty(false);
+    setError(null);
   };
+
+  useEffect(() => {
+    if (!open) return;
+
+    setClientType(client?.type ?? "");
+    setSelectedServices(client?.servicesSubscribed ?? []);
+    setSelectedMcaFilings([]);
+    setFullName(client?.name ?? "");
+    setPanValue(client?.pan ?? "");
+    setGstinValue(client?.gstin ?? "");
+    setPhone(client?.phone ?? "");
+    setAltPhone(client?.alt_phone ?? "");
+    setEmail(client?.email ?? "");
+    setAddress(client?.address ?? "");
+    setCity(client?.city ?? "");
+    setState(client?.state ?? "");
+    setPin("");
+    setDob(client?.date_of_birth ?? "");
+    setGstRegDate(client?.gst_reg_date ?? "");
+    setCompRegDate("");
+    setAnnualFees(client?.annual_fees ? String(client.annual_fees) : "");
+    setError(null);
+    setIsDirty(false);
+  }, [open, client]);
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen && isDirty) {
@@ -150,6 +178,12 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
   };
 
   const handleSave = async () => {
+    setError(null);
+    if (!dob) {
+      setError("Date of Birth / Incorporation is required.");
+      return;
+    }
+
     if (!onSave) {
       onOpenChange(false);
       return;
@@ -157,13 +191,14 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
 
     setSaving(true);
     try {
-      await onSave({
+      const result = await onSave({
         name: fullName.trim(),
         type: (clientType || "Individual") as ClientType,
         pan: panValue,
         phone,
         alt_phone: altPhone,
         email,
+        date_of_birth: dob,
         address,
         city,
         state,
@@ -174,7 +209,17 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
         mca_filings: selectedMcaFilings,
         annual_fees: annualFees ? Number(annualFees) : 0,
       });
+      if (result === false || (typeof result === "object" && result !== null && "success" in result && !result.success)) {
+        setError(
+          typeof result === "object" && result !== null && "error" in result && result.error
+            ? result.error
+            : "Could not save client. Please check the details and try again."
+        );
+        return;
+      }
       resetForm();
+    } catch (err: any) {
+      setError(err?.message ?? "Could not save client. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -184,7 +229,7 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] p-0">
         <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="text-lg font-heading">Add New Client</DialogTitle>
+          <DialogTitle className="text-lg font-heading">{client ? "Edit Client" : "Add New Client"}</DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[75vh] px-6 pb-6">
           <div className="space-y-6 pt-4">
@@ -214,8 +259,16 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
                   <Input id="fatherName" placeholder="Optional" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="dob">Date of Birth / Incorporation</Label>
-                  <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+                  <Label htmlFor="dob">Date of Birth / Incorporation *</Label>
+                  <DatePickerField
+                    id="dob"
+                    value={dob}
+                    onChange={(value) => {
+                      setIsDirty(true);
+                      setDob(value);
+                    }}
+                    placeholder="dd/mm/yyyy"
+                  />
                   <FYHint date={dob} />
                 </div>
                 <div className="space-y-1.5">
@@ -237,13 +290,21 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
                       )
                     )}
                   </div>
-                  {panCheck.isValid && panCheck.entityType && (
+                  {panValue.length === 10 && panCheck.isValid && panCheck.entityType && !panCheck.clientTypeMismatch && (
                     <p className="text-[11px] text-muted-foreground mt-1">
                       Entity type: <span className="font-medium text-primary">{panCheck.entityType}</span>
                     </p>
                   )}
+                  {panValue.length === 10 && panCheck.isValid && panCheck.unknownEntityCode && (
+                    <p className="text-[11px] text-destructive mt-1">{panCheck.unknownEntityCode}</p>
+                  )}
+                  {panValue.length === 10 && panCheck.clientTypeMismatch && (
+                    <p className="text-[11px] text-destructive mt-1">{panCheck.clientTypeMismatch}</p>
+                  )}
                   {!panCheck.isValid && panValue.length === 10 && (
-                    <p className="text-[11px] text-destructive mt-1">Invalid PAN format</p>
+                    <p className="text-[11px] text-destructive mt-1">
+                      Invalid PAN format (expected AAAAA9999A — 5 letters, 4 digits, 1 letter)
+                    </p>
                   )}
                 </div>
                 <div className="space-y-1.5">
@@ -326,7 +387,15 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="gstRegDate">GST Registration Date</Label>
-                  <Input id="gstRegDate" type="date" value={gstRegDate} onChange={(e) => setGstRegDate(e.target.value)} />
+                  <DatePickerField
+                    id="gstRegDate"
+                    value={gstRegDate}
+                    onChange={(value) => {
+                      setIsDirty(true);
+                      setGstRegDate(value);
+                    }}
+                    placeholder="dd/mm/yyyy"
+                  />
                   <FYHint date={gstRegDate} />
                 </div>
                 <div className="space-y-1.5">
@@ -408,7 +477,15 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="compRegDate">Registration Date</Label>
-                      <Input id="compRegDate" type="date" value={compRegDate} onChange={(e) => setCompRegDate(e.target.value)} />
+                      <DatePickerField
+                        id="compRegDate"
+                        value={compRegDate}
+                        onChange={(value) => {
+                          setIsDirty(true);
+                          setCompRegDate(value);
+                        }}
+                        placeholder="dd/mm/yyyy"
+                      />
                       <FYHint date={compRegDate} />
                     </div>
                     <div className="space-y-1.5">
@@ -502,6 +579,11 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
             </section>
 
             {/* Actions */}
+            {error && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
             <div className="flex justify-end gap-3 pt-2 pb-2">
               <Button variant="outline" onClick={() => handleOpenChange(false)}>
                 Cancel
@@ -511,7 +593,7 @@ export function AddClientModal({ open, onOpenChange, onSave }: AddClientModalPro
                 onClick={handleSave}
                 disabled={saving}
               >
-                {saving ? "Saving..." : "Save Client"}
+                {saving ? "Saving..." : client ? "Update Client" : "Save Client"}
               </Button>
             </div>
           </div>

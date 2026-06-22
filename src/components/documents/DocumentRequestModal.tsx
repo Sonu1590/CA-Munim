@@ -17,7 +17,7 @@ interface Props {
 }
 
 export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }: Props) {
-  const [clientId, setClientId] = useState(preselectedClientId || "");
+  const [selectedClientId, setSelectedClientId] = useState(preselectedClientId || "");
   const [docType, setDocType] = useState("");
   const [customLabel, setCustomLabel] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -28,6 +28,7 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
 
   useEffect(() => {
     if (open) {
+      setSelectedClientId(preselectedClientId || "");
       const loadClients = async () => {
         setLoading(true);
         try {
@@ -41,13 +42,13 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
       };
       loadClients();
     }
-  }, [open]);
+  }, [open, preselectedClientId]);
 
   const isCustom = docType === "Custom";
-  const client = clients.find((c) => c.id === clientId);
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
 
   useEffect(() => {
-    if (!clientId || !docType || !dueDate) {
+    if (!selectedClientId || !docType || !dueDate) {
       setRequestToken("");
       return;
     }
@@ -55,12 +56,12 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
     const tokenArray = new Uint8Array(16);
     crypto.getRandomValues(tokenArray);
     setRequestToken(Array.from(tokenArray).map((b) => b.toString(16).padStart(2, "0")).join(""));
-  }, [clientId, docType, dueDate]);
+  }, [selectedClientId, docType, dueDate]);
 
   const uploadLink = requestToken ? `${window.location.origin}/upload/${requestToken}` : "";
 
   const handleSend = async () => {
-    if (!clientId || !docType || !dueDate) {
+    if (!selectedClientId || !docType || !dueDate) {
       toast.error("Please fill all required fields");
       return;
     }
@@ -92,7 +93,7 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
         .from("document_requests")
         .insert({
           firm_id: staffRow.firm_id,
-          client_id: clientId,
+          client_id: selectedClientId,
           document_type: docType,
           custom_label: isCustom ? customLabel.trim() : null,
           due_date: dueDate,
@@ -106,11 +107,11 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
       await navigator.clipboard.writeText(link).catch(() => {});
 
       toast.success("Document request created!", {
-        description: `Upload link copied to clipboard. Send it to ${client?.name ?? "client"} via WhatsApp.`,
+        description: `Upload link copied to clipboard. Send it to ${selectedClient?.name ?? "client"} via WhatsApp.`,
       });
 
       onOpenChange(false);
-      setClientId("");
+      setSelectedClientId("");
       setDocType("");
       setCustomLabel("");
       setDueDate("");
@@ -137,7 +138,7 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Client</Label>
-            <Select value={clientId} onValueChange={setClientId} disabled={loading}>
+            <Select value={selectedClientId} onValueChange={setSelectedClientId} disabled={loading}>
               <SelectTrigger>
                 <SelectValue placeholder={loading ? "Loading clients..." : "Select client"} />
               </SelectTrigger>
@@ -171,14 +172,14 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
 
           <div className="space-y-2">
             <Label>Submission Due Date</Label>
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <Input id="documentDueDate" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </div>
 
-          {clientId && docType && dueDate && (
+          {selectedClientId && docType && dueDate && (
             <div className="space-y-2">
               <div className="rounded-xl bg-[#dcf8c6] p-3 text-sm text-foreground border border-[#25D366]/20">
                 <p className="font-medium text-xs text-[#25D366] mb-1">WhatsApp Preview</p>
-                <p>Hello {client?.name}, Sharma & Associates requires your {isCustom ? customLabel : docType} by {new Date(dueDate).toLocaleDateString("en-IN")}. Please upload here: {uploadLink}</p>
+                <p>Hello {selectedClient?.name}, Sharma & Associates requires your {isCustom ? customLabel : docType} by {new Date(dueDate).toLocaleDateString("en-IN")}. Please upload here: {uploadLink}</p>
               </div>
               <div className="rounded-lg bg-muted/50 p-2.5 text-xs flex items-center gap-2">
                 <Link2 className="h-3.5 w-3.5 text-primary shrink-0" />

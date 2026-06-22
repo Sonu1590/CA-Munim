@@ -25,6 +25,23 @@ dist-ssr
 .env
 .env.local
 .env.production
+.env.test
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+
+# Screenshots / videos
+screenshots/
+videos/
+
+# Trace files
+trace.zip
+*.trace
+
+# Coverage
+coverage/
 <<<<<<< HEAD
 .env
 =======
