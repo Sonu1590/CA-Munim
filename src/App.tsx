@@ -63,54 +63,16 @@ function AppRoutes() {
   const [status, setStatus] = useState<AuthStatus>("loading");
 
   /**
-   * Creates missing firms + staff rows when the signup trigger fails.
-   * Silent — never throws, never blocks the user.
+   * Repairs missing firm/staff rows when the signup trigger's own error
+   * handler swallowed a failure. Delegates to the ensure_my_firm() RPC
+   * (SECURITY DEFINER, scoped to auth.uid()) instead of inserting directly —
+   * a direct client insert can't satisfy firm-row RLS since firm ids are
+   * server-generated, not derived from the user id. Silent — never throws,
+   * never blocks the user.
    */
-  const bootstrapMissingRecords = async (session: Session): Promise<void> => {
-    try {
-      const userId = session.user.id;
-      const email = session.user.email ?? "";
-      const metadata = session.user.user_metadata ?? {};
-      const caName = String(metadata.ca_name || metadata.full_name || metadata.name || email.split("@")[0] || "").trim();
-      const firmName = String(metadata.firm_name || "").trim();
-      const displayName = firmName || caName || email.split("@")[0];
-      const icaiNumber = String(metadata.icai_number || "").trim();
-      const practiceType = metadata.practice_type === "solo" ? "solo" : "firm";
-      let firmId: string | null = null;
-
-      const { data: existingFirm } = await supabase
-        .from("firms")
-        .select("id")
-        .eq("email", email)
-        .maybeSingle();
-
-      if (existingFirm?.id) {
-        firmId = existingFirm.id;
-      } else {
-        const { data: newFirm } = await supabase
-          .from("firms")
-          .insert({
-            name: displayName,
-            ca_name: caName || null,
-            icai_number: icaiNumber || null,
-            email,
-            practice_type: practiceType,
-            onboarding_complete: false,
-          })
-          .select("id")
-          .single();
-        firmId = newFirm?.id ?? null;
-      }
-
-      if (!firmId) return;
-
-      await supabase.from("staff").upsert(
-        { firm_id: firmId, name: caName || email.split("@")[0], email, auth_user_id: userId, role: "admin", active: true },
-        { onConflict: "auth_user_id" }
-      );
-    } catch (err) {
-      console.error("bootstrapMissingRecords:", err);
-    }
+  const bootstrapMissingRecords = async (): Promise<void> => {
+    const { error } = await supabase.rpc("ensure_my_firm");
+    if (error) console.error("bootstrapMissingRecords:", error.message);
   };
 
   /**
@@ -139,7 +101,7 @@ function AppRoutes() {
 
       if (!data) {
         // Trigger failed — bootstrap silently then go to onboarding
-        await bootstrapMissingRecords(session);
+        await bootstrapMissingRecords();
         setStatus("onboarding");
         return;
       }

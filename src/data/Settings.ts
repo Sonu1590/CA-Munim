@@ -211,37 +211,19 @@ export async function fetchFirmProfileFromSupabase(): Promise<FirmProfile> {
       practice_type
     `;
 
-  let profileData: any = null;
-  let error: any = null;
+  // Firms have their own auto-generated UUID — resolve via the staff record,
+  // not by assuming firms.id === user.id.
+  const { data: staffData, error: staffError } = await supabase
+    .from('staff')
+    .select(`firms(${selectFields})`)
+    .eq('auth_user_id', user.id)
+    .maybeSingle();
 
-  const { data, error: firmError } = await supabase
-    .from("firms")
-    .select(selectFields)
-    .eq('id', user.id)
-    .single();
+  if (staffError) throw getFirmProfileError(staffError);
 
-  if (firmError) {
-    error = firmError;
-  } else {
-    profileData = data;
-  }
-
+  const profileData = (staffData as any)?.firms;
   if (!profileData) {
-    const { data: staffData, error: staffError } = await supabase
-      .from('staff')
-      .select(`firms(${selectFields})`)
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (staffError) {
-      if (error) throw getFirmProfileError(error);
-      throw getFirmProfileError(staffError);
-    }
-
-    profileData = (staffData as any)?.firms;
-    if (!profileData) {
-      throw new Error("Firm profile not found.");
-    }
+    throw new Error("Firm profile not found.");
   }
 
   const bankDetails = profileData.bank_details
