@@ -90,20 +90,17 @@ export default function UploadPortal() {
     }
     setLoadingRequest(true);
     supabase
-      .from('document_requests')
-      .select('document_type, custom_label, due_date, client_id, clients(name)')
-      .eq('upload_token', token)
-      .eq('status', 'pending')
-      .single()
+      .rpc('get_upload_request', { p_token: token })
       .then(({ data, error }) => {
-        if (error || !data) {
+        const row = Array.isArray(data) ? data[0] : data;
+        if (error || !row) {
           setRequestError("This upload link is invalid or has already been used.");
         } else {
           setRequest({
-            documentName: data.custom_label ?? data.document_type ?? 'Document',
-            clientName: (data.clients as any)?.name ?? 'Client',
-            clientId: data.client_id,
-            dueDate: data.due_date ?? '',
+            documentName: row.custom_label ?? row.document_type ?? 'Document',
+            clientName: row.client_name ?? 'Client',
+            clientId: row.client_id,
+            dueDate: row.due_date ?? '',
           });
         }
         setLoadingRequest(false);
