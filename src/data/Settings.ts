@@ -417,8 +417,11 @@ export async function saveInvoiceSettingsToSupabase(settings: InvoiceSettings): 
 }
 
 export async function fetchComplianceUpdatesFromSupabase(): Promise<ComplianceUpdate[]> {
+  // Table is compliance_bulletins, not compliance_updates — the old name
+  // here meant this query always errored and silently fell back to the
+  // hardcoded (July 2025) mockComplianceUpdates on every load.
   const { data, error } = await supabase
-    .from("compliance_updates")
+    .from("compliance_bulletins")
     .select(`id, title, body, severity, published_at`)
     .order("published_at", { ascending: false });
 
@@ -434,16 +437,22 @@ export async function fetchComplianceUpdatesFromSupabase(): Promise<ComplianceUp
 }
 
 export async function fetchSubscriptionPlansFromSupabase(): Promise<SubscriptionPlan[]> {
+  // subscription_plans has price_monthly/price_annual, not a plain `price`
+  // column — the old select() referenced a column that doesn't exist, so
+  // this always errored and silently fell back to the stale hardcoded
+  // subscriptionPlans mock (wrong prices) on every load. The app only
+  // models a single base price (annual pricing is derived as 10x monthly
+  // elsewhere, e.g. RazorpayCheckoutModal), so price_annual isn't mapped.
   const { data, error } = await supabase
     .from("subscription_plans")
-    .select(`name, price, client_limit, staff_limit, features`)
-    .order("price", { ascending: true });
+    .select(`name, price_monthly, client_limit, staff_limit, features`)
+    .order("price_monthly", { ascending: true });
 
   if (error || !data) return subscriptionPlans;
 
   return data.map((row: any) => ({
     name: row.name as SubscriptionPlan["name"],
-    price: Number(row.price ?? 0),
+    price: Number(row.price_monthly ?? 0),
     clientLimit: Number(row.client_limit ?? 0),
     staffLimit: Number(row.staff_limit ?? 0),
     features: row.features ?? [],
@@ -451,27 +460,50 @@ export async function fetchSubscriptionPlansFromSupabase(): Promise<Subscription
 }
 
 export async function fetchFilingCategoriesFromSupabase(): Promise<FilingCategory[]> {
+  // Column is `name`, not `label` — the old select() always errored and
+  // silently fell back to the hardcoded filingCategories mock.
   const { data, error } = await supabase
     .from("filing_categories")
-    .select(`id, label, enabled`)
-    .order("id", { ascending: true });
+    .select(`id, name, enabled`)
+    .order("name", { ascending: true });
 
   if (error || !data) return filingCategories;
 
   return data.map((row: any) => ({
     id: row.id,
-    label: row.label,
+    label: row.name,
     enabled: toBool(row.enabled),
   }));
 }
 
 export async function saveFilingCategoriesToSupabase(categories: FilingCategory[]): Promise<FilingCategory[]> {
-  const { error } = await supabase.from("filing_categories").upsert(categories.map((category) => ({
-    id: category.id,
-    label: category.label,
-    enabled: category.enabled,
-  })), { onConflict: "id" });
+  // filing_categories.id is a DB-generated uuid with no unique constraint on
+  // (firm_id, name), so an upsert keyed on the client's fixed slug ids
+  // (e.g. "gstr1") isn't possible — those aren't valid uuids and there's no
+  // conflict target to upsert against. Replace the firm's rows wholesale
+  // instead; this is safe because the whole category list is always saved
+  // together as one settings form, not edited row-by-row.
+  const firmId = await getCurrentFirmId();
 
-  if (error) throw error;
-  return categories;
+  const { error: deleteErr } = await supabase.from("filing_categories").delete().eq("firm_id", firmId);
+  if (deleteErr) throw deleteErr;
+
+  if (categories.length === 0) return categories;
+
+  const { data, error: insertErr } = await supabase
+    .from("filing_categories")
+    .insert(categories.map((category) => ({
+      firm_id: firmId,
+      name: category.label,
+      enabled: category.enabled,
+    })))
+    .select("id, name, enabled");
+
+  if (insertErr) throw insertErr;
+
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    label: row.name,
+    enabled: toBool(row.enabled),
+  }));
 }
