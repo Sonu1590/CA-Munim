@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, CheckCircle2, ShieldCheck, CreditCard, Smartphone, Building, IndianRupee } from "lucide-react";
+import { Loader2, CheckCircle2, Info, Smartphone, Building, IndianRupee } from "lucide-react";
 import { SubscriptionPlan } from "@/data/Settings";
 import { toast } from "sonner";
 
@@ -16,13 +16,12 @@ interface Props {
 }
 
 type Step = "summary" | "method" | "processing" | "success";
-type PayMethod = "upi" | "card" | "netbanking";
+type PayMethod = "upi" | "netbanking";
 
 export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props) {
   const [step, setStep] = useState<Step>("summary");
   const [method, setMethod] = useState<PayMethod>("upi");
   const [upi, setUpi] = useState("");
-  const [card, setCard] = useState({ number: "", expiry: "", cvv: "", name: "" });
 
   useEffect(() => {
     if (open) setStep("summary");
@@ -38,10 +37,6 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props
   const startPayment = () => {
     if (method === "upi" && !/^[\w.\-]+@[\w]+$/.test(upi)) {
       toast.error("Enter a valid UPI ID (e.g. name@bank)");
-      return;
-    }
-    if (method === "card" && (card.number.replace(/\s/g, "").length < 12 || !card.cvv)) {
-      toast.error("Enter valid card details");
       return;
     }
     setStep("processing");
@@ -61,7 +56,7 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props
         <DialogHeader>
           <DialogTitle className="font-heading flex items-center gap-2">
             <div className="h-7 px-2 rounded bg-[#072654] text-white text-xs font-bold flex items-center">Razorpay</div>
-            Secure Checkout
+            Demo Checkout
           </DialogTitle>
         </DialogHeader>
 
@@ -86,8 +81,8 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props
               </div>
             </div>
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-green-600" />
-              256-bit SSL · Auto-renews {cycle === "annual" ? "yearly" : "monthly"} · Cancel anytime
+              <Info className="h-3.5 w-3.5" />
+              Demo mode — no real payment gateway is connected yet · Auto-renews {cycle === "annual" ? "yearly" : "monthly"} · Cancel anytime
             </div>
             <Button onClick={() => setStep("method")} className="w-full h-11 bg-primary">Continue to Payment</Button>
           </div>
@@ -98,7 +93,6 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props
             <RadioGroup value={method} onValueChange={(v) => setMethod(v as PayMethod)} className="space-y-2">
               {[
                 { id: "upi", label: "UPI", icon: Smartphone, hint: "GPay, PhonePe, Paytm" },
-                { id: "card", label: "Card", icon: CreditCard, hint: "Credit / Debit" },
                 { id: "netbanking", label: "Net Banking", icon: Building, hint: "All major banks" },
               ].map((m) => {
                 const Icon = m.icon;
@@ -119,16 +113,6 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props
               <div className="space-y-2">
                 <Label>UPI ID</Label>
                 <Input placeholder="yourname@okhdfcbank" value={upi} onChange={(e) => setUpi(e.target.value)} />
-              </div>
-            )}
-            {method === "card" && (
-              <div className="space-y-2">
-                <Input placeholder="Card number" value={card.number} onChange={(e) => setCard({ ...card, number: e.target.value })} />
-                <div className="grid grid-cols-2 gap-2">
-                  <Input placeholder="MM/YY" value={card.expiry} onChange={(e) => setCard({ ...card, expiry: e.target.value })} />
-                  <Input placeholder="CVV" type="password" maxLength={4} value={card.cvv} onChange={(e) => setCard({ ...card, cvv: e.target.value })} />
-                </div>
-                <Input placeholder="Cardholder name" value={card.name} onChange={(e) => setCard({ ...card, name: e.target.value })} />
               </div>
             )}
             {method === "netbanking" && (
