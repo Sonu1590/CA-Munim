@@ -109,7 +109,7 @@ function mockClientsState(overrides: Partial<ReturnType<typeof useClients>> = {}
     clients,
     loading: false,
     error: null,
-    addClient: vi.fn().mockResolvedValue(true),
+    addClient: vi.fn().mockResolvedValue({ success: true }),
     updateClient: vi.fn(),
     deleteClient: vi.fn(),
     refetch: vi.fn(),
@@ -173,7 +173,7 @@ describe("Clients page", () => {
   });
 
   it("passes saved client data to addClient and closes the modal on success", async () => {
-    const addClient = vi.fn().mockResolvedValue(true);
+    const addClient = vi.fn().mockResolvedValue({ success: true });
     mockClientsState({ addClient });
 
     render(<Clients />);

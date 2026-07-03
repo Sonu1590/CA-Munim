@@ -35,7 +35,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 
 import { useClients } from "@/hooks/useClients";
-import { TaskFormData } from "@/hooks/useTasks";
+import { TaskFormData, TaskPriority } from "@/hooks/useTasks";
 import { useFinancialYear } from "@/context/financialYear";
 import { financialYears } from "@/data/Tasks";
 import type { Task } from "@/data/Tasks";
@@ -66,7 +66,7 @@ export function AddTaskModal({
 
   const [dueDate, setDueDate] = useState<Date>();
 
-  const [priority, setPriority] = useState("medium");
+  const [priority, setPriority] = useState<TaskPriority>("medium");
 
   const [notes, setNotes] = useState("");
 
@@ -377,7 +377,7 @@ export function AddTaskModal({
 
               <Select
                 value={priority}
-                onValueChange={setPriority}
+                onValueChange={(value) => setPriority(value as TaskPriority)}
               >
                 <SelectTrigger>
                   <SelectValue />

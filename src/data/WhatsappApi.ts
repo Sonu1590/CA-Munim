@@ -243,6 +243,12 @@ export async function markReceivedMessageRead(id: string): Promise<void> {
  * Until that registration exists, Meta will reject the send and the error
  * will surface to the user rather than silently sending placeholder text.
  */
+interface WhatsAppSendResult {
+  phone: string;
+  success: boolean;
+  error?: string;
+}
+
 function toMetaTemplateName(displayName: string): string {
   return displayName
     .trim()
@@ -290,8 +296,8 @@ export async function sendBulkWhatsAppMessages(
     throw new Error(detail);
   }
 
-  const results = Array.isArray(edgeData?.results) ? edgeData.results : [];
-  const resultByPhone = new Map(results.map((result: any) => [result.phone, result]));
+  const results: WhatsAppSendResult[] = Array.isArray(edgeData?.results) ? edgeData.results : [];
+  const resultByPhone = new Map<string, WhatsAppSendResult>(results.map((result) => [result.phone, result]));
 
   // STEP 2: Log the dispatched messages to the database to update the UI
   const logsToInsert = clients.map(client => ({
@@ -311,7 +317,7 @@ export async function sendBulkWhatsAppMessages(
     throw new Error("Messages sent, but failed to log to database.");
   }
 
-  const failed = results.filter((result: any) => !result.success);
+  const failed = results.filter((result) => !result.success);
   if (!edgeData?.success || failed.length > 0) {
     const reason = failed[0]?.error;
     console.error("META API EXACT ERROR:", reason);
