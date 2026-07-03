@@ -45,3 +45,6 @@ coverage/
 
 # Vercel
 .vercel
+
+# Claude Code
+CLAUDE.md
