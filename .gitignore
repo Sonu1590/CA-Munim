@@ -42,11 +42,6 @@ trace.zip
 
 # Coverage
 coverage/
-<<<<<<< HEAD
-.env
-=======
 
+# Vercel
 .vercel
-dist
-node_modules
->>>>>>> a6b6bed27469094d4dbc9f3b8321277ba5c24a71
