@@ -184,6 +184,11 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
       return;
     }
 
+    if (panValue.trim() && !panCheck.isValid) {
+      setError("Enter a valid PAN (format: AAAAA9999A — 5 letters, 4 digits, 1 letter).");
+      return;
+    }
+
     if (!onSave) {
       onOpenChange(false);
       return;
