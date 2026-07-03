@@ -1,4 +1,4 @@
-import { Task } from "@/data/Tasks";
+import { Task, ChecklistItem } from "@/data/Tasks";
 import { TaskCard } from "./TaskCard";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
@@ -7,6 +7,7 @@ interface Props {
   onStatusChange: (taskId: string, status: Task["status"]) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (task: Task) => void;
+  onChecklistUpdate: (taskId: string, items: ChecklistItem[]) => void | Promise<void>;
 }
 
 const columns: { key: Task["status"]; label: string; short: string; color: string }[] = [
@@ -21,12 +22,14 @@ function Column({
   onStatusChange,
   onEdit,
   onDelete,
+  onChecklistUpdate,
 }: {
   col: (typeof columns)[number];
   tasks: Task[];
   onStatusChange: Props["onStatusChange"];
   onEdit?: Props["onEdit"];
   onDelete?: Props["onDelete"];
+  onChecklistUpdate: Props["onChecklistUpdate"];
 }) {
   return (
     <div className="flex flex-col">
@@ -42,14 +45,14 @@ function Column({
           <p className="text-xs text-muted-foreground text-center py-8">No tasks</p>
         )}
         {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} />
+          <TaskCard key={task.id} task={task} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} onChecklistUpdate={onChecklistUpdate} />
         ))}
       </div>
     </div>
   );
 }
 
-export function TaskKanbanBoard({ tasks, onStatusChange, onEdit, onDelete }: Props) {
+export function TaskKanbanBoard({ tasks, onStatusChange, onEdit, onDelete, onChecklistUpdate }: Props) {
   const byStatus = (s: Task["status"]) => tasks.filter((t) => t.status === s);
 
   return (
@@ -57,7 +60,7 @@ export function TaskKanbanBoard({ tasks, onStatusChange, onEdit, onDelete }: Pro
       {/* Desktop & tablet: 3-column board */}
       <div className="hidden md:grid grid-cols-3 gap-4">
         {columns.map((col) => (
-          <Column key={col.key} col={col} tasks={byStatus(col.key)} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} />
+          <Column key={col.key} col={col} tasks={byStatus(col.key)} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} onChecklistUpdate={onChecklistUpdate} />
         ))}
       </div>
 
@@ -80,7 +83,7 @@ export function TaskKanbanBoard({ tasks, onStatusChange, onEdit, onDelete }: Pro
           </TabsList>
           {columns.map((col) => (
             <TabsContent key={col.key} value={col.key} className="mt-3">
-              <Column col={col} tasks={byStatus(col.key)} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} />
+              <Column col={col} tasks={byStatus(col.key)} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} onChecklistUpdate={onChecklistUpdate} />
             </TabsContent>
           ))}
         </Tabs>
