@@ -21,13 +21,20 @@ export function FeesDashboard({ invoices }: FeesDashboardProps) {
 
   const totalInvoicedThisMonth = thisMonthInvoices.reduce((s, i) => s + i.grandTotal, 0);
   const totalReceivedThisMonth = thisMonthInvoices.reduce((s, i) => s + i.amountPaid, 0);
-  const totalOutstanding = invoices.reduce((s, i) => s + i.amountDue, 0);
-  const overdueInvoices = invoices.filter(
-    (i) => i.status === "Overdue" || (i.amountDue > 0 && new Date(i.dueDate) < now && i.status !== "Cancelled")
+
+  // "Outstanding" only makes sense for invoices actually sent to the client —
+  // a Draft hasn't been billed yet, so it shouldn't count as money owed or
+  // overdue. Keep this filter identical to unpaidInvoices below so the
+  // summary cards and the list always agree.
+  const billedUnpaidInvoices = invoices.filter(
+    (i) => i.amountDue > 0 && i.status !== "Cancelled" && i.status !== "Draft"
+  );
+  const totalOutstanding = billedUnpaidInvoices.reduce((s, i) => s + i.amountDue, 0);
+  const overdueInvoices = billedUnpaidInvoices.filter(
+    (i) => i.status === "Overdue" || new Date(i.dueDate) < now
   );
 
-  const unpaidInvoices = invoices
-    .filter((i) => i.amountDue > 0 && i.status !== "Cancelled" && i.status !== "Draft")
+  const unpaidInvoices = billedUnpaidInvoices
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
   const metrics = [
