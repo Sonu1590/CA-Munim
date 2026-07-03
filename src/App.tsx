@@ -10,7 +10,8 @@ import {
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 
@@ -36,13 +37,13 @@ import ResetPasswordPage from "./pages/ResetPasswordPage.tsx";
 const queryClient = new QueryClient();
 
 // ── Auth status type — single source of truth ────────────────────────────────
-type AuthStatus = "loading" | "unauthenticated" | "onboarding" | "ready";
+type AuthStatus = "loading" | "unauthenticated" | "onboarding" | "ready" | "error";
 
 // ── Route guard ──────────────────────────────────────────────────────────────
 function ProtectedRoute({ status, children }: { status: AuthStatus; children: React.ReactNode }) {
   const location = useLocation();
 
-  if (status === "loading") {
+  if (status === "loading" || status === "error") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -94,8 +95,12 @@ function AppRoutes() {
         .maybeSingle();
 
       if (error) {
+        // A query error (e.g. transient network issue) is not the same as
+        // "this user has no firm yet" — don't force them into the
+        // onboarding form, which could overwrite a real firm profile with
+        // blank data if unknowingly resubmitted.
         console.error("resolveStatus error:", error.message);
-        setStatus("onboarding");
+        setStatus("error");
         return;
       }
 
@@ -111,9 +116,14 @@ function AppRoutes() {
 
     } catch (err) {
       console.error("resolveStatus unexpected:", err);
-      setStatus("onboarding");
+      setStatus("error");
     }
   }, []);
+
+  const retryResolveStatus = () => {
+    setStatus("loading");
+    supabase.auth.getSession().then(({ data: { session } }) => resolveStatus(session));
+  };
 
   useEffect(() => {
     // Initial session on mount
@@ -136,6 +146,22 @@ function AppRoutes() {
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Loading CA Munim...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Couldn't resolve account status (e.g. transient network issue) — retry
+  // rather than silently routing into onboarding.
+  if (status === "error") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="flex flex-col items-center gap-3 text-center max-w-sm">
+          <AlertTriangle className="h-8 w-8 text-destructive" />
+          <p className="text-sm text-muted-foreground">
+            Something went wrong while loading your account. This is usually a temporary network issue.
+          </p>
+          <Button onClick={retryResolveStatus}>Try Again</Button>
         </div>
       </div>
     );
