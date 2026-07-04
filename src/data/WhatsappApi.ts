@@ -289,6 +289,7 @@ interface WhatsAppSendResult {
   phone: string;
   success: boolean;
   error?: string;
+  wamid?: string;
 }
 
 function toMetaTemplateName(displayName: string): string {
@@ -348,6 +349,7 @@ export async function sendBulkWhatsAppMessages(
     template_name: template.name,
     message: compiledMessages[client.id] || "Document request sent.",
     status: resultByPhone.get(client.phone)?.success ? "sent" : "failed",
+    wamid: resultByPhone.get(client.phone)?.wamid ?? null,
   }));
 
   const { error: dbError } = await supabase

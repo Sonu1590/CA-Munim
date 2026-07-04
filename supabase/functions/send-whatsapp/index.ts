@@ -114,7 +114,10 @@ serve(async (req) => {
         if (!response.ok || body.error) {
           return { phone, success: false, error: body.error?.message ?? `Meta API error (${response.status})` }
         }
-        return { phone, success: true }
+        // Meta's own id for this specific message (the "wamid") — the webhook
+        // receiver needs this to match a later delivery/read status update
+        // back to this row, since it has no other stable shared key.
+        return { phone, success: true, wamid: body.messages?.[0]?.id as string | undefined }
       })
     );
 
