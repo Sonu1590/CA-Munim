@@ -33,6 +33,7 @@ import { GlobalSearch } from "./components/common/GlobalSearch";
 import { FinancialYearProvider } from "@/context/financialYear";
 import AuthCallback from "./pages/AuthCallback.tsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.tsx";
+import PrivacyPolicy from "./pages/PrivacyPolicy.tsx";
 
 const queryClient = new QueryClient();
 
@@ -173,6 +174,7 @@ function AppRoutes() {
       <Routes>
         {/* Public */}
         <Route path="/upload/:token" element={<UploadPortal />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
         {/* Login — bounces away if already authenticated */}
         <Route
