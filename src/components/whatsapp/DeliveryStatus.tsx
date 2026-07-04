@@ -67,7 +67,7 @@ export function DeliveryStatus() {
         { [client.id]: parameters }
       );
 
-      toast.success(`Retried message to ${msg.clientName}`);
+      toast.success(`Message resent to ${msg.clientName}`);
       await loadMessages();
     } catch (err: any) {
       toast.error(err?.message ?? `Failed to retry message to ${msg.clientName}`);
