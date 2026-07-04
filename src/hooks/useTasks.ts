@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import type { ChecklistItem } from '@/data/Tasks'
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed'
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
@@ -18,7 +19,7 @@ export interface Task {
   priority: TaskPriority
   assignedTo?: string
   assignedToName?: string
-  documentChecklist: { label: string; checked: boolean }[]
+  documentChecklist: ChecklistItem[]
   filingReference?: string
   ackNumber?: string
   notes?: string
@@ -35,7 +36,7 @@ export interface TaskFormData {
   due_date: string
   priority?: TaskPriority
   assigned_to?: string
-  document_checklist?: { label: string; checked: boolean }[]
+  document_checklist?: ChecklistItem[]
   notes?: string
 }
 

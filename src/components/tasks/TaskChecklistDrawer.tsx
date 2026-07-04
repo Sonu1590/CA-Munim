@@ -4,7 +4,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { taskChecklistStore } from "@/lib/taskChecklistStore";
 import { ChecklistItem } from "@/data/Tasks";
 import { Plus, Trash2, MessageCircle, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -15,18 +14,24 @@ interface Props {
   taskId: string;
   taskName: string;
   clientName: string;
+  items: ChecklistItem[];
+  onUpdate: (items: ChecklistItem[]) => void | Promise<void>;
 }
 
-export function TaskChecklistDrawer({ open, onOpenChange, taskId, taskName, clientName }: Props) {
-  const [items, setItems] = useState<ChecklistItem[]>([]);
+export function TaskChecklistDrawer({ open, onOpenChange, taskId, taskName, clientName, items: initialItems, onUpdate }: Props) {
+  const [items, setItems] = useState<ChecklistItem[]>(initialItems);
   const [newLabel, setNewLabel] = useState("");
 
+  // Re-sync when a fresh checklist arrives from the parent (e.g. after a
+  // successful save elsewhere) or when the drawer is opened for a task.
   useEffect(() => {
-    if (!open) return;
-    setItems(taskChecklistStore.get(taskId));
-    const unsub = taskChecklistStore.subscribe(() => setItems(taskChecklistStore.get(taskId)));
-    return () => { unsub(); };
-  }, [open, taskId]);
+    setItems(initialItems);
+  }, [initialItems, taskId, open]);
+
+  const commit = (next: ChecklistItem[]) => {
+    setItems(next);
+    onUpdate(next);
+  };
 
   const received = items.filter((i) => i.received).length;
   const pending = items.filter((i) => !i.received);
@@ -49,7 +54,15 @@ export function TaskChecklistDrawer({ open, onOpenChange, taskId, taskName, clie
             <div key={item.id} className="flex items-start gap-2 p-2.5 rounded-lg border border-border">
               <Checkbox
                 checked={item.received}
-                onCheckedChange={() => taskChecklistStore.toggle(taskId, item.id)}
+                onCheckedChange={() =>
+                  commit(
+                    items.map((i) =>
+                      i.id === item.id
+                        ? { ...i, received: !i.received, source: "manual" as const, receivedAt: !i.received ? new Date().toISOString() : undefined }
+                        : i
+                    )
+                  )
+                }
                 className="mt-0.5"
               />
               <div className="flex-1 min-w-0">
@@ -62,7 +75,7 @@ export function TaskChecklistDrawer({ open, onOpenChange, taskId, taskName, clie
                   </p>
                 )}
               </div>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => taskChecklistStore.remove(taskId, item.id)}>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => commit(items.filter((i) => i.id !== item.id))}>
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -78,7 +91,7 @@ export function TaskChecklistDrawer({ open, onOpenChange, taskId, taskName, clie
             size="icon"
             onClick={() => {
               if (!newLabel.trim()) return;
-              taskChecklistStore.add(taskId, newLabel.trim());
+              commit([...items, { id: crypto.randomUUID(), label: newLabel.trim(), received: false }]);
               setNewLabel("");
             }}
           >

@@ -1,10 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 // The magic headers that fix the browser block!
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+const MAX_RECIPIENTS = 200
 
 serve(async (req) => {
   // 1. Handle CORS Preflight request from the React Browser
@@ -13,43 +16,117 @@ serve(async (req) => {
   }
 
   try {
-    const { phoneNumbers, templateName } = await req.json()
-    
+    const { templateName, languageCode, recipients } = await req.json()
+
+    if (!templateName || !Array.isArray(recipients) || recipients.length === 0) {
+      throw new Error('templateName and at least one recipient are required.')
+    }
+    if (recipients.length > MAX_RECIPIENTS) {
+      throw new Error(`Cannot send to more than ${MAX_RECIPIENTS} recipients in one request.`)
+    }
+
+    // Authenticate the caller and scope sends to phone numbers that are
+    // actually clients of their own firm. Without this, any authenticated
+    // user could call this function directly (bypassing the app's UI) and
+    // dispatch WhatsApp templates to arbitrary phone numbers using the
+    // firm's Meta credentials — verify_jwt only proves the request carries
+    // a valid Supabase session, not that these are the caller's clients.
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) throw new Error('Missing Authorization header.')
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    )
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) throw new Error('Not authenticated.')
+
+    const requestedPhones = [...new Set(recipients.map((r: { phone: string }) => r.phone))]
+    // RLS (clients_all: firm_id = get_my_firm_id()) automatically scopes this
+    // to the caller's own firm's clients.
+    const { data: ownClients, error: clientsError } = await supabase
+      .from('clients')
+      .select('phone')
+      .in('phone', requestedPhones)
+
+    if (clientsError) throw new Error('Unable to verify recipients.')
+
+    const allowedPhones = new Set((ownClients ?? []).map((c: { phone: string }) => c.phone))
+    const authorizedRecipients = recipients.filter((r: { phone: string }) => allowedPhones.has(r.phone))
+    const rejectedPhones = recipients
+      .map((r: { phone: string }) => r.phone)
+      .filter((phone: string) => !allowedPhones.has(phone))
+
+    if (authorizedRecipients.length === 0) {
+      throw new Error('None of the requested phone numbers belong to a client of your firm.')
+    }
+
     // Grabbing the secrets you set in the dashboard
     const META_TOKEN = Deno.env.get('WHATSAPP_ACCESS_TOKEN')
     const PHONE_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')
 
-    // Loop through the clients and send
-    const results = await Promise.all(phoneNumbers.map(async (phone: string) => {
-      const response = await fetch(`https://graph.facebook.com/v21.0/${PHONE_ID}/messages`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${META_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: phone,
-          type: "template",
-          template: {
-            name: templateName, // Usually "hello_world" for sandbox
-            language: { code: "en_US" }
-          }
-        })
-      });
-      return response.json();
-    }));
+    // Send one templated message per recipient, with that recipient's own
+    // compiled parameter values filled into the template's body placeholders.
+    const sentResults = await Promise.all(
+      authorizedRecipients.map(async (recipient: { phone: string; parameters?: string[] }) => {
+        const { phone, parameters } = recipient
+
+        const template: Record<string, unknown> = {
+          name: templateName,
+          language: { code: languageCode || 'en_US' },
+        }
+        if (parameters && parameters.length > 0) {
+          template.components = [{
+            type: 'body',
+            parameters: parameters.map((text) => ({ type: 'text', text: String(text) })),
+          }]
+        }
+
+        const response = await fetch(`https://graph.facebook.com/v21.0/${PHONE_ID}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${META_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: phone,
+            type: 'template',
+            template,
+          })
+        });
+
+        const body = await response.json()
+        if (!response.ok || body.error) {
+          return { phone, success: false, error: body.error?.message ?? `Meta API error (${response.status})` }
+        }
+        return { phone, success: true }
+      })
+    );
+
+    // Report rejected (non-client) phone numbers as explicit failures so the
+    // caller can see they weren't silently dropped.
+    const rejectedResults = rejectedPhones.map((phone: string) => ({
+      phone,
+      success: false,
+      error: 'Not a client of your firm — message not sent.',
+    }))
+
+    const results = [...sentResults, ...rejectedResults]
+    const allSucceeded = results.every((r) => r.success)
 
     // Success response with CORS headers included
-    return new Response(JSON.stringify({ success: true, results }), {
+    return new Response(JSON.stringify({ success: allSucceeded, results }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
   } catch (error) {
     // Error response with CORS headers included
-    return new Response(JSON.stringify({ error: error.message }), { 
+    return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400 
+      status: 400
     })
   }
 })

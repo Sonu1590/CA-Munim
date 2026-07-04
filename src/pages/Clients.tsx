@@ -162,15 +162,13 @@ export default function Clients() {
             const result = editingClient
               ? await updateClient(editingClient.id, formData)
               : await addClient(formData);
-            const success = result === true || (typeof result === "object" && result !== null && result.success);
-            const message = typeof result === "object" && result !== null ? result.error : undefined;
 
-            if (success) {
+            if (result.success) {
               toast.success(editingClient ? "Client updated" : "Client added");
               setModalOpen(false);
               setEditingClient(null);
             } else {
-              toast.error(message ?? "Could not save client. Please check the details and try again.");
+              toast.error(result.error ?? "Could not save client. Please check the details and try again.");
             }
             return result;
           }}

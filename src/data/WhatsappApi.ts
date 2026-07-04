@@ -234,28 +234,54 @@ export async function markReceivedMessageRead(id: string): Promise<void> {
 }
 
 /**
+ * Meta requires WhatsApp template names in lowercase snake_case, matching
+ * whatever the firm registered and got approved in Meta Business Manager.
+ * This derives that name from the internal display name (e.g. "GST Filing
+ * Reminder" -> "gst_filing_reminder") — the firm must register a template
+ * with this exact name and body parameters matching `template.variables`
+ * (same count and order) before bulk sends will deliver the real content.
+ * Until that registration exists, Meta will reject the send and the error
+ * will surface to the user rather than silently sending placeholder text.
+ */
+interface WhatsAppSendResult {
+  phone: string;
+  success: boolean;
+  error?: string;
+}
+
+function toMetaTemplateName(displayName: string): string {
+  return displayName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+/**
  * LIVE META API INTEGRATION
- * This function calls the secure Supabase Edge Function to dispatch 
- * the messages via WhatsApp Cloud API, then logs the outbound messages 
+ * This function calls the secure Supabase Edge Function to dispatch
+ * the messages via WhatsApp Cloud API, then logs the outbound messages
  * to your database so the Delivery Status UI updates instantly.
  */
 export async function sendBulkWhatsAppMessages(
   clients: { id: string; name: string; phone: string }[],
   template: MessageTemplate,
-  compiledMessages: Record<string, string> // Map of clientId -> final text (for DB logging)
+  compiledMessages: Record<string, string>, // Map of clientId -> final text (for DB logging)
+  parametersByClientId: Record<string, string[]> // Map of clientId -> ordered values matching template.variables (for the Meta API call)
 ): Promise<void> {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) throw new Error("Authentication required to send messages.");
 
-  // STEP 1: Dispatch to Meta via Secure Edge Function
+  // STEP 1: Dispatch to Meta via Secure Edge Function, using the template the
+  // user actually selected and that client's real compiled parameter values.
   const { data: edgeData, error: edgeError } = await supabase.functions.invoke('send-whatsapp', {
     body: {
-      phoneNumbers: clients.map(c => c.phone),
-      // NOTE FOR HACKATHON SANDBOX: 
-      // Meta's sandbox only allows pre-approved templates like "hello_world".
-      // In production, change this to: templateName: template.name
-      templateName: "hello_world",
+      templateName: toMetaTemplateName(template.name),
       languageCode: "en_US",
+      recipients: clients.map(c => ({
+        phone: c.phone,
+        parameters: parametersByClientId[c.id] ?? [],
+      })),
     }
   });
 
@@ -270,8 +296,8 @@ export async function sendBulkWhatsAppMessages(
     throw new Error(detail);
   }
 
-  const results = Array.isArray(edgeData?.results) ? edgeData.results : [];
-  const resultByPhone = new Map(results.map((result: any) => [result.phone, result]));
+  const results: WhatsAppSendResult[] = Array.isArray(edgeData?.results) ? edgeData.results : [];
+  const resultByPhone = new Map<string, WhatsAppSendResult>(results.map((result) => [result.phone, result]));
 
   // STEP 2: Log the dispatched messages to the database to update the UI
   const logsToInsert = clients.map(client => ({
@@ -291,17 +317,14 @@ export async function sendBulkWhatsAppMessages(
     throw new Error("Messages sent, but failed to log to database.");
   }
 
-  const failed = results.filter((result: any) => !result.success);
+  const failed = results.filter((result) => !result.success);
   if (!edgeData?.success || failed.length > 0) {
     const reason = failed[0]?.error;
-    
-    // ADD THIS LOG: This will print the exact Meta error in your F12 Console
     console.error("META API EXACT ERROR:", reason);
 
-    // FIX THE TOAST: Tell it to read the `.message` property instead of the whole object
     throw new Error(
       reason
-        ? `${failed.length} message(s) failed: ${reason.message || JSON.stringify(reason)}`
+        ? `${failed.length} message(s) failed: ${reason}`
         : "WhatsApp did not confirm that all messages were sent.",
     );
   }

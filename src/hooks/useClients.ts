@@ -210,6 +210,15 @@ export function useClients() {
         throw new Error('Date of Birth / Incorporation is required')
       }
 
+      // PAN is a unique national identifier — reject an obvious duplicate
+      // within the firm before hitting the DB. (No DB-level constraint yet:
+      // existing production data already has duplicate PANs that would need
+      // manual review before a hard constraint could be added.)
+      const normalizedPan = formData.pan?.trim().toUpperCase()
+      if (normalizedPan && clients.some(c => c.pan?.trim().toUpperCase() === normalizedPan)) {
+        return { success: false, error: 'A client with this PAN already exists.' }
+      }
+
       // Get firm_id from current user's staff record
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
@@ -286,6 +295,11 @@ if (!staffRow?.firm_id) {
 
       if (formData.date_of_birth !== undefined && !formData.date_of_birth.trim()) {
         throw new Error('Date of Birth / Incorporation is required')
+      }
+
+      const normalizedPan = formData.pan?.trim().toUpperCase()
+      if (normalizedPan && clients.some(c => c.id !== id && c.pan?.trim().toUpperCase() === normalizedPan)) {
+        return { success: false, error: 'A client with this PAN already exists.' }
       }
 
       const { error: updateErr } = await supabase

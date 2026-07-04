@@ -4,9 +4,21 @@
  */
 import { Page, expect } from '@playwright/test';
 
+function requireTestEnv(name: 'TEST_USER_EMAIL' | 'TEST_USER_PASSWORD'): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(
+      `${name} is not set. Copy e2e/.env.test.example to e2e/.env.test (or export ` +
+      `${name} in your shell/CI secrets) with credentials for a real test account ` +
+      `before running e2e tests.`
+    );
+  }
+  return value;
+}
+
 export const TEST_USER = {
-  email: process.env.TEST_USER_EMAIL ?? 'REDACTED-EMAIL',
-  password: process.env.TEST_USER_PASSWORD ?? 'REDACTED-PASSWORD',
+  get email() { return requireTestEnv('TEST_USER_EMAIL'); },
+  get password() { return requireTestEnv('TEST_USER_PASSWORD'); },
 };
 
 export const TEST_CLIENT = {

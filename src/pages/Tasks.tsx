@@ -208,7 +208,13 @@ export default function Tasks() {
         {normalisedTasks.length > 0 && (
           <>
             {view === "kanban" && (
-              <TaskKanbanBoard tasks={filteredTasks} onStatusChange={handleStatusChange} onEdit={handleEditTask} onDelete={handleDeleteTask} />
+              <TaskKanbanBoard
+                tasks={filteredTasks}
+                onStatusChange={handleStatusChange}
+                onEdit={handleEditTask}
+                onDelete={handleDeleteTask}
+                onChecklistUpdate={async (taskId, items) => { await updateTask(taskId, { document_checklist: items }); }}
+              />
             )}
             {view === "list" && (
               <TaskListView tasks={filteredTasks} onStatusChange={handleStatusChange} onEdit={handleEditTask} onDelete={handleDeleteTask} />

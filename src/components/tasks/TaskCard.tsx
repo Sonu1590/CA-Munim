@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Task } from "@/data/Tasks";
+import { useState } from "react";
+import { Task, ChecklistItem } from "@/data/Tasks";
 import { Badge } from "@/components/ui/badge";
 import { format, differenceInDays, parseISO } from "date-fns";
 import {
@@ -11,7 +11,6 @@ import {
 import { MoreVertical, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TaskChecklistDrawer } from "./TaskChecklistDrawer";
-import { taskChecklistStore } from "@/lib/taskChecklistStore";
 import { TaskTypeIcon } from "./TaskTypeIcon";
 
 interface Props {
@@ -19,6 +18,7 @@ interface Props {
   onStatusChange: (taskId: string, status: Task["status"]) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (task: Task) => void;
+  onChecklistUpdate: (taskId: string, items: ChecklistItem[]) => void | Promise<void>;
 }
 
 function getDueDateColor(dueDate: string, status: string) {
@@ -39,20 +39,14 @@ function getPriorityBadge(priority: Task["priority"]) {
   return map[priority];
 }
 
-export function TaskCard({ task, onStatusChange, onEdit, onDelete }: Props) {
+export function TaskCard({ task, onStatusChange, onEdit, onDelete, onChecklistUpdate }: Props) {
   const dateColor = getDueDateColor(task.dueDate, task.status);
   const priority = getPriorityBadge(task.priority);
   const [openChecklist, setOpenChecklist] = useState(false);
-  const [checklistVersion, setChecklistVersion] = useState(0);
-  useEffect(() => {
-    const unsub = taskChecklistStore.subscribe(() => setChecklistVersion((v) => v + 1));
-    return () => { unsub(); };
-  }, []);
-  const items = taskChecklistStore.get(task.id);
+  const items = task.documentChecklist ?? [];
   const received = items.filter((i) => i.received).length;
   const total = items.length || task.docsTotal;
   const docsReceived = items.length ? received : task.docsReceived;
-  void checklistVersion;
 
   return (
     <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm hover:shadow-md transition-shadow">
@@ -128,6 +122,8 @@ export function TaskCard({ task, onStatusChange, onEdit, onDelete }: Props) {
           taskId={task.id}
           taskName={task.customTaskName || task.taskType}
           clientName={task.clientName}
+          items={items}
+          onUpdate={(next) => onChecklistUpdate(task.id, next)}
         />
       )}
     </div>

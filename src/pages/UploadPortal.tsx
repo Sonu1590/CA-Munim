@@ -5,15 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { UploadCloud, FileText, CheckCircle2, X, Calendar, Building2, Loader2 } from "lucide-react";
 import { fetchFirmProfileFromSupabase } from "@/data/Settings";
-import { taskChecklistStore } from "@/lib/taskChecklistStore";
 import { toast } from "sonner";
 
 interface UploadedFile {
   name: string;
   size: number;
+  type: string;
   progress: number;
   done: boolean;
+  error?: boolean;
+  path?: string; // storage path once the file is uploaded
 }
+
+const STORAGE_BUCKET = "ca-munim-documents";
 
 interface DocumentRequest {
   documentName: string;
@@ -86,20 +90,17 @@ export default function UploadPortal() {
     }
     setLoadingRequest(true);
     supabase
-      .from('document_requests')
-      .select('document_type, custom_label, due_date, client_id, clients(name)')
-      .eq('upload_token', token)
-      .eq('status', 'pending')
-      .single()
+      .rpc('get_upload_request', { p_token: token })
       .then(({ data, error }) => {
-        if (error || !data) {
+        const row = Array.isArray(data) ? data[0] : data;
+        if (error || !row) {
           setRequestError("This upload link is invalid or has already been used.");
         } else {
           setRequest({
-            documentName: data.custom_label ?? data.document_type ?? 'Document',
-            clientName: (data.clients as any)?.name ?? 'Client',
-            clientId: data.client_id,
-            dueDate: data.due_date ?? '',
+            documentName: row.custom_label ?? row.document_type ?? 'Document',
+            clientName: row.client_name ?? 'Client',
+            clientId: row.client_id,
+            dueDate: row.due_date ?? '',
           });
         }
         setLoadingRequest(false);
@@ -107,7 +108,12 @@ export default function UploadPortal() {
   }, [token]);
 
   // ── File handling ────────────────────────────────────────────────────────
-  const handleFiles = (list: FileList | File[]) => {
+  const handleFiles = async (list: FileList | File[]) => {
+    if (!token) {
+      toast.error("Invalid upload link.");
+      return;
+    }
+
     const incoming = Array.from(list);
     for (const f of incoming) {
       const ext = "." + f.name.split(".").pop()?.toLowerCase();
@@ -119,20 +125,33 @@ export default function UploadPortal() {
         toast.error(`${f.name}: max ${MAX_FILE_MB}MB`);
         continue;
       }
-      const entry: UploadedFile = { name: f.name, size: f.size, progress: 0, done: false };
+
+      const entry: UploadedFile = {
+        name: f.name,
+        size: f.size,
+        type: f.type || "application/octet-stream",
+        progress: 15,
+        done: false,
+      };
       setFiles((prev) => [...prev, entry]);
 
-      // Simulate upload progress
-      const interval = setInterval(() => {
-        setFiles((prev) =>
-          prev.map((x) => {
-            if (x.name !== entry.name) return x;
-            const next = Math.min(x.progress + 15 + Math.random() * 20, 100);
-            return { ...x, progress: next, done: next >= 100 };
-          })
-        );
-      }, 250);
-      setTimeout(() => clearInterval(interval), 3000);
+      // Real upload to the private Supabase storage bucket.
+      const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+      const path = `client-uploads/${token}/${Date.now()}-${safeName}`;
+      const { error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(path, f, { cacheControl: "3600", upsert: false, contentType: f.type || undefined });
+
+      setFiles((prev) =>
+        prev.map((x) => {
+          if (x !== entry && !(x.name === entry.name && !x.path && !x.error)) return x;
+          return error
+            ? { ...x, error: true, done: false, progress: 0 }
+            : { ...x, path, progress: 100, done: true };
+        })
+      );
+
+      if (error) toast.error(`${f.name}: upload failed. Please try again.`);
     }
   };
 
@@ -143,26 +162,36 @@ export default function UploadPortal() {
   };
 
   const handleSubmit = async () => {
-    if (files.length === 0 || files.some((f) => !f.done)) {
+    const uploaded = files.filter((f) => f.done && f.path);
+    const stillUploading = files.some((f) => !f.done && !f.error);
+
+    if (uploaded.length === 0 || stillUploading) {
       toast.error("Please wait for all files to finish uploading");
+      return;
+    }
+    if (!token) {
+      toast.error("Invalid upload link.");
       return;
     }
 
     setSubmitting(true);
     try {
-      if (token) {
-        const { error } = await supabase
-          .from('document_requests')
-          .update({ status: 'uploaded', uploaded_at: new Date().toISOString() })
-          .eq('upload_token', token);
+      // Record the uploaded files against the correct firm/client and mark the
+      // request complete. The token is validated server-side inside the RPC.
+      const { error } = await supabase.rpc("record_client_upload", {
+        p_token: token,
+        p_files: uploaded.map((f) => ({
+          name: f.name,
+          url: f.path,
+          size: f.size,
+          type: f.type,
+        })),
+      });
 
-        if (error) throw error;
-      }
-
-      taskChecklistStore.markReceivedByLabel(request?.clientId, request?.documentName);
+      if (error) throw error;
       setSubmitted(true);
     } catch (err: any) {
-      toast.error("Submission failed. Please try again or contact your CA.");
+      toast.error(err?.message || "Submission failed. Please try again or contact your CA.");
     } finally {
       setSubmitting(false);
     }
@@ -322,7 +351,11 @@ export default function UploadPortal() {
 
             <Button
               onClick={handleSubmit}
-              disabled={submitting || files.length === 0 || files.some((f) => !f.done)}
+              disabled={
+                submitting ||
+                !files.some((f) => f.done && f.path) ||
+                files.some((f) => !f.done && !f.error)
+              }
               className="w-full h-11 bg-primary"
             >
               {submitting ? "Submitting..." : `Submit to ${firm.firmName || firm.caName || "your CA"}`}

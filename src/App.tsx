@@ -10,7 +10,8 @@ import {
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 
@@ -36,13 +37,13 @@ import ResetPasswordPage from "./pages/ResetPasswordPage.tsx";
 const queryClient = new QueryClient();
 
 // ── Auth status type — single source of truth ────────────────────────────────
-type AuthStatus = "loading" | "unauthenticated" | "onboarding" | "ready";
+type AuthStatus = "loading" | "unauthenticated" | "onboarding" | "ready" | "error";
 
 // ── Route guard ──────────────────────────────────────────────────────────────
 function ProtectedRoute({ status, children }: { status: AuthStatus; children: React.ReactNode }) {
   const location = useLocation();
 
-  if (status === "loading") {
+  if (status === "loading" || status === "error") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -63,54 +64,16 @@ function AppRoutes() {
   const [status, setStatus] = useState<AuthStatus>("loading");
 
   /**
-   * Creates missing firms + staff rows when the signup trigger fails.
-   * Silent — never throws, never blocks the user.
+   * Repairs missing firm/staff rows when the signup trigger's own error
+   * handler swallowed a failure. Delegates to the ensure_my_firm() RPC
+   * (SECURITY DEFINER, scoped to auth.uid()) instead of inserting directly —
+   * a direct client insert can't satisfy firm-row RLS since firm ids are
+   * server-generated, not derived from the user id. Silent — never throws,
+   * never blocks the user.
    */
-  const bootstrapMissingRecords = async (session: Session): Promise<void> => {
-    try {
-      const userId = session.user.id;
-      const email = session.user.email ?? "";
-      const metadata = session.user.user_metadata ?? {};
-      const caName = String(metadata.ca_name || metadata.full_name || metadata.name || email.split("@")[0] || "").trim();
-      const firmName = String(metadata.firm_name || "").trim();
-      const displayName = firmName || caName || email.split("@")[0];
-      const icaiNumber = String(metadata.icai_number || "").trim();
-      const practiceType = metadata.practice_type === "solo" ? "solo" : "firm";
-      let firmId: string | null = null;
-
-      const { data: existingFirm } = await supabase
-        .from("firms")
-        .select("id")
-        .eq("email", email)
-        .maybeSingle();
-
-      if (existingFirm?.id) {
-        firmId = existingFirm.id;
-      } else {
-        const { data: newFirm } = await supabase
-          .from("firms")
-          .insert({
-            name: displayName,
-            ca_name: caName || null,
-            icai_number: icaiNumber || null,
-            email,
-            practice_type: practiceType,
-            onboarding_complete: false,
-          })
-          .select("id")
-          .single();
-        firmId = newFirm?.id ?? null;
-      }
-
-      if (!firmId) return;
-
-      await supabase.from("staff").upsert(
-        { firm_id: firmId, name: caName || email.split("@")[0], email, auth_user_id: userId, role: "admin", active: true },
-        { onConflict: "auth_user_id" }
-      );
-    } catch (err) {
-      console.error("bootstrapMissingRecords:", err);
-    }
+  const bootstrapMissingRecords = async (): Promise<void> => {
+    const { error } = await supabase.rpc("ensure_my_firm");
+    if (error) console.error("bootstrapMissingRecords:", error.message);
   };
 
   /**
@@ -132,14 +95,18 @@ function AppRoutes() {
         .maybeSingle();
 
       if (error) {
+        // A query error (e.g. transient network issue) is not the same as
+        // "this user has no firm yet" — don't force them into the
+        // onboarding form, which could overwrite a real firm profile with
+        // blank data if unknowingly resubmitted.
         console.error("resolveStatus error:", error.message);
-        setStatus("onboarding");
+        setStatus("error");
         return;
       }
 
       if (!data) {
         // Trigger failed — bootstrap silently then go to onboarding
-        await bootstrapMissingRecords(session);
+        await bootstrapMissingRecords();
         setStatus("onboarding");
         return;
       }
@@ -149,9 +116,14 @@ function AppRoutes() {
 
     } catch (err) {
       console.error("resolveStatus unexpected:", err);
-      setStatus("onboarding");
+      setStatus("error");
     }
   }, []);
+
+  const retryResolveStatus = () => {
+    setStatus("loading");
+    supabase.auth.getSession().then(({ data: { session } }) => resolveStatus(session));
+  };
 
   useEffect(() => {
     // Initial session on mount
@@ -174,6 +146,22 @@ function AppRoutes() {
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Loading CA Munim...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Couldn't resolve account status (e.g. transient network issue) — retry
+  // rather than silently routing into onboarding.
+  if (status === "error") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="flex flex-col items-center gap-3 text-center max-w-sm">
+          <AlertTriangle className="h-8 w-8 text-destructive" />
+          <p className="text-sm text-muted-foreground">
+            Something went wrong while loading your account. This is usually a temporary network issue.
+          </p>
+          <Button onClick={retryResolveStatus}>Try Again</Button>
         </div>
       </div>
     );

@@ -83,14 +83,12 @@ export function QuickActions() {
         onOpenChange={setClientOpen}
         onSave={async (formData) => {
           const result = await addClient(formData);
-          const success = result === true || (typeof result === "object" && result !== null && result.success);
-          const message = typeof result === "object" && result !== null ? result.error : undefined;
 
-          if (success) {
+          if (result.success) {
             toast.success("Client created successfully");
             setClientOpen(false);
           } else {
-            toast.error(message ?? "Failed to create client");
+            toast.error(result.error ?? "Failed to create client");
           }
 
           return result;
