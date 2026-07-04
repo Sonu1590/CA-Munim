@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { fetchSentMessagesFromSupabase, SentMessage } from "@/data/WhatsappApi";
+import { compileTemplateForClient, fetchMessageTemplatesFromSupabase, fetchSentMessagesFromSupabase, sendBulkWhatsAppMessages, SentMessage } from "@/data/WhatsappApi";
+import { fetchClientsFromSupabase } from "@/data/Clients";
+import { useFinancialYear } from "@/context/financialYear";
 import { Search, RefreshCw, Check, CheckCheck, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -15,32 +17,63 @@ const statusConfig: Record<SentMessage["status"], { label: string; icon: React.R
 };
 
 export function DeliveryStatus() {
+  const { selectedFY } = useFinancialYear();
   const [messages, setMessages] = useState<SentMessage[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+
+  const loadMessages = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchSentMessagesFromSupabase();
+      setMessages(data);
+    } catch (err: any) {
+      setError(err.message ?? "Unable to load sent messages");
+      setMessages([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadMessages = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await fetchSentMessagesFromSupabase();
-        setMessages(data);
-      } catch (err: any) {
-        setError(err.message ?? "Unable to load sent messages");
-        setMessages([]);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadMessages();
   }, []);
 
   const filtered = messages.filter((m) => m.clientName.toLowerCase().includes(search.toLowerCase()));
 
-  const handleRetry = (msg: SentMessage) => {
-    toast.success(`Retrying message to ${msg.clientName}...`);
+  const handleRetry = async (msg: SentMessage) => {
+    setRetryingId(msg.id);
+    try {
+      const [allClients, allTemplates] = await Promise.all([
+        fetchClientsFromSupabase(),
+        fetchMessageTemplatesFromSupabase(),
+      ]);
+
+      const client = allClients.find((c) => c.id === msg.clientId);
+      if (!client) throw new Error("This client no longer exists.");
+
+      const template = allTemplates.find((t) => t.name === msg.templateName);
+      if (!template) throw new Error("This template no longer exists.");
+
+      const { text, parameters } = compileTemplateForClient(template, client, selectedFY);
+
+      await sendBulkWhatsAppMessages(
+        [{ id: client.id, name: client.name, phone: client.phone }],
+        template,
+        { [client.id]: text },
+        { [client.id]: parameters }
+      );
+
+      toast.success(`Retried message to ${msg.clientName}`);
+      await loadMessages();
+    } catch (err: any) {
+      toast.error(err?.message ?? `Failed to retry message to ${msg.clientName}`);
+    } finally {
+      setRetryingId(null);
+    }
   };
 
   return (
@@ -103,8 +136,19 @@ export function DeliveryStatus() {
                 {msg.status === "failed" && (
                   <div className="mt-2 flex items-center justify-between bg-destructive/5 rounded-lg px-2 py-1.5">
                     <span className="text-xs text-destructive">{msg.failReason}</span>
-                    <Button size="sm" variant="ghost" className="h-6 text-xs gap-1" onClick={() => handleRetry(msg)}>
-                      <RefreshCw className="h-3 w-3" /> Retry
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs gap-1"
+                      disabled={retryingId === msg.id}
+                      onClick={() => handleRetry(msg)}
+                    >
+                      {retryingId === msg.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" />
+                      )}
+                      Retry
                     </Button>
                   </div>
                 )}

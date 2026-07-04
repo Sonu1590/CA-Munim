@@ -11,6 +11,48 @@ export interface MessageTemplate {
   isDefault: boolean;
 }
 
+/**
+ * Fills a template's {{variable}} placeholders for one client, and returns
+ * both the human-readable compiled text (for previews / DB logging) and the
+ * ordered parameter values matching template.variables (for Meta's
+ * positional {{1}}, {{2}}... template parameters). Shared by BulkSender's
+ * send flow and DeliveryStatus's retry, so a failed/resent message is
+ * recompiled identically to how it was originally built.
+ */
+export function compileTemplateForClient(
+  template: MessageTemplate,
+  client: { name: string; pendingFees?: number; servicesSubscribed?: string[] },
+  financialYear: string
+): { text: string; parameters: string[] } {
+  const replacements: Record<string, string> = {
+    client_name: client.name,
+    firm_name: "Sharma & Associates",
+    ca_name: "CA Rajesh Sharma",
+    ca_phone: "9876543210",
+    due_date: new Date().toLocaleDateString("en-IN"),
+    filing_type: client.servicesSubscribed?.[0] ?? "Compliance filing",
+    doc_name: "N/A",
+    document_list: "N/A",
+    upload_link: "N/A",
+    amount: client.pendingFees ? client.pendingFees.toLocaleString("en-IN") : "0",
+    financial_year: financialYear.replace("FY ", ""),
+    invoice_number: "N/A",
+    service_description: client.servicesSubscribed?.join(", ") || "Professional services",
+    upi_id: "N/A",
+    ack_number: "N/A",
+    filing_date: new Date().toLocaleDateString("en-IN"),
+    payment_date: new Date().toLocaleDateString("en-IN"),
+    receipt_number: "N/A",
+    instalment_number: "N/A",
+    percentage: "N/A",
+    year: String(new Date().getFullYear()),
+  };
+
+  const text = template.body.replace(/\{\{(\w+)\}\}/g, (_match, key) => replacements[key] ?? "N/A");
+  const parameters = template.variables.map((key) => replacements[key] ?? "N/A");
+  return { text, parameters };
+}
+
 export interface SentMessage {
   id: string;
   clientId: string;
