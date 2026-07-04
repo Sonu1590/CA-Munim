@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { defaultTemplates, fetchMessageTemplatesFromSupabase, MessageTemplate, sendBulkWhatsAppMessages,TemplateCategory } from "@/data/WhatsappApi";
+import { compileTemplateForClient, defaultTemplates, fetchMessageTemplatesFromSupabase, MessageTemplate, sendBulkWhatsAppMessages,TemplateCategory } from "@/data/WhatsappApi";
 import { fetchClientsFromSupabase, type Client } from "@/data/Clients";
 import { Send, ChevronRight, ChevronLeft, Search, Clock, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -103,45 +103,14 @@ export function BulkSender() {
     );
   };
 
-  const getTemplateReplacements = (client: Client): Record<string, string> => ({
-    client_name: client.name,
-    firm_name: "Sharma & Associates",
-    ca_name: "CA Rajesh Sharma",
-    ca_phone: "9876543210",
-    due_date: new Date().toLocaleDateString("en-IN"),
-    filing_type: client.servicesSubscribed[0] ?? "Compliance filing",
-    doc_name: "N/A",
-    document_list: "N/A",
-    upload_link: "N/A",
-    amount: client.pendingFees ? client.pendingFees.toLocaleString("en-IN") : "0",
-    financial_year: selectedFY.replace("FY ", ""),
-    invoice_number: "N/A",
-    service_description: client.servicesSubscribed.join(", ") || "Professional services",
-    upi_id: "N/A",
-    ack_number: "N/A",
-    filing_date: new Date().toLocaleDateString("en-IN"),
-    payment_date: new Date().toLocaleDateString("en-IN"),
-    receipt_number: "N/A",
-    instalment_number: "N/A",
-    percentage: "N/A",
-    year: String(new Date().getFullYear()),
-  });
-
   const renderPreview = (client: Client) => {
     if (!template) return "";
-    const replacements = getTemplateReplacements(client);
-    return template.body
-      .replace(/\{\{(\w+)\}\}/g, (_match, key) => replacements[key] ?? "N/A");
+    return compileTemplateForClient(template, client, selectedFY).text;
   };
 
-  // Ordered parameter values matching template.variables — this is what
-  // actually gets sent to Meta as the template's body parameters, since
-  // WhatsApp templates use positional {{1}}, {{2}}... placeholders, not the
-  // named {{client_name}} placeholders used for the in-app preview.
   const getTemplateParameters = (client: Client): string[] => {
     if (!template) return [];
-    const replacements = getTemplateReplacements(client);
-    return template.variables.map((key) => replacements[key] ?? "N/A");
+    return compileTemplateForClient(template, client, selectedFY).parameters;
   };
 
   const handleSend = async () => {

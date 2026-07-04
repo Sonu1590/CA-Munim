@@ -9,6 +9,17 @@ const corsHeaders = {
 
 const MAX_RECIPIENTS = 200
 
+// Client phone numbers are stored as bare 10-digit Indian mobile numbers
+// (e.g. "7507327755"), but Meta's Graph API needs the full E.164-style
+// number with country code (e.g. "917507327755") to route the message and
+// match it against the sandbox's verified-recipient list. This is applied
+// only at the point of calling Meta — the client-ownership lookup above
+// matches against the DB's raw (un-prefixed) format and must stay that way.
+function toMetaPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  return digits.length === 10 ? `91${digits}` : digits
+}
+
 serve(async (req) => {
   // 1. Handle CORS Preflight request from the React Browser
   if (req.method === 'OPTIONS') {
@@ -45,7 +56,8 @@ serve(async (req) => {
 
     const requestedPhones = [...new Set(recipients.map((r: { phone: string }) => r.phone))]
     // RLS (clients_all: firm_id = get_my_firm_id()) automatically scopes this
-    // to the caller's own firm's clients.
+    // to the caller's own firm's clients. Matches against the DB's raw phone
+    // format (no country code) — do not normalize requestedPhones here.
     const { data: ownClients, error: clientsError } = await supabase
       .from('clients')
       .select('phone')
@@ -92,7 +104,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             messaging_product: 'whatsapp',
-            to: phone,
+            to: toMetaPhone(phone),
             type: 'template',
             template,
           })
