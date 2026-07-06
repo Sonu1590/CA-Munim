@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, CheckCircle2, Info, Smartphone, Building, IndianRupee } from "lucide-react";
+import { Loader2, CheckCircle2, Info, IndianRupee } from "lucide-react";
 import { SubscriptionPlan } from "@/data/Settings";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 interface Props {
@@ -15,13 +13,25 @@ interface Props {
   cycle: "monthly" | "annual";
 }
 
-type Step = "summary" | "method" | "processing" | "success";
-type PayMethod = "upi" | "netbanking";
+type Step = "summary" | "processing" | "success";
+
+// Razorpay's own hosted Checkout — card/UPI/netbanking details are entered
+// inside Razorpay's iframe, never touching our frontend or backend, so this
+// stays out of PCI-DSS scope entirely.
+function loadRazorpayScript(): Promise<void> {
+  if ((window as any).Razorpay) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Unable to load Razorpay checkout."));
+    document.body.appendChild(script);
+  });
+}
 
 export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props) {
   const [step, setStep] = useState<Step>("summary");
-  const [method, setMethod] = useState<PayMethod>("upi");
-  const [upi, setUpi] = useState("");
+  const [paidAmount, setPaidAmount] = useState(0);
 
   useEffect(() => {
     if (open) setStep("summary");
@@ -34,20 +44,61 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props
   const gst = Math.round(subtotal * 0.18);
   const total = subtotal + gst;
 
-  const startPayment = () => {
-    if (method === "upi" && !/^[\w.\-]+@[\w]+$/.test(upi)) {
-      toast.error("Enter a valid UPI ID (e.g. name@bank)");
+  const startPayment = async () => {
+    if (!plan.id) {
+      toast.error("Plan data unavailable — please reload and try again.");
       return;
     }
+
     setStep("processing");
-    setTimeout(() => setStep("success"), 1800);
+    try {
+      await loadRazorpayScript();
+
+      const { data: order, error: orderError } = await supabase.functions.invoke("create-razorpay-order", {
+        body: { planId: plan.id, cycle },
+      });
+      if (orderError || !order) throw new Error(orderError?.message ?? "Unable to create order.");
+      if (order.error) throw new Error(order.error);
+
+      const razorpay = new (window as any).Razorpay({
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.orderId,
+        name: "CA Munim",
+        description: `${plan.name} plan (${cycle})`,
+        theme: { color: "#1e3a5f" },
+        handler: async (response: any) => {
+          try {
+            const { data: verified, error: verifyError } = await supabase.functions.invoke("verify-razorpay-payment", {
+              body: {
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              },
+            });
+            if (verifyError || !verified?.success) throw new Error(verifyError?.message ?? "Payment verification failed.");
+            setPaidAmount(order.amount / 100);
+            setStep("success");
+          } catch (err: any) {
+            toast.error(err?.message ?? "Payment could not be verified. Contact support if you were charged.");
+            setStep("summary");
+          }
+        },
+        modal: {
+          ondismiss: () => setStep("summary"),
+        },
+      });
+      razorpay.open();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Unable to start checkout.");
+      setStep("summary");
+    }
   };
 
   const finish = () => {
     onOpenChange(false);
-    toast.success(`Subscription activated: ${plan.name} (${cycle})`, {
-      description: `Razorpay ref: rzp_${Math.random().toString(36).slice(2, 10)}`,
-    });
+    toast.success(`Subscription activated: ${plan.name} (${cycle})`);
   };
 
   return (
@@ -56,7 +107,7 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props
         <DialogHeader>
           <DialogTitle className="font-heading flex items-center gap-2">
             <div className="h-7 px-2 rounded bg-[#072654] text-white text-xs font-bold flex items-center">Razorpay</div>
-            Demo Checkout
+            Checkout
           </DialogTitle>
         </DialogHeader>
 
@@ -82,46 +133,9 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props
             </div>
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
               <Info className="h-3.5 w-3.5" />
-              Demo mode — no real payment gateway is connected yet · Auto-renews {cycle === "annual" ? "yearly" : "monthly"} · Cancel anytime
+              Auto-renews {cycle === "annual" ? "yearly" : "monthly"} · Cancel anytime
             </div>
-            <Button onClick={() => setStep("method")} className="w-full h-11 bg-primary">Continue to Payment</Button>
-          </div>
-        )}
-
-        {step === "method" && (
-          <div className="space-y-4">
-            <RadioGroup value={method} onValueChange={(v) => setMethod(v as PayMethod)} className="space-y-2">
-              {[
-                { id: "upi", label: "UPI", icon: Smartphone, hint: "GPay, PhonePe, Paytm" },
-                { id: "netbanking", label: "Net Banking", icon: Building, hint: "All major banks" },
-              ].map((m) => {
-                const Icon = m.icon;
-                return (
-                  <label key={m.id} htmlFor={m.id} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${method === m.id ? "border-primary bg-primary/5" : "border-border"}`}>
-                    <RadioGroupItem value={m.id} id={m.id} />
-                    <Icon className="h-4 w-4 text-primary" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{m.label}</p>
-                      <p className="text-[11px] text-muted-foreground">{m.hint}</p>
-                    </div>
-                  </label>
-                );
-              })}
-            </RadioGroup>
-
-            {method === "upi" && (
-              <div className="space-y-2">
-                <Label>UPI ID</Label>
-                <Input placeholder="yourname@okhdfcbank" value={upi} onChange={(e) => setUpi(e.target.value)} />
-              </div>
-            )}
-            {method === "netbanking" && (
-              <p className="text-xs text-muted-foreground">You'll be redirected to your bank's secure login page.</p>
-            )}
-
-            <Button onClick={startPayment} className="w-full h-11 bg-primary">
-              Pay ₹{total.toLocaleString("en-IN")}
-            </Button>
+            <Button onClick={startPayment} className="w-full h-11 bg-primary">Pay ₹{total.toLocaleString("en-IN")}</Button>
           </div>
         )}
 
@@ -141,7 +155,7 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props
             <div>
               <p className="font-heading font-bold text-lg">Payment Successful</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {plan.name} plan activated · ₹{total.toLocaleString("en-IN")}
+                {plan.name} plan activated · ₹{paidAmount.toLocaleString("en-IN")}
               </p>
             </div>
             <Button onClick={finish} className="w-full bg-primary">Done</Button>

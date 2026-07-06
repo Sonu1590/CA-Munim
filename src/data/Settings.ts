@@ -53,6 +53,7 @@ export interface ComplianceUpdate {
 }
 
 export interface SubscriptionPlan {
+  id: string;
   name: "Starter" | "Professional" | "Firm";
   price: number;
   clientLimit: number;
@@ -110,9 +111,9 @@ export const mockComplianceUpdates: ComplianceUpdate[] = [
 ];
 
 export const subscriptionPlans: SubscriptionPlan[] = [
-  { name: "Starter", price: 0, clientLimit: 25, staffLimit: 1, features: ["25 clients", "1 user", "Basic reports", "WhatsApp templates", "Invoice generation"] },
-  { name: "Professional", price: 999, clientLimit: 150, staffLimit: 3, features: ["150 clients", "3 users", "Advanced reports", "Bulk WhatsApp", "Priority support", "Custom templates"] },
-  { name: "Firm", price: 2499, clientLimit: 999, staffLimit: 10, features: ["Unlimited clients", "10 users", "All reports", "API access", "Dedicated support", "White-label invoices", "Data backup"] },
+  { id: "", name: "Starter", price: 0, clientLimit: 25, staffLimit: 1, features: ["25 clients", "1 user", "Basic reports", "WhatsApp templates", "Invoice generation"] },
+  { id: "", name: "Professional", price: 999, clientLimit: 150, staffLimit: 3, features: ["150 clients", "3 users", "Advanced reports", "Bulk WhatsApp", "Priority support", "Custom templates"] },
+  { id: "", name: "Firm", price: 2499, clientLimit: 999, staffLimit: 10, features: ["Unlimited clients", "10 users", "All reports", "API access", "Dedicated support", "White-label invoices", "Data backup"] },
 ];
 
 export const filingCategories: FilingCategory[] = [
@@ -445,12 +446,13 @@ export async function fetchSubscriptionPlansFromSupabase(): Promise<Subscription
   // elsewhere, e.g. RazorpayCheckoutModal), so price_annual isn't mapped.
   const { data, error } = await supabase
     .from("subscription_plans")
-    .select(`name, price_monthly, client_limit, staff_limit, features`)
+    .select(`id, name, price_monthly, client_limit, staff_limit, features`)
     .order("price_monthly", { ascending: true });
 
   if (error || !data) return subscriptionPlans;
 
   return data.map((row: any) => ({
+    id: row.id,
     name: row.name as SubscriptionPlan["name"],
     price: Number(row.price_monthly ?? 0),
     clientLimit: Number(row.client_limit ?? 0),

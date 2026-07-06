@@ -54,6 +54,17 @@ Every row renders "Unknown Client" instead of the client name. The join from `do
 The client always sends `templateName: "hello_world"` regardless of which template the user picked, and the edge function sends a template with **no variable components** — so none of the `{{client_name}}`, `{{due_date}}`, etc. are ever populated. The compiled message is logged to the DB (so the UI looks correct) but the message actually delivered to the client is the generic sandbox "hello_world." This is flagged as a "hackathon sandbox" note in code, but as shipped it means WhatsApp reminders don't contain the real content.
 **Fix:** send the approved template name plus a `components`/parameters payload built from the template variables; remove the hardcoded `hello_world`.
 
+### H6. Compliance due-date and penalty rules are hardcoded and several are wrong
+**Files:** `src/data/Tasks.ts` (`dueDateRules`), `src/lib/penaltyRules.ts`, `src/lib/indianTaxUtils.ts`
+Domain review (2026-07-06) found the hardcoded Indian tax/compliance rules ship stale or incorrect values — for a CA-audience product, wrong statutory dates and penalty amounts are disqualifying, not cosmetic:
+- **GSTR-4 due date wrong.** `dueDateRules["GSTR-4"]` and the FY-based due-date calculation both say 30th April. From FY 2024-25 onward it's 30th June (53rd GST Council meeting, CGST Notification 12/2024, 10 Jul 2024) — every generated GSTR-4 task is ~2 months early.
+- **GSTR-3B/GSTR-1 late fee cap wrong.** `penaltyRules.ts` caps both at a flat ₹5,000. Actual caps are turnover-slabbed: ₹2,000 up to ₹1.5cr turnover, ₹5,000 for ₹1.5–5cr, ₹10,000 above ₹5cr; nil returns cap at ₹500 (₹20/day). Overstates penalties ~2.5x for small clients (the majority of a typical CA's book) and understates for large ones. No nil-return option exists at all.
+- **GSTR-9 late fee wrong.** Flat ₹200/day. From FY 2022-23 (Notification 07/2023) it's turnover-slabbed: ₹50/day (cap 0.04% of turnover) up to ₹5cr, ₹100/day for ₹5–20cr, only ₹200/day (cap 0.50%) above that. Overstates ~4x for most clients.
+- **GSTR-3B label is misleading.** "20th of following month (turnover > ₹5cr)" conflates monthly and QRMP filing — QRMP taxpayers (turnover ≤ ₹5cr, opted in) file quarterly by the 22nd/24th depending on state category. The QRMP scheme doesn't exist anywhere in the data model.
+- **Advance Tax penalty is fabricated.** The calculation multiplies against a hardcoded `assumedShortfall = 100000` instead of asking the user for the client's actual shortfall — the Section 234B/C output is not derived from real data.
+- Verified correct as-is: GSTR-1 (11th), GSTR-9 (31 Dec date itself, only the fee is wrong), CMP-08 (18th), TDS challan (7th / 30 Apr for March), 24Q/26Q, Form 16 (15 June), ITR (31 Jul/31 Oct), advance tax instalment dates, DIR-3 KYC, MGT-7, AOC-4, and the ITR/TDS late-fee sections (234F, 234E).
+**Structural point:** even correct rules get amended ad hoc by notification (e.g. GSTR-3B for Mar 2026 moved 20th→21st). Hardcoded frontend constants can never track this — the real fix is a data-driven rules table (e.g. a `compliance_rules`-style Supabase table with effective-date ranges) that can be updated without a redeploy, not another round of hardcoded constants. Explicitly requested by the user as the next priority after Razorpay integration.
+
 ---
 
 ## Medium
