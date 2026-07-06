@@ -49,9 +49,9 @@ export const taskTypeGroups = {
 
 export const dueDateRules: Record<string, string> = {
   "GSTR-1": "11th of following month",
-  "GSTR-3B": "20th of following month (turnover > ₹5cr)",
+  "GSTR-3B": "20th of following month (monthly filers); QRMP: 22nd/24th of month after quarter end (state-dependent)",
   "GSTR-9": "31st December of the year",
-  "GSTR-4": "30th April",
+  "GSTR-4": "30th June of the year after FY end (FY 2024-25 onward; was 30th April earlier)",
   "CMP-08": "18th of month following quarter",
   "TDS Challan": "7th of following month (30th April for March)",
   "24Q": "31st of month following quarter end (Q4: 31st May)",
