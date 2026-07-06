@@ -3,13 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CreditCard, Check, Crown, Zap, Building, Download, Loader2 } from "lucide-react";
-import { fetchSubscriptionPlansFromSupabase, type SubscriptionPlan } from "@/data/Settings";
+import { CreditCard, Check, Crown, Zap, Building, Sparkles, Download, Loader2 } from "lucide-react";
+import { fetchSubscriptionPlansFromSupabase, fetchFoundingMemberSlotsRemaining, type SubscriptionPlan } from "@/data/Settings";
 import { RazorpayCheckoutModal } from "@/components/billing/RazorpayCheckoutModal";
 import { downloadHtmlDocument, formatDateIN, formatINR, slugifyFileName } from "@/lib/downloads";
 import { toast } from "sonner";
 
-const planIcons = { Starter: Zap, Professional: Crown, Firm: Building };
+const planIcons = { Starter: Zap, Professional: Crown, Firm: Building, "Founding Member": Sparkles };
 
 const billingHistory = [
   { id: "rzp_QkA7m2", date: "2025-04-01", plan: "Starter", amount: 0, status: "Free" },
@@ -19,7 +19,9 @@ export function SubscriptionBilling() {
   const [currentPlan, setCurrentPlan] = useState("Starter");
   const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
   const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlan | null>(null);
+  const [checkoutCycle, setCheckoutCycle] = useState<"monthly" | "annual">("monthly");
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [foundingSlotsLeft, setFoundingSlotsLeft] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,8 +30,12 @@ export function SubscriptionBilling() {
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchSubscriptionPlansFromSupabase();
+        const [data, slotsLeft] = await Promise.all([
+          fetchSubscriptionPlansFromSupabase(),
+          fetchFoundingMemberSlotsRemaining(),
+        ]);
         setPlans(data);
+        setFoundingSlotsLeft(slotsLeft);
       } catch (err: any) {
         setError(err.message ?? "Unable to load subscription plans");
       } finally {
@@ -38,6 +44,11 @@ export function SubscriptionBilling() {
     };
     loadPlans();
   }, []);
+
+  const openCheckout = (plan: SubscriptionPlan, planCycle: "monthly" | "annual") => {
+    setCheckoutCycle(planCycle);
+    setCheckoutPlan(plan);
+  };
 
   const downloadReceipt = (bill: (typeof billingHistory)[number]) => {
     downloadHtmlDocument(
@@ -84,25 +95,36 @@ export function SubscriptionBilling() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {plans.map((plan) => {
+            const isFounding = plan.name === "Founding Member";
             const Icon = planIcons[plan.name];
             const isCurrent = plan.name === currentPlan;
-            const displayPrice = cycle === "annual" ? plan.price * 10 : plan.price;
+            // Founding Member is a fixed annual-only offer — it ignores the
+            // page-level monthly/annual toggle entirely.
+            const planCycle = isFounding ? "annual" : cycle;
+            const displayPrice = planCycle === "annual" ? plan.priceAnnual : plan.price;
+            const soldOut = isFounding && foundingSlotsLeft === 0;
             return (
-              <Card key={plan.name} className={isCurrent ? "border-primary ring-2 ring-primary/20" : ""}>
+              <Card key={plan.name} className={isCurrent ? "border-primary ring-2 ring-primary/20" : isFounding ? "border-amber-400" : ""}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base flex items-center gap-2">
                       <Icon className="h-5 w-5 text-primary" />{plan.name}
                     </CardTitle>
                     {isCurrent && <Badge className="bg-primary text-primary-foreground">Current</Badge>}
+                    {isFounding && !isCurrent && (
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                        {soldOut ? "Sold out" : `${foundingSlotsLeft ?? "—"} of 50 left`}
+                      </Badge>
+                    )}
                   </div>
                   <div className="mt-2">
-                    {plan.price === 0 ? (
+                    {plan.price === 0 && plan.priceAnnual === 0 ? (
                       <span className="text-2xl font-bold">Free</span>
                     ) : (
                       <>
                         <span className="text-2xl font-bold">₹{displayPrice.toLocaleString("en-IN")}</span>
-                        <span className="text-sm text-muted-foreground">/{cycle === "annual" ? "year" : "month"}</span>
+                        <span className="text-sm text-muted-foreground">/{planCycle === "annual" ? "year" : "month"}</span>
+                        {isFounding && <span className="text-xs text-muted-foreground ml-1">· locked for life</span>}
                       </>
                     )}
                   </div>
@@ -121,10 +143,10 @@ export function SubscriptionBilling() {
                   <Button
                     className="w-full mt-4"
                     variant={isCurrent ? "outline" : "default"}
-                    disabled={isCurrent || plan.price === 0}
-                    onClick={() => setCheckoutPlan(plan)}
+                    disabled={isCurrent || (plan.price === 0 && plan.priceAnnual === 0) || soldOut}
+                    onClick={() => openCheckout(plan, planCycle)}
                   >
-                    {isCurrent ? "Current Plan" : plan.price === 0 ? "Free Plan" : `Upgrade via Razorpay`}
+                    {isCurrent ? "Current Plan" : soldOut ? "Sold out" : (plan.price === 0 && plan.priceAnnual === 0) ? "Free Plan" : `Upgrade via Razorpay`}
                   </Button>
                 </CardContent>
               </Card>
@@ -159,7 +181,7 @@ export function SubscriptionBilling() {
         open={!!checkoutPlan}
         onOpenChange={(o) => !o && setCheckoutPlan(null)}
         plan={checkoutPlan}
-        cycle={cycle}
+        cycle={checkoutCycle}
       />
     </div>
   );
