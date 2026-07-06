@@ -63,7 +63,8 @@ Domain review (2026-07-06) found the hardcoded Indian tax/compliance rules ship 
 - **GSTR-3B label is misleading.** "20th of following month (turnover > ₹5cr)" conflates monthly and QRMP filing — QRMP taxpayers (turnover ≤ ₹5cr, opted in) file quarterly by the 22nd/24th depending on state category. The QRMP scheme doesn't exist anywhere in the data model.
 - **Advance Tax penalty is fabricated.** The calculation multiplies against a hardcoded `assumedShortfall = 100000` instead of asking the user for the client's actual shortfall — the Section 234B/C output is not derived from real data.
 - Verified correct as-is: GSTR-1 (11th), GSTR-9 (31 Dec date itself, only the fee is wrong), CMP-08 (18th), TDS challan (7th / 30 Apr for March), 24Q/26Q, Form 16 (15 June), ITR (31 Jul/31 Oct), advance tax instalment dates, DIR-3 KYC, MGT-7, AOC-4, and the ITR/TDS late-fee sections (234F, 234E).
-**Structural point:** even correct rules get amended ad hoc by notification (e.g. GSTR-3B for Mar 2026 moved 20th→21st). Hardcoded frontend constants can never track this — the real fix is a data-driven rules table (e.g. a `compliance_rules`-style Supabase table with effective-date ranges) that can be updated without a redeploy, not another round of hardcoded constants. Explicitly requested by the user as the next priority after Razorpay integration.
+**Structural point:** even correct rules get amended ad hoc by notification (e.g. GSTR-3B for Mar 2026 moved 20th→21st). Hardcoded frontend constants can never track this — the real fix is a data-driven rules table with effective-date ranges, updatable without a redeploy.
+**Correction (2026-07-06, verified against live DB):** this table already exists — `public.compliance_rules` (`due_date_rule`/`late_fee_rule` jsonb, `effective_from`/`effective_to`, `applicable_states`) — with 14 seeded rows, but **nothing in the frontend reads it**; `dueDateRules`/`penaltyRules.ts` remain the only thing actually consulted. The seeded data is itself a mix: due dates for GSTR-1/GSTR-3B (including separate `GSTR-3B_QRMP_CAT1`/`CAT2` rows at 22nd/24th — QRMP *is* modeled here, contrary to the frontend gap) and TDS look correct, but `late_fee_rule` for GSTR-1/GSTR-3B/GSTR-9 is still flat (not turnover-slabbed) and several filing types are missing entirely (GSTR-4, CMP-08, MGT-7, AOC-4, DIR-3 KYC, Form 16, ADT-1, INC-20A, PAS-3). Similarly, `clients.gst_filing_freq` and `clients.gst_turnover_category` already exist and are captured in `AddClientModal` — the "QRMP flag" and "turnover slab" data model gap PM review flagged below is largely a **wiring gap**, not a missing-column gap. Fix scope is: (1) complete/correct the seeded rows (add missing filing types, fix late-fee JSON to a turnover-slab shape), (2) build a resolver (rule + client's filing-frequency/turnover-category + as-of date → due date/penalty) and switch every caller to it, (3) delete the hardcoded constants.
 
 ---
 
@@ -124,6 +125,42 @@ Two clients ("dummy client", "sss") share PAN `ABCDE1234F`; two others share pho
 
 ### L5. Compliance content hardcoded/stale
 `src/data/Settings.ts` ships hardcoded `mockComplianceUpdates` and `mockFirmProfile` (Sharma & Associates) dated 2025. Confirm these mocks aren't surfacing anywhere in production UI.
+
+---
+
+## Architecture & Product Roadmap (Fable architect/PM review, 2026-07-06)
+
+A second-pass review covering architecture and product gaps, not just correctness bugs. Ranked priority order below is the reviewer's combined recommendation, adjusted for what's since shipped in this repo (Razorpay is live — L1; direct Meta WhatsApp send/receive is live — H5/webhook work, so "BSP integration" below is already done, leaving the scheduler as the actual gap).
+
+### P1. Fix the three wrong statutory values — quick, no schema change
+The GSTR-4 due date, GSTR-3B/GSTR-1 late fee caps, and GSTR-9 late fee — see H6. Do this first; it's the fastest fix and the one most likely to burn credibility with a CA reviewer if left as-is.
+
+### P2. Move compliance rules out of the JS bundle into `compliance_rules`
+See H6's correction above — the table and partial seed data already exist. Scope: complete the seed data (missing filing types, turnover-slabbed `late_fee_rule`), build one resolver function, delete `dueDateRules`/`penaltyRules.ts`/the hardcoded parts of `indianTaxUtils.ts`.
+
+### P3. No scheduler — the core "never miss a deadline" promise is not automated
+**Certain, and more fundamental than any BSP gap.** Nothing runs when no one has the app open — no cron, no scheduled Edge Function, no queue. "Send Reminder" requires a human to click it every time. Fix: one Supabase-scheduled Edge Function (`pg_cron` + `pg_net`, calling the function via HTTP on a schedule) that scans tasks due in N days and queues/sends WhatsApp reminders automatically. Without this, the product's core pitch is aspirational, not real.
+
+### P4. Recurrence engine driven by `clients.services_subscribed`
+**Biggest product disconnect.** `AddClientModal` collects "Services Subscribed" (ITR, GST monthly/quarterly, TDS...) into `clients.services_subscribed` (jsonb) and nothing reads it to generate tasks. Task creation today is manual or via the bulk generator (a batch workaround for a missing recurrence engine). Should instead auto-generate recurring tasks (with correct due dates once P2 lands) for as long as a service is subscribed. This is the specific gap a Jamku reviewer flagged as missing there — an open competitive flank.
+
+### P5. Excel importer for clients
+Every prospect firm has 100–300 existing clients in Excel or Jamku today. No importer means hours of manual re-entry before the product shows any value — likely the single biggest trial-drop-off point. Highest-leverage onboarding feature buildable.
+
+### Also missing (ranked, not yet scheduled against P1–P5)
+- **RBAC enforcement.** `staff.role` exists (Senior CA / Article Clerk / Admin Staff in the UI) but nothing enforces it server-side — any staff login can delete invoices, edit clients, see all fees. Acceptable for solo practitioners at launch; blocking for firms with 3+ staff and a partner/manager/article hierarchy.
+- **Audit trail.** No record of who changed a task status or edited an invoice. For a profession built on audit, this gap will be noticed in demos.
+- **CA-facing notification digest** (morning email/WhatsApp summary of today's due tasks) — cheap once P3 (scheduler) exists.
+- **DSC register + portal-password vault.** Incumbents (Jamku) treat these as headline features — CAs juggle dozens of client GST/IT portal logins and physical DSC tokens with expiry dates. Low build cost, high perceived value, **but a badly-built password vault is a liability — encrypt properly (not plaintext, not client-side-only) or defer entirely.** Not scheduled until we're ready to do the encryption properly.
+- **Receivables aging report** (30/60/90 days) — billing data already supports this; fee recovery is a chronic CA pain point.
+- **Email fallback** for the minority of clients not reachable on WhatsApp.
+- **Smaller, cheap, high-value-to-fix:** `financialYears` array hardcoded ending at FY 2027-28 (silent failure in ~2 years); due-date/reminder timing math uses client-local `new Date()` instead of IST (off-by-one risk for users abroad or near midnight); money handled as floats rather than integer paise (precision-bug-prone); no error monitoring (Sentry or equivalent) — production failures like the earlier "success toast, zero rows written" class of bug (L5, M1) stay invisible without one.
+
+### Explicitly NOT building (by design, not oversight)
+Attendance/geo-tracking, inward-outward registers, timesheets. Incumbents (Jamku) have these; matching them feature-for-feature makes this app a worse Jamku. The differentiation is WhatsApp-native client communication plus auto-recurrence (P3/P4) — depth there over breadth elsewhere.
+
+### Penalty calculator publishability gate
+The Penalty Calculator is a plausible lead magnet, but only once P1 (turnover-slab logic, in particular) is fixed and a nil-return toggle plus an actual-shortfall input (replacing the fabricated `assumedShortfall`) are added — as shipped, it would damage credibility with the exact audience it's meant to attract.
 
 ---
 
