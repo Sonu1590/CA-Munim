@@ -76,7 +76,9 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
       if (month === "March") return `${fyStart + 1}-05-31`;
     }
     if (type === "GSTR-9" || type === "GSTR-9C") return `${fyStart + 1}-12-31`;
-    if (type === "GSTR-4") return `${fyStart + 1}-04-30`;
+    // From FY 2024-25 onward the due date moved from 30 Apr to 30 Jun
+    // (53rd GST Council meeting, CGST Notification 12/2024, 10 Jul 2024).
+    if (type === "GSTR-4") return fyStart >= 2024 ? `${fyStart + 1}-06-30` : `${fyStart + 1}-04-30`;
     if (type === "CMP-08") return dateForDay(18);
     if (type === "ITR Filing") return `${fyStart + 1}-07-31`;
     if (type === "Tax Audit" || type === "Form 3CD") return `${fyStart + 1}-09-30`;

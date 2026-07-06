@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -14,15 +15,28 @@ import { filingTypes, calculatePenalty } from "@/lib/penaltyRules";
 import { FYHint } from "@/components/common/FYHint";
 import { Badge } from "@/components/ui/badge";
 
+const GST_FILING_IDS = ["gstr3b", "gstr1", "gstr9"];
+
 export default function PenaltyCalculator() {
   const [filingId, setFilingId] = useState("");
   const [dueDate, setDueDate] = useState<Date>();
   const [actualDate, setActualDate] = useState<Date>();
+  const [turnover, setTurnover] = useState("");
+  const [isNilReturn, setIsNilReturn] = useState(false);
+  const [incomeBelow5L, setIncomeBelow5L] = useState(false);
+  const [actualShortfall, setActualShortfall] = useState("");
+
+  const isGstFiling = GST_FILING_IDS.includes(filingId);
 
   const result = useMemo(() => {
     if (!filingId || !dueDate || !actualDate) return null;
-    return calculatePenalty(filingId, dueDate, actualDate);
-  }, [filingId, dueDate, actualDate]);
+    return calculatePenalty(filingId, dueDate, actualDate, {
+      turnover: Number(turnover) || 0,
+      isNilReturn,
+      incomeBelow5L,
+      actualShortfall: Number(actualShortfall) || 0,
+    });
+  }, [filingId, dueDate, actualDate, turnover, isNilReturn, incomeBelow5L, actualShortfall]);
 
   const selectedFiling = filingTypes.find((f) => f.id === filingId);
 
@@ -85,6 +99,37 @@ export default function PenaltyCalculator() {
                 <FYHint date={actualDate} />
               </div>
             </div>
+
+            {isGstFiling && (
+              <div className="space-y-3 pt-2 border-t">
+                <div className="flex items-center gap-2">
+                  <Checkbox id="nilReturn" checked={isNilReturn} onCheckedChange={(v) => setIsNilReturn(v === true)} />
+                  <Label htmlFor="nilReturn" className="font-normal cursor-pointer">This is a nil return (₹20/day, capped at ₹500)</Label>
+                </div>
+                {!isNilReturn && (
+                  <div>
+                    <Label>Annual Turnover (₹)</Label>
+                    <Input type="number" placeholder="e.g. 8000000" value={turnover} onChange={(e) => setTurnover(e.target.value)} className="mt-1" />
+                    <p className="text-xs text-muted-foreground mt-1">Determines the late-fee cap slab.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {filingId === "itr" && (
+              <div className="flex items-center gap-2 pt-2 border-t">
+                <Checkbox id="incomeBelow5L" checked={incomeBelow5L} onCheckedChange={(v) => setIncomeBelow5L(v === true)} />
+                <Label htmlFor="incomeBelow5L" className="font-normal cursor-pointer">Total income ≤ ₹5 lakh (caps penalty at ₹1,000)</Label>
+              </div>
+            )}
+
+            {filingId === "advTax" && (
+              <div className="pt-2 border-t">
+                <Label>Actual Tax Shortfall (₹)</Label>
+                <Input type="number" placeholder="e.g. 45000" value={actualShortfall} onChange={(e) => setActualShortfall(e.target.value)} className="mt-1" />
+                <p className="text-xs text-muted-foreground mt-1">The real shortfall between tax due and tax paid for this instalment.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
