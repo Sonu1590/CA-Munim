@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, Check, Crown, Zap, Building, Sparkles, Download, Loader2 } from "lucide-react";
-import { fetchSubscriptionPlansFromSupabase, fetchFoundingMemberSlotsRemaining, type SubscriptionPlan } from "@/data/Settings";
+import { fetchSubscriptionPlansFromSupabase, fetchFoundingMemberSlotsRemaining, fetchCurrentSubscriptionFromSupabase, type SubscriptionPlan } from "@/data/Settings";
 import { RazorpayCheckoutModal } from "@/components/billing/RazorpayCheckoutModal";
 import { downloadHtmlDocument, formatDateIN, formatINR, slugifyFileName } from "@/lib/downloads";
 import { toast } from "sonner";
@@ -25,23 +25,26 @@ export function SubscriptionBilling() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const loadPlans = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [data, slotsLeft, subscription] = await Promise.all([
+        fetchSubscriptionPlansFromSupabase(),
+        fetchFoundingMemberSlotsRemaining(),
+        fetchCurrentSubscriptionFromSupabase(),
+      ]);
+      setPlans(data);
+      setFoundingSlotsLeft(slotsLeft);
+      setCurrentPlan(subscription.plan ?? "Starter");
+    } catch (err: any) {
+      setError(err.message ?? "Unable to load subscription plans");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadPlans = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [data, slotsLeft] = await Promise.all([
-          fetchSubscriptionPlansFromSupabase(),
-          fetchFoundingMemberSlotsRemaining(),
-        ]);
-        setPlans(data);
-        setFoundingSlotsLeft(slotsLeft);
-      } catch (err: any) {
-        setError(err.message ?? "Unable to load subscription plans");
-      } finally {
-        setLoading(false);
-      }
-    };
     loadPlans();
   }, []);
 
@@ -97,7 +100,7 @@ export function SubscriptionBilling() {
           {plans.map((plan) => {
             const isFounding = plan.name === "Founding Member";
             const Icon = planIcons[plan.name];
-            const isCurrent = plan.name === currentPlan;
+            const isCurrent = plan.name.toLowerCase() === currentPlan.toLowerCase();
             // Founding Member is a fixed annual-only offer — it ignores the
             // page-level monthly/annual toggle entirely.
             const planCycle = isFounding ? "annual" : cycle;
@@ -182,6 +185,7 @@ export function SubscriptionBilling() {
         onOpenChange={(o) => !o && setCheckoutPlan(null)}
         plan={checkoutPlan}
         cycle={checkoutCycle}
+        onSuccess={loadPlans}
       />
     </div>
   );
