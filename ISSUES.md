@@ -110,8 +110,8 @@ Two clients ("dummy client", "sss") share PAN `ABCDE1234F`; two others share pho
 
 ## Low / Cleanup
 
-### L1. Simulated payment checkout presented as real
-`src/components/billing/RazorpayCheckoutModal.tsx` collects card number/CVV/UPI in plain inputs and "processes" via `setTimeout`, then shows a fake `rzp_...` reference. It's a mock, but it asks users for real card data and displays "256-bit SSL / Razorpay Secure Checkout." Either wire up real Razorpay or clearly label it as a demo and stop collecting card fields.
+### L1. Simulated payment checkout presented as real — FIXED (2026-07-06)
+`src/components/billing/RazorpayCheckoutModal.tsx` collected card number/CVV/UPI in plain inputs and "processed" via `setTimeout`, then showed a fake `rzp_...` reference. First-pass fix removed the raw card fields and labeled it "Demo Checkout." Now replaced with real Razorpay Checkout.js: `create-razorpay-order` computes the amount server-side and `verify-razorpay-payment` checks Razorpay's HMAC signature before activating a plan — card/UPI/netbanking details go through Razorpay's own hosted iframe, never our servers. Verified live with a real test-mode payment (netbanking): `subscription_payments` row reached `status: 'paid'` and the firm's plan/plan_expiry updated correctly.
 
 ### L2. Committed Supabase config in git history
 `VITE_SUPABASE_URL` and the publishable anon key were committed (`.env`, commit `80c9007`). The anon key is designed to be public, so impact is low, but committing `.env` at all is a bad pattern — ensure the root `.env` stays untracked (the `.gitignore` currently contains an unresolved merge conflict, see L3).
