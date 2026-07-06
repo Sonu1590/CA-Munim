@@ -11,6 +11,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   plan: SubscriptionPlan | null;
   cycle: "monthly" | "annual";
+  onSuccess?: () => void;
 }
 
 type Step = "summary" | "processing" | "success";
@@ -29,7 +30,7 @@ function loadRazorpayScript(): Promise<void> {
   });
 }
 
-export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props) {
+export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle, onSuccess }: Props) {
   const [step, setStep] = useState<Step>("summary");
   const [paidAmount, setPaidAmount] = useState(0);
 
@@ -99,6 +100,7 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props
 
   const finish = () => {
     onOpenChange(false);
+    onSuccess?.();
     toast.success(`Subscription activated: ${plan.name} (${cycle})`);
   };
 

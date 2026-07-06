@@ -466,6 +466,21 @@ export async function fetchFoundingMemberSlotsRemaining(): Promise<number> {
   return Number(data);
 }
 
+export async function fetchCurrentSubscriptionFromSupabase(): Promise<{ plan: string | null; planExpiry: string | null }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { data: staffData, error } = await supabase
+    .from("staff")
+    .select(`firms(plan, plan_expiry)`)
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+  if (error) throw error;
+
+  const firm = (staffData as any)?.firms;
+  return { plan: firm?.plan ?? null, planExpiry: firm?.plan_expiry ?? null };
+}
+
 export async function fetchFilingCategoriesFromSupabase(): Promise<FilingCategory[]> {
   // Column is `name`, not `label` — the old select() always errored and
   // silently fell back to the hardcoded filingCategories mock.
