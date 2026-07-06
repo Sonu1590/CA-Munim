@@ -54,8 +54,9 @@ export interface ComplianceUpdate {
 
 export interface SubscriptionPlan {
   id: string;
-  name: "Starter" | "Professional" | "Firm";
-  price: number;
+  name: "Starter" | "Professional" | "Firm" | "Founding Member";
+  price: number; // monthly
+  priceAnnual: number; // full yearly total, not derived from `price` — the two are independently priced
   clientLimit: number;
   staffLimit: number;
   features: string[];
@@ -111,9 +112,9 @@ export const mockComplianceUpdates: ComplianceUpdate[] = [
 ];
 
 export const subscriptionPlans: SubscriptionPlan[] = [
-  { id: "", name: "Starter", price: 0, clientLimit: 25, staffLimit: 1, features: ["25 clients", "1 user", "Basic reports", "WhatsApp templates", "Invoice generation"] },
-  { id: "", name: "Professional", price: 999, clientLimit: 150, staffLimit: 3, features: ["150 clients", "3 users", "Advanced reports", "Bulk WhatsApp", "Priority support", "Custom templates"] },
-  { id: "", name: "Firm", price: 2499, clientLimit: 999, staffLimit: 10, features: ["Unlimited clients", "10 users", "All reports", "API access", "Dedicated support", "White-label invoices", "Data backup"] },
+  { id: "", name: "Starter", price: 0, priceAnnual: 0, clientLimit: 25, staffLimit: 1, features: ["25 clients", "1 user", "Manual WhatsApp reminders only"] },
+  { id: "", name: "Professional", price: 417, priceAnnual: 4999, clientLimit: 150, staffLimit: 3, features: ["150 clients", "3 users", "Automated WhatsApp reminders (~500 utility messages/month, then top-up)", "All reports"] },
+  { id: "", name: "Firm", price: 833, priceAnnual: 9999, clientLimit: 999, staffLimit: 10, features: ["Unlimited clients", "10 users", "White-label invoices", "Priority support"] },
 ];
 
 export const filingCategories: FilingCategory[] = [
@@ -438,15 +439,10 @@ export async function fetchComplianceUpdatesFromSupabase(): Promise<ComplianceUp
 }
 
 export async function fetchSubscriptionPlansFromSupabase(): Promise<SubscriptionPlan[]> {
-  // subscription_plans has price_monthly/price_annual, not a plain `price`
-  // column — the old select() referenced a column that doesn't exist, so
-  // this always errored and silently fell back to the stale hardcoded
-  // subscriptionPlans mock (wrong prices) on every load. The app only
-  // models a single base price (annual pricing is derived as 10x monthly
-  // elsewhere, e.g. RazorpayCheckoutModal), so price_annual isn't mapped.
   const { data, error } = await supabase
     .from("subscription_plans")
-    .select(`id, name, price_monthly, client_limit, staff_limit, features`)
+    .select(`id, name, price_monthly, price_annual, client_limit, staff_limit, features`)
+    .eq("is_active", true)
     .order("price_monthly", { ascending: true });
 
   if (error || !data) return subscriptionPlans;
@@ -455,10 +451,19 @@ export async function fetchSubscriptionPlansFromSupabase(): Promise<Subscription
     id: row.id,
     name: row.name as SubscriptionPlan["name"],
     price: Number(row.price_monthly ?? 0),
+    priceAnnual: Number(row.price_annual ?? 0),
     clientLimit: Number(row.client_limit ?? 0),
     staffLimit: Number(row.staff_limit ?? 0),
     features: row.features ?? [],
   }));
+}
+
+// Public-safe count (no individual payment rows exposed) so the pricing page
+// can show "N of 50 claimed" for the capped Founding Member offer.
+export async function fetchFoundingMemberSlotsRemaining(): Promise<number> {
+  const { data, error } = await supabase.rpc("get_founding_member_slots_remaining");
+  if (error || data == null) return 0;
+  return Number(data);
 }
 
 export async function fetchFilingCategoriesFromSupabase(): Promise<FilingCategory[]> {

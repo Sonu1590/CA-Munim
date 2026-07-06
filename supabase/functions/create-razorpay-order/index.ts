@@ -40,11 +40,33 @@ serve(async (req) => {
     // trust a client-supplied amount for something that charges real money.
     const { data: plan, error: planError } = await supabase
       .from('subscription_plans')
-      .select('id, price_monthly, price_annual')
+      .select('id, name, price_monthly, price_annual')
       .eq('id', planId)
       .eq('is_active', true)
       .single()
     if (planError || !plan) throw new Error('Unknown or inactive plan.')
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
+    // Founding Member is capped at the first 50 firms ever to pay for it —
+    // checked here, before creating a real Razorpay order, so a sold-out
+    // offer never gets that far.
+    if (plan.name === 'Founding Member') {
+      const { data: paidRows, error: countError } = await supabaseAdmin
+        .from('subscription_payments')
+        .select('firm_id')
+        .eq('plan_id', planId)
+        .eq('status', 'paid')
+      if (countError) throw new Error('Unable to check Founding Member availability.')
+      const claimedByOthers = new Set((paidRows ?? []).map((r: { firm_id: string }) => r.firm_id))
+      claimedByOthers.delete(staff.firm_id)
+      if (claimedByOthers.size >= 50) {
+        throw new Error('The Founding Member offer is fully claimed.')
+      }
+    }
 
     // price_annual is already the full discounted yearly total (2 months
     // free baked in), not a monthly rate — do not multiply it again.
@@ -75,12 +97,9 @@ serve(async (req) => {
       throw new Error(order.error?.description ?? `Razorpay order creation failed (${orderResponse.status})`)
     }
 
-    // Service-role client so the insert isn't subject to subscription_payments'
-    // read-only RLS policy — this is the only code path allowed to create a row.
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
+    // supabaseAdmin (service role) already created above for the Founding
+    // Member count check — reused here since subscription_payments' RLS
+    // policy is select-only; this is the only code path allowed to insert.
     const { error: insertError } = await supabaseAdmin.from('subscription_payments').insert({
       firm_id: staff.firm_id,
       plan_id: planId,

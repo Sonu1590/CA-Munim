@@ -39,8 +39,9 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props
 
   if (!plan) return null;
 
-  const months = cycle === "annual" ? 10 : 1; // 2 months free annually
-  const subtotal = plan.price * months;
+  // price and priceAnnual are independently set (not one derived from the
+  // other) — see SubscriptionPlan in src/data/Settings.ts.
+  const subtotal = cycle === "annual" ? plan.priceAnnual : plan.price;
   const gst = Math.round(subtotal * 0.18);
   const total = subtotal + gst;
 
@@ -119,7 +120,7 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle }: Props
                 <span className="text-sm font-semibold">{plan.name} ({cycle})</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Subtotal {cycle === "annual" && <span className="text-[10px] text-green-600">(2 months free)</span>}</span>
+                <span className="text-sm text-muted-foreground">Subtotal</span>
                 <span className="text-sm font-medium">₹{subtotal.toLocaleString("en-IN")}</span>
               </div>
               <div className="flex items-center justify-between">
