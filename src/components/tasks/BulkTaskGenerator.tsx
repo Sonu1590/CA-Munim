@@ -10,6 +10,28 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { AlertCircle, Check, ListChecks, Loader2 } from "lucide-react";
 import { useFinancialYear } from "@/context/financialYear";
+import { fetchComplianceRulesFromSupabase, selectRuleForFY, computeDueDate, type ComplianceRule } from "@/data/ComplianceRules";
+
+// Maps this UI's TaskType labels to compliance_rules.filing_type keys. 24Q/
+// 26Q/27Q/27EQ and ITR share one row each since their due-date rules don't
+// currently differ (matches the behavior this replaces).
+const FILING_TYPE_MAP: Record<string, string> = {
+  "GSTR-1": "GSTR-1_MONTHLY",
+  "GSTR-3B": "GSTR-3B_MONTHLY_ABOVE5CR",
+  "GSTR-9": "GSTR-9",
+  "GSTR-9C": "GSTR-9C",
+  "GSTR-4": "GSTR-4",
+  "CMP-08": "CMP-08",
+  "TDS Challan": "TDS_CHALLAN",
+  "24Q": "TDS_RETURN_24Q_26Q",
+  "26Q": "TDS_RETURN_24Q_26Q",
+  "27Q": "TDS_RETURN_24Q_26Q",
+  "27EQ": "TDS_RETURN_24Q_26Q",
+  "ITR Filing": "ITR_NON_AUDIT",
+  "Tax Audit": "TAX_AUDIT",
+  "Form 3CD": "TAX_AUDIT",
+  "DIR-3 KYC": "DIR-3 KYC",
+};
 
 interface Props {
   open: boolean;
@@ -25,6 +47,14 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [rules, setRules] = useState<ComplianceRule[]>([]);
+  const [rulesError, setRulesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchComplianceRulesFromSupabase()
+      .then(setRules)
+      .catch((err: any) => setRulesError(err.message ?? "Unable to load compliance rules"));
+  }, []);
 
   const toggleClient = (id: string) => {
     setSelectedClients((prev) =>
@@ -55,35 +85,29 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
 
   const totalTasks = selectedClients.length * selectedMonths.length;
 
-  const calculateDueDate = (type: string, month: string) => {
+  // month/year of the return PERIOD being filed — used for monthly/quarterly
+  // rules (annual rules like GSTR-9/ITR/DIR-3 KYC ignore period entirely).
+  const periodFor = (month: string, fyStart: number) => {
     const monthIndex = months.indexOf(month);
+    return {
+      month: monthIndex <= 8 ? monthIndex + 4 : monthIndex - 8, // 1-12
+      year: monthIndex <= 8 ? fyStart : fyStart + 1,
+    };
+  };
+
+  const calculateDueDate = (type: string, month: string): string => {
     const fyStart = Number(currentFY.match(/FY (\d{4})-/)?.[1] ?? new Date().getFullYear());
-    const periodYear = monthIndex <= 8 ? fyStart : fyStart + 1;
-    const periodMonth = monthIndex <= 8 ? monthIndex + 3 : monthIndex - 9;
-    const nextMonth = new Date(periodYear, periodMonth + 1, 1);
-
-    const dateForDay = (day: number) =>
-      new Date(nextMonth.getFullYear(), nextMonth.getMonth(), day).toISOString().split("T")[0];
-
-    if (type === "GSTR-1") return dateForDay(11);
-    if (type === "GSTR-3B") return dateForDay(20);
-    if (type === "TDS Challan") {
-      if (month === "March") return `${fyStart + 1}-04-30`;
-      return dateForDay(7);
+    const filingType = FILING_TYPE_MAP[type];
+    const rule = filingType ? selectRuleForFY(rules, filingType, fyStart) : undefined;
+    const dueDate = rule ? computeDueDate(rule, fyStart, periodFor(month, fyStart)) : null;
+    if (!dueDate) {
+      console.error(`No compliance rule found for filing type "${type}" — falling back to 20th of following month.`);
+      const { month: pMonth, year: pYear } = periodFor(month, fyStart);
+      const nextMonth = pMonth === 12 ? 1 : pMonth + 1;
+      const nextYear = pMonth === 12 ? pYear + 1 : pYear;
+      return `${nextYear}-${String(nextMonth).padStart(2, "0")}-20`;
     }
-    if (["24Q", "26Q", "27Q", "27EQ"].includes(type)) {
-      if (["June", "September", "December"].includes(month)) return dateForDay(31);
-      if (month === "March") return `${fyStart + 1}-05-31`;
-    }
-    if (type === "GSTR-9" || type === "GSTR-9C") return `${fyStart + 1}-12-31`;
-    // From FY 2024-25 onward the due date moved from 30 Apr to 30 Jun
-    // (53rd GST Council meeting, CGST Notification 12/2024, 10 Jul 2024).
-    if (type === "GSTR-4") return fyStart >= 2024 ? `${fyStart + 1}-06-30` : `${fyStart + 1}-04-30`;
-    if (type === "CMP-08") return dateForDay(18);
-    if (type === "ITR Filing") return `${fyStart + 1}-07-31`;
-    if (type === "Tax Audit" || type === "Form 3CD") return `${fyStart + 1}-09-30`;
-    if (type === "DIR-3 KYC") return `${fyStart}-09-30`;
-    return dateForDay(20);
+    return dueDate;
   };
 
   const handleGenerate = async () => {
@@ -178,6 +202,12 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
 
         {step === 1 && (
           <div className="space-y-4">
+            {rulesError && (
+              <div className="text-xs text-destructive flex items-center gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {rulesError} — due dates will fall back to a generic estimate.
+              </div>
+            )}
             <Label>Select Filing Type</Label>
             <Select value={taskType} onValueChange={setTaskType}>
               <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>

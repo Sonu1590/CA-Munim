@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,7 @@ import { CalendarIcon, AlertTriangle, IndianRupee } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { filingTypes, calculatePenalty } from "@/lib/penaltyRules";
+import { fetchComplianceRulesFromSupabase, type ComplianceRule } from "@/data/ComplianceRules";
 import { FYHint } from "@/components/common/FYHint";
 import { Badge } from "@/components/ui/badge";
 
@@ -25,6 +26,14 @@ export default function PenaltyCalculator() {
   const [isNilReturn, setIsNilReturn] = useState(false);
   const [incomeBelow5L, setIncomeBelow5L] = useState(false);
   const [actualShortfall, setActualShortfall] = useState("");
+  const [rules, setRules] = useState<ComplianceRule[]>([]);
+  const [rulesError, setRulesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchComplianceRulesFromSupabase()
+      .then(setRules)
+      .catch((err: any) => setRulesError(err.message ?? "Unable to load compliance rules"));
+  }, []);
 
   const isGstFiling = GST_FILING_IDS.includes(filingId);
 
@@ -35,8 +44,8 @@ export default function PenaltyCalculator() {
       isNilReturn,
       incomeBelow5L,
       actualShortfall: Number(actualShortfall) || 0,
-    });
-  }, [filingId, dueDate, actualDate, turnover, isNilReturn, incomeBelow5L, actualShortfall]);
+    }, rules);
+  }, [filingId, dueDate, actualDate, turnover, isNilReturn, incomeBelow5L, actualShortfall, rules]);
 
   const selectedFiling = filingTypes.find((f) => f.id === filingId);
 
@@ -55,6 +64,12 @@ export default function PenaltyCalculator() {
             <CardTitle className="text-base font-heading">Filing Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {rulesError && (
+              <div className="text-xs text-destructive flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {rulesError} — penalty estimates are unavailable.
+              </div>
+            )}
             <div>
               <Label>Filing Type</Label>
               <Select value={filingId} onValueChange={setFilingId}>
@@ -141,7 +156,7 @@ export default function PenaltyCalculator() {
                   <AlertTriangle className="h-5 w-5 text-accent" />
                   Estimated Penalty
                 </CardTitle>
-                <Badge variant="outline" className="text-xs">{selectedFiling.section}</Badge>
+                <Badge variant="outline" className="text-xs">{result.section}</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
