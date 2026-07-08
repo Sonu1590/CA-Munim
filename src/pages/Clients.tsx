@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { ClientListTable } from "@/components/clients/ClientListTable";
 import { ClientCards } from "@/components/clients/ClientCards";
 import { AddClientModal } from "@/components/clients/AddClientModal";
+import { ImportClientsModal } from "@/components/clients/ImportClientsModal";
 import { useClients, Client } from "@/hooks/useClients";   // ← CHANGED from mockClients
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Loader2, AlertCircle } from "lucide-react";
+import { Plus, Search, Loader2, AlertCircle, FileSpreadsheet } from "lucide-react";
 
 const filterOptions = [
   "All", "Individual", "HUF", "Sole Proprietor", "Partnership",
@@ -26,6 +27,7 @@ export default function Clients() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [modalOpen, setModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
   // ── Real data from Supabase ──────────────────────────────────────────────
@@ -93,13 +95,23 @@ export default function Clients() {
               {clients.length}
             </Badge>
           </div>
-          <Button
-            className="bg-accent text-accent-foreground hover:bg-accent/90 w-full sm:w-auto"
-            onClick={openAddClient}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add Client
-          </Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              className="flex-1 sm:flex-none"
+              onClick={() => setImportModalOpen(true)}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-1" />
+              Import from Excel
+            </Button>
+            <Button
+              className="bg-accent text-accent-foreground hover:bg-accent/90 flex-1 sm:flex-none"
+              onClick={openAddClient}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Client
+            </Button>
+          </div>
         </div>
 
         {/* Search & Filter */}
@@ -172,6 +184,12 @@ export default function Clients() {
             }
             return result;
           }}
+        />
+
+        <ImportClientsModal
+          open={importModalOpen}
+          onOpenChange={setImportModalOpen}
+          onImported={refetch}
         />
       </div>
     </AppLayout>
