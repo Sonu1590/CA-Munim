@@ -16,7 +16,7 @@ interface Props {
   onImported?: () => void;
 }
 
-type Step = "upload" | "map" | "preview" | "importing" | "done";
+type Step = "upload" | "map" | "preview" | "importing";
 
 // Target import fields. name/phone/date_of_birth are required by the same
 // addClient() this reuses (see useClients.ts — date_of_birth throws if
@@ -45,7 +45,7 @@ export function ImportClientsModal({ open, onOpenChange, onImported }: Props) {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [importing, setImporting] = useState(false);
-  const [results, setResults] = useState<{ success: number; failed: { row: number; name: string; error: string }[] }>({ success: 0, failed: [] });
+  const [dragActive, setDragActive] = useState(false);
 
   const reset = () => {
     setStep("upload");
@@ -54,7 +54,6 @@ export function ImportClientsModal({ open, onOpenChange, onImported }: Props) {
     setRawRows([]);
     setMapping({});
     setRows([]);
-    setResults({ success: 0, failed: [] });
   };
 
   const handleFile = async (file: File) => {
@@ -97,6 +96,11 @@ export function ImportClientsModal({ open, onOpenChange, onImported }: Props) {
     setStep("preview");
   };
 
+  const close = () => {
+    onOpenChange(false);
+    reset();
+  };
+
   const runImport = async () => {
     setImporting(true);
     setStep("importing");
@@ -114,15 +118,17 @@ export function ImportClientsModal({ open, onOpenChange, onImported }: Props) {
       }
     }
 
-    setResults({ success, failed });
     setImporting(false);
-    setStep("done");
     onImported?.();
-  };
+    close();
 
-  const close = () => {
-    onOpenChange(false);
-    reset();
+    if (failed.length === 0) {
+      toast.success(`${success} client${success === 1 ? "" : "s"} imported.`);
+    } else {
+      toast.warning(`${success} imported, ${failed.length} failed.`, {
+        description: failed.slice(0, 3).map((f) => `${f.name}: ${f.error}`).join(" · ") + (failed.length > 3 ? " …" : ""),
+      });
+    }
   };
 
   const validCount = rows.filter((r) => r.errors.length === 0).length;
@@ -140,17 +146,30 @@ export function ImportClientsModal({ open, onOpenChange, onImported }: Props) {
 
         {step === "upload" && (
           <div className="space-y-4">
-            <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-lg py-12 cursor-pointer hover:bg-muted/50">
+            <div
+              className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg py-12 transition-colors ${dragActive ? "border-primary bg-primary/5" : "border-border"}`}
+              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+              onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragActive(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) handleFile(file);
+              }}
+            >
               <Upload className="h-8 w-8 text-muted-foreground" />
-              <span className="text-sm font-medium">Click to select a file</span>
+              <span className="text-sm font-medium">Drag a file here, or</span>
+              <label className="cursor-pointer">
+                <span className="text-sm font-medium text-primary underline underline-offset-2">click to select a file</span>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                />
+              </label>
               <span className="text-xs text-muted-foreground">.xlsx, .xls, or .csv</span>
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-              />
-            </label>
+            </div>
             <p className="text-xs text-muted-foreground">
               First row must be column headers. Existing clients are matched by PAN — a row with a PAN already in your client list will be skipped.
             </p>
@@ -214,26 +233,6 @@ export function ImportClientsModal({ open, onOpenChange, onImported }: Props) {
           </div>
         )}
 
-        {step === "done" && (
-          <div className="space-y-3">
-            <div className="text-center py-4 space-y-2">
-              <Check className="h-10 w-10 text-green-600 mx-auto" />
-              <p className="font-heading font-semibold text-lg">{results.success} clients imported</p>
-              {results.failed.length > 0 && <p className="text-sm text-muted-foreground">{results.failed.length} failed</p>}
-            </div>
-            {results.failed.length > 0 && (
-              <div className="border border-border rounded-lg max-h-60 overflow-y-auto">
-                {results.failed.map((f) => (
-                  <div key={f.row} className="px-3 py-2 text-sm border-t border-border first:border-t-0 flex items-center justify-between gap-2">
-                    <span>{f.name}</span>
-                    <span className="text-xs text-destructive">{f.error}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
         <DialogFooter className="flex gap-2">
           {step === "map" && (
             <>
@@ -248,9 +247,6 @@ export function ImportClientsModal({ open, onOpenChange, onImported }: Props) {
                 Import {validCount} Clients
               </Button>
             </>
-          )}
-          {step === "done" && (
-            <Button onClick={close} className="bg-accent hover:bg-accent/90 text-white">Done</Button>
           )}
         </DialogFooter>
       </DialogContent>
