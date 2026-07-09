@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle, Check, FileSpreadsheet, Loader2, Upload, X } from "lucide-react";
-import { useClients, type ClientFormData, type ClientType } from "@/hooks/useClients";
+import { useClients, type ClientFormData } from "@/hooks/useClients";
 import { validatePAN, validateGSTIN } from "@/lib/indianTaxUtils";
+import { guessField, mapAndValidateRow, type ParsedRow } from "@/lib/clientImport";
 import { toast } from "sonner";
 
 interface Props {
@@ -34,49 +35,6 @@ const TARGET_FIELDS: { key: keyof ClientFormData | "skip"; label: string; requir
   { key: "annual_fees", label: "Annual Fees" },
   { key: "skip", label: "— Don't import —" },
 ];
-
-const CLIENT_TYPES: ClientType[] = ["Individual", "HUF", "Sole Proprietor", "Partnership", "LLP", "Private Ltd", "Public Ltd", "Trust", "Society", "AOP", "BOI"];
-
-// Best-guess mapping from a raw spreadsheet header to a target field —
-// the user reviews/overrides every guess before anything is imported.
-function guessField(header: string): string {
-  const h = header.toLowerCase().replace(/[^a-z0-9]/g, "");
-  if (/name|client/.test(h)) return "name";
-  if (/phone|mobile|contact|whatsapp/.test(h)) return "phone";
-  if (/dob|birth|incorporat/.test(h)) return "date_of_birth";
-  if (/^type$|category|entity|constitution/.test(h)) return "type";
-  if (/email|mail/.test(h)) return "email";
-  if (/^pan$|pannumber|pancard/.test(h)) return "pan";
-  if (/gst/.test(h)) return "gstin";
-  if (/city|town/.test(h)) return "city";
-  if (/state/.test(h)) return "state";
-  if (/fee|billing/.test(h)) return "annual_fees";
-  return "skip";
-}
-
-function guessClientType(raw: string): ClientType {
-  const v = raw.trim().toLowerCase();
-  const match = CLIENT_TYPES.find((t) => t.toLowerCase() === v || v.includes(t.toLowerCase()) || t.toLowerCase().includes(v));
-  return match ?? "Individual";
-}
-
-// Excel stores dates as a day-count serial number when cellDates isn't
-// honored by a given sheet/cell format — handle both a real Date and a
-// plain string the way it actually arrives from sheet_to_json.
-function formatDate(value: unknown): string {
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  if (typeof value === "string") {
-    const parsed = new Date(value);
-    if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
-  }
-  return "";
-}
-
-interface ParsedRow {
-  raw: Record<string, unknown>;
-  mapped: Partial<ClientFormData>;
-  errors: string[];
-}
 
 export function ImportClientsModal({ open, onOpenChange, onImported }: Props) {
   const { addClient } = useClients();
@@ -131,34 +89,9 @@ export function ImportClientsModal({ open, onOpenChange, onImported }: Props) {
       return;
     }
 
-    const parsed: ParsedRow[] = rawRows.map((raw) => {
-      const mapped: Partial<ClientFormData> = { services_subscribed: [], mca_filings: [], directors: [] };
-      for (const header of headers) {
-        const field = mapping[header];
-        if (field === "skip" || !field) continue;
-        const value = raw[header];
-        if (field === "date_of_birth") mapped.date_of_birth = formatDate(value);
-        else if (field === "type") mapped.type = guessClientType(String(value ?? ""));
-        else if (field === "annual_fees") mapped.annual_fees = Number(value) || 0;
-        else (mapped as any)[field] = String(value ?? "").trim();
-      }
-      if (!mapped.type) mapped.type = "Individual";
-
-      const errors: string[] = [];
-      if (!mapped.name) errors.push("Missing name");
-      if (!mapped.phone) errors.push("Missing phone");
-      if (!mapped.date_of_birth) errors.push("Missing/unparseable date of birth");
-      if (mapped.pan) {
-        const panCheck = validatePAN(mapped.pan, mapped.type);
-        if (!panCheck.isValid) errors.push("Invalid PAN format");
-      }
-      if (mapped.gstin) {
-        const gstinCheck = validateGSTIN(mapped.gstin);
-        if (!gstinCheck.isValid) errors.push("Invalid GSTIN format");
-      }
-
-      return { raw, mapped, errors };
-    });
+    const parsed: ParsedRow[] = rawRows.map((raw) =>
+      mapAndValidateRow(raw, headers, mapping, validatePAN, validateGSTIN)
+    );
 
     setRows(parsed);
     setStep("preview");
