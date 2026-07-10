@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { BarChart3, ClipboardList, TrendingUp, BookOpen, Calendar, Users } from "lucide-react";
+import { BarChart3, ClipboardList, TrendingUp, BookOpen, Calendar, Users, Wallet } from "lucide-react";
 import { ComplianceStatusReport } from "@/components/reports/ComplianceStatusReport";
 import { PendingWorkReport } from "@/components/reports/PendingWorkReport";
 import { FYSummaryReport } from "@/components/reports/FYSummaryReport";
 import { ClientLedgerReport } from "@/components/reports/ClientLedgerReport";
 import { ComplianceCalendarReport } from "@/components/reports/ComplianceCalendarReport";
 import { StaffProductivityReport } from "@/components/reports/StaffProductivityReport";
+import { ReceivablesAgingReport } from "@/components/reports/ReceivablesAgingReport";
 
 const reportTabs = [
   { value: "compliance", label: "Compliance", shortLabel: "Compliance", icon: BarChart3 },
   { value: "pending", label: "Pending Work", shortLabel: "Pending", icon: ClipboardList },
   { value: "fy-summary", label: "FY Summary", shortLabel: "FY", icon: TrendingUp },
+  { value: "aging", label: "Receivables Aging", shortLabel: "Aging", icon: Wallet },
   { value: "ledger", label: "Client Ledger", shortLabel: "Ledger", icon: BookOpen },
   { value: "calendar", label: "Compliance Calendar", shortLabel: "Calendar", icon: Calendar },
   { value: "staff", label: "Staff Productivity", shortLabel: "Staff", icon: Users },
@@ -47,6 +49,7 @@ export default function Reports() {
           <TabsContent value="compliance"><ComplianceStatusReport /></TabsContent>
           <TabsContent value="pending"><PendingWorkReport /></TabsContent>
           <TabsContent value="fy-summary"><FYSummaryReport /></TabsContent>
+          <TabsContent value="aging"><ReceivablesAgingReport /></TabsContent>
           <TabsContent value="ledger"><ClientLedgerReport /></TabsContent>
           <TabsContent value="calendar"><ComplianceCalendarReport /></TabsContent>
           <TabsContent value="staff"><StaffProductivityReport /></TabsContent>
