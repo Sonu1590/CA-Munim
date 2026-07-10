@@ -30,6 +30,15 @@ export interface MonthlyWorkData {
   byType: { name: string; count: number }[]
 }
 
+export interface DigestItem {
+  id: string
+  taskType: string
+  clientId: string
+  clientName: string
+  dueDate: string
+  daysOverdue: number // 0 = due today, >0 = overdue
+}
+
 export function useDashboard() {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalClients: 0,
@@ -38,6 +47,7 @@ export function useDashboard() {
     dueThisWeek: 0,
   })
   const [complianceAlerts, setComplianceAlerts] = useState<ComplianceAlert[]>([])
+  const [digest, setDigest] = useState<DigestItem[]>([])
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [monthlyWork, setMonthlyWork] = useState<MonthlyWorkData>({
     completed: 0,
@@ -58,6 +68,7 @@ export function useDashboard() {
       await Promise.all([
         fetchMetrics(),
         fetchComplianceAlerts(),
+        fetchDigest(),
         fetchActivity(),
         fetchMonthlyWork(),
         fetchFirmInfo(),
@@ -181,6 +192,42 @@ export function useDashboard() {
     setComplianceAlerts(alerts.slice(0, 10)) // top 10
   }
 
+  // The "morning digest" (PM review: cheap to build once the scheduler
+  // exists — this is the in-app version, since a pushed WhatsApp/email
+  // digest hits the same Meta template-approval / no-email-provider
+  // blockers as send-task-reminders). Unlike complianceAlerts (grouped by
+  // filing type across a 30-day window, count-only), this lists individual
+  // tasks with client names so it reads like an actual to-do list.
+  async function fetchDigest() {
+    const todayStr = new Date().toISOString().split('T')[0]
+
+    const { data } = await supabase
+      .from('tasks')
+      .select('id, task_type, due_date, client_id, clients(name)')
+      .neq('status', 'completed')
+      .lte('due_date', todayStr)
+      .order('due_date', { ascending: true })
+      .limit(50)
+
+    if (!data) { setDigest([]); return }
+
+    const today = new Date(todayStr)
+    const items: DigestItem[] = (data as { id: string; task_type: string; due_date: string; client_id: string; clients: { name: string } | null }[]).map((row) => {
+      const due = new Date(row.due_date)
+      const daysOverdue = Math.max(0, Math.round((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)))
+      return {
+        id: row.id,
+        taskType: row.task_type,
+        clientId: row.client_id,
+        clientName: row.clients?.name ?? 'Unknown client',
+        dueDate: row.due_date,
+        daysOverdue,
+      }
+    })
+
+    setDigest(items)
+  }
+
   async function fetchActivity() {
     // Recent completed tasks
     const { data: recentTasks } = await supabase
@@ -276,6 +323,7 @@ export function useDashboard() {
   return {
     metrics,
     complianceAlerts,
+    digest,
     activity,
     monthlyWork,
     loading,
