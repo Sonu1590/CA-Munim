@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, MessageCircle, CalendarClock, Receipt, Newspaper, CreditCard, FileSpreadsheet, LogOut } from "lucide-react";
+import { Building2, Users, MessageCircle, CalendarClock, Receipt, Newspaper, CreditCard, FileSpreadsheet, LogOut, History } from "lucide-react";
 import { FirmProfileSettings } from "@/components/settings/FirmProfileSettings";
 import { StaffManagement } from "@/components/settings/StaffManagement";
 import { WhatsAppConfig } from "@/components/settings/WhatsAppConfig";
@@ -12,8 +12,10 @@ import { InvoiceSettingsPanel } from "@/components/settings/InvoiceSettingsPanel
 import { ComplianceUpdatesFeed } from "@/components/settings/ComplianceUpdatesFeed";
 import { SubscriptionBilling } from "@/components/settings/SubscriptionBilling";
 import { DataExport } from "@/components/settings/DataExport";
+import { AuditTrail } from "@/components/settings/AuditTrail";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const settingsTabs = [
   { value: "firm", label: "Firm Profile", icon: Building2 },
@@ -24,6 +26,7 @@ const settingsTabs = [
   { value: "updates", label: "Updates", icon: Newspaper },
   { value: "subscription", label: "Plans", icon: CreditCard },
   { value: "export", label: "Export", icon: FileSpreadsheet },
+  { value: "audit", label: "Audit Trail", icon: History, adminOnly: true },
 ];
 
 class SettingsTabErrorBoundary extends Component<
@@ -48,7 +51,9 @@ class SettingsTabErrorBoundary extends Component<
 export default function Settings() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const { isAdmin } = useUserRole();
   const [signingOut, setSigningOut] = useState(false);
+  const visibleTabs = settingsTabs.filter((tab) => !tab.adminOnly || isAdmin);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -78,7 +83,7 @@ export default function Settings() {
         <Tabs defaultValue="firm" className="space-y-6">
           <div className="overflow-x-auto -mx-4 px-4">
             <TabsList className="inline-flex h-auto p-1 gap-1 bg-muted/50">
-              {settingsTabs.map((tab) => (
+              {visibleTabs.map((tab) => (
                 <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5 text-xs sm:text-sm px-2.5 py-2 data-[state=active]:bg-background">
                   <tab.icon className="h-4 w-4 shrink-0" />
                   <span className="hidden sm:inline">{tab.label}</span>
@@ -99,6 +104,7 @@ export default function Settings() {
           <TabsContent value="updates"><ComplianceUpdatesFeed /></TabsContent>
           <TabsContent value="subscription"><SubscriptionBilling /></TabsContent>
           <TabsContent value="export"><DataExport /></TabsContent>
+          <TabsContent value="audit"><AuditTrail /></TabsContent>
         </Tabs>
       </div>
     </AppLayout>
