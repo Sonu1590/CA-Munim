@@ -1,16 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { taskTypeGroups, months } from "@/data/Tasks";
-import { useClients } from "@/hooks/useClients";
+import { useClients, type Client } from "@/hooks/useClients";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { AlertCircle, Check, ListChecks, Loader2 } from "lucide-react";
 import { useFinancialYear } from "@/context/financialYear";
 import { fetchComplianceRulesFromSupabase, selectRuleForFY, computeDueDate, type ComplianceRule } from "@/data/ComplianceRules";
+import { qrmpCategory, QRMP_QUARTER_END_MONTHS } from "@/lib/gstQrmp";
 
 // Maps this UI's TaskType labels to compliance_rules.filing_type keys. 24Q/
 // 26Q/27Q/27EQ and ITR share one row each since their due-date rules don't
@@ -83,8 +84,6 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
     setSelectedClients(sanitized);
   }, [clients, selectedClients]);
 
-  const totalTasks = selectedClients.length * selectedMonths.length;
-
   // month/year of the return PERIOD being filed — used for monthly/quarterly
   // rules (annual rules like GSTR-9/ITR/DIR-3 KYC ignore period entirely).
   const periodFor = (month: string, fyStart: number) => {
@@ -95,13 +94,26 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
     };
   };
 
-  const calculateDueDate = (type: string, month: string): string => {
+  // Returns null when a QRMP (quarterly) client has no return due in this
+  // particular month — GSTR-3B/GSTR-1 only fall due at quarter-end for them,
+  // unlike every other filing type here, which is always due somewhere.
+  const calculateDueDate = (type: string, month: string, client?: Client): string | null => {
     const fyStart = Number(currentFY.match(/FY (\d{4})-/)?.[1] ?? new Date().getFullYear());
-    const filingType = FILING_TYPE_MAP[type];
+    const isQrmpClient = (type === "GSTR-3B" || type === "GSTR-1") && client?.gst_filing_freq === "Quarterly";
+
+    if (isQrmpClient && !QRMP_QUARTER_END_MONTHS.has(month)) return null;
+
+    let filingType = FILING_TYPE_MAP[type];
+    if (isQrmpClient) {
+      filingType = type === "GSTR-3B"
+        ? (qrmpCategory(client!.state) === "CAT1" ? "GSTR-3B_QRMP_CAT1" : "GSTR-3B_QRMP_CAT2")
+        : "GSTR-1_QRMP";
+    }
+
     const rule = filingType ? selectRuleForFY(rules, filingType, fyStart) : undefined;
     const dueDate = rule ? computeDueDate(rule, fyStart, periodFor(month, fyStart)) : null;
     if (!dueDate) {
-      console.error(`No compliance rule found for filing type "${type}" — falling back to 20th of following month.`);
+      console.error(`No compliance rule found for filing type "${filingType}" — falling back to 20th of following month.`);
       const { month: pMonth, year: pYear } = periodFor(month, fyStart);
       const nextMonth = pMonth === 12 ? 1 : pMonth + 1;
       const nextYear = pMonth === 12 ? pYear + 1 : pYear;
@@ -109,6 +121,23 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
     }
     return dueDate;
   };
+
+  const { plannedTasks, skippedQrmp } = useMemo(() => {
+    const plannedTasks: { clientId: string; month: string; dueDate: string }[] = [];
+    let skippedQrmp = 0;
+    for (const clientId of selectedClients) {
+      const client = clients.find((c) => c.id === clientId);
+      for (const month of selectedMonths) {
+        const dueDate = calculateDueDate(taskType, month, client);
+        if (dueDate === null) { skippedQrmp++; continue; }
+        plannedTasks.push({ clientId, month, dueDate });
+      }
+    }
+    return { plannedTasks, skippedQrmp };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClients, selectedMonths, taskType, clients, rules, currentFY]);
+
+  const totalTasks = plannedTasks.length;
 
   const handleGenerate = async () => {
     if (!taskType || selectedClients.length === 0 || selectedMonths.length === 0) return;
@@ -129,22 +158,17 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
 
       if (!staffRow?.firm_id) throw new Error("Firm not found");
 
-      const tasksToInsert = [];
-      for (const clientId of selectedClients) {
-        for (const month of selectedMonths) {
-          tasksToInsert.push({
-            firm_id: staffRow.firm_id,
-            client_id: clientId,
-            task_type: taskType,
-            financial_year: currentFY,
-            period: month,
-            due_date: calculateDueDate(taskType, month),
-            status: "pending",
-            priority: "medium",
-            document_checklist: [],
-          });
-        }
-      }
+      const tasksToInsert = plannedTasks.map(({ clientId, month, dueDate }) => ({
+        firm_id: staffRow.firm_id,
+        client_id: clientId,
+        task_type: taskType,
+        financial_year: currentFY,
+        period: month,
+        due_date: dueDate,
+        status: "pending",
+        priority: "medium",
+        document_checklist: [],
+      }));
 
       const batchSize = 50;
       for (let i = 0; i < tasksToInsert.length; i += batchSize) {
@@ -286,6 +310,11 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
               <strong>{totalTasks}</strong> tasks will be created for <strong>{selectedClients.length}</strong> clients × <strong>{selectedMonths.length}</strong> months
             </p>
             <p className="text-sm text-muted-foreground">Filing type: <strong>{taskType}</strong></p>
+            {skippedQrmp > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {skippedQrmp} client-month{skippedQrmp === 1 ? "" : "s"} skipped — quarterly (QRMP) filers have no return due outside quarter-end months.
+              </p>
+            )}
           </div>
         )}
 
@@ -302,7 +331,7 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
               Next
             </Button>
           ) : (
-            <Button onClick={handleGenerate} disabled={generating} className="bg-accent hover:bg-accent/90 text-white">
+            <Button onClick={handleGenerate} disabled={generating || totalTasks === 0} className="bg-accent hover:bg-accent/90 text-white">
               {generating ? (
                 <><Loader2 className="h-4 w-4 animate-spin mr-2" />Generating...</>
               ) : (

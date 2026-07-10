@@ -9,9 +9,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 // Deliberately excludes: ROC forms that need an AGM date to compute a due
 // date (MGT-7, AOC-4, ADT-1 — clients.agm_due_month is a column but nothing
 // in the UI sets it yet), and event-based/one-time services (Company
-// Incorporation, IEC, MSME Registration, INC-20A, PAS-3). Also defaults
-// every GST client to monthly cadence — clients.gst_filing_freq exists but
-// nothing populates it either, same gap as QRMP flagged in the H6 P2 work.
+// Incorporation, IEC, MSME Registration, INC-20A, PAS-3).
+//
+// GST cadence: clients.gst_filing_freq (now wired up in AddClientModal) is
+// read below to switch GSTR-1/GSTR-3B to quarterly QRMP rules for clients
+// who opted in — everyone else defaults to monthly, unchanged.
 
 const MONTHS = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"]
 
@@ -34,6 +36,18 @@ const SERVICE_TASK_MAP: Record<string, { taskTypes: string[]; cadence: "monthly"
 // INC-20A/PAS-3) — only DIR-3 KYC has a due date computable from the FY
 // alone, so it's the only one auto-generated here.
 const RECURRING_MCA_FILINGS = new Set(["DIR-3 KYC"])
+
+// Mirrors src/lib/gstQrmp.ts (Deno edge functions can't share a module with
+// the Vite frontend) — CGST Notification 85/2020's QRMP state split.
+const QRMP_CATEGORY_1_STATES = new Set([
+  "Chhattisgarh", "Madhya Pradesh", "Gujarat", "Maharashtra", "Karnataka",
+  "Goa", "Kerala", "Tamil Nadu", "Telangana", "Andhra Pradesh",
+  "Daman and Diu", "Dadra and Nagar Haveli", "Puducherry",
+  "Andaman and Nicobar", "Lakshadweep",
+])
+function qrmpCategory(state: string): "CAT1" | "CAT2" {
+  return QRMP_CATEGORY_1_STATES.has(state) ? "CAT1" : "CAT2"
+}
 
 // Maps a TaskType to compliance_rules.filing_type — mirrors
 // BulkTaskGenerator.tsx's FILING_TYPE_MAP (duplicated; Deno edge functions
@@ -128,7 +142,7 @@ serve(async (req) => {
 
   const { data: clients, error: clientsError } = await supabase
     .from('clients')
-    .select('id, firm_id, services_subscribed, mca_filings')
+    .select('id, firm_id, services_subscribed, mca_filings, gst_filing_freq, state')
     .eq('is_active', true)
   if (clientsError) {
     return new Response(JSON.stringify({ error: clientsError.message }), { status: 500 })
@@ -144,14 +158,22 @@ serve(async (req) => {
     for (const service of (client.services_subscribed as string[] | null) ?? []) {
       const mapped = SERVICE_TASK_MAP[service]
       if (!mapped) continue
-      for (const taskType of mapped.taskTypes) wants.push({ taskType, cadence: mapped.cadence })
+      for (const taskType of mapped.taskTypes) {
+        const isQrmpClient = (taskType === "GSTR-1" || taskType === "GSTR-3B") && client.gst_filing_freq === "Quarterly"
+        wants.push({ taskType, cadence: isQrmpClient ? "quarterly" : mapped.cadence })
+      }
     }
     for (const filing of (client.mca_filings as string[] | null) ?? []) {
       if (RECURRING_MCA_FILINGS.has(filing)) wants.push({ taskType: filing, cadence: "annual" })
     }
 
     for (const { taskType, cadence } of wants) {
-      const filingType = FILING_TYPE_MAP[taskType]
+      let filingType = FILING_TYPE_MAP[taskType]
+      if (cadence === "quarterly" && taskType === "GSTR-3B") {
+        filingType = qrmpCategory(client.state as string) === "CAT1" ? "GSTR-3B_QRMP_CAT1" : "GSTR-3B_QRMP_CAT2"
+      } else if (cadence === "quarterly" && taskType === "GSTR-1") {
+        filingType = "GSTR-1_QRMP"
+      }
       let dueDate: string | null = null
       let targetFY = financialYear
       let targetPeriod: string

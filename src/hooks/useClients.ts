@@ -25,6 +25,7 @@ export interface Client {
   lastActivity: string
   city: string
   state: string
+  gst_filing_freq?: string
   servicesSubscribed: string[]
 }
 
@@ -131,6 +132,7 @@ export function useClients() {
           gst_reg_date,
           city,
           state,
+          gst_filing_freq,
           services_subscribed,
           annual_fees,
           updated_at,
@@ -185,6 +187,7 @@ export function useClients() {
           lastActivity: row.updated_at?.split('T')[0] ?? '',
           city: row.city ?? '',
           state: row.state ?? '',
+          gst_filing_freq: row.gst_filing_freq ?? '',
           servicesSubscribed: row.services_subscribed ?? [],
         }
       })
