@@ -1,6 +1,6 @@
 import { fetchClientsFromSupabase } from "./Clients";
 import { fetchTasksFromSupabase } from "./Tasks";
-import { fetchInvoicesFromSupabase } from "./Billing";
+import { fetchInvoicesFromSupabase, type Invoice } from "./Billing";
 
 export type FilingStatus = "filed" | "pending" | "overdue" | "na";
 
@@ -160,6 +160,77 @@ export async function getClientLedger(clientId: string): Promise<LedgerEntry[]> 
   });
 
   return entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+export type AgingBucketLabel = "Current" | "1-30 days" | "31-60 days" | "61-90 days" | "90+ days";
+
+const AGING_BUCKETS: AgingBucketLabel[] = ["Current", "1-30 days", "31-60 days", "61-90 days", "90+ days"];
+
+function emptyBucketMap(): Record<AgingBucketLabel, number> {
+  return { "Current": 0, "1-30 days": 0, "31-60 days": 0, "61-90 days": 0, "90+ days": 0 };
+}
+
+export function bucketForDaysOverdue(daysOverdue: number): AgingBucketLabel {
+  if (daysOverdue <= 0) return "Current";
+  if (daysOverdue <= 30) return "1-30 days";
+  if (daysOverdue <= 60) return "31-60 days";
+  if (daysOverdue <= 90) return "61-90 days";
+  return "90+ days";
+}
+
+export interface ClientAgingRow {
+  clientId: string;
+  clientName: string;
+  buckets: Record<AgingBucketLabel, number>;
+  total: number;
+}
+
+export interface ReceivablesAging {
+  bucketTotals: { label: AgingBucketLabel; amount: number }[];
+  byClient: ClientAgingRow[];
+  totalOutstanding: number;
+}
+
+// Ages by days since dueDate — the invoices table has no separate due_date
+// column (only invoice_date + a free-text payment_terms), so dueDate is
+// invoice_date here, same convention FeesDashboard.tsx already uses for its
+// own overdue check. "unpaid" filter matches FeesDashboard's
+// billedUnpaidInvoices exactly so the numbers agree across the app.
+export function computeReceivablesAging(invoices: Invoice[], asOf: Date = new Date()): ReceivablesAging {
+  const unpaid = invoices.filter(
+    (inv) => inv.amountDue > 0 && inv.status !== "Cancelled" && inv.status !== "Draft"
+  );
+
+  const byClientMap = new Map<string, ClientAgingRow>();
+  const bucketTotals = emptyBucketMap();
+
+  for (const inv of unpaid) {
+    const daysOverdue = Math.floor((asOf.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24));
+    const bucket = bucketForDaysOverdue(daysOverdue);
+    bucketTotals[bucket] += inv.amountDue;
+
+    let row = byClientMap.get(inv.clientId);
+    if (!row) {
+      row = { clientId: inv.clientId, clientName: inv.clientName, buckets: emptyBucketMap(), total: 0 };
+      byClientMap.set(inv.clientId, row);
+    }
+    row.buckets[bucket] += inv.amountDue;
+    row.total += inv.amountDue;
+  }
+
+  const byClient = Array.from(byClientMap.values()).sort((a, b) => b.total - a.total);
+  const totalOutstanding = byClient.reduce((sum, row) => sum + row.total, 0);
+
+  return {
+    bucketTotals: AGING_BUCKETS.map((label) => ({ label, amount: bucketTotals[label] })),
+    byClient,
+    totalOutstanding,
+  };
+}
+
+export async function getReceivablesAging(): Promise<ReceivablesAging> {
+  const invoices = await fetchInvoicesFromSupabase();
+  return computeReceivablesAging(invoices);
 }
 
 export type PendingWorkFilter = "all" | "this_week" | "this_month" | "overdue";
