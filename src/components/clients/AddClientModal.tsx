@@ -86,6 +86,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
   const [pin, setPin] = useState("");
   const [dob, setDob] = useState("");
   const [gstRegDate, setGstRegDate] = useState("");
+  const [gstFilingFreq, setGstFilingFreq] = useState("");
   const [compRegDate, setCompRegDate] = useState("");
   const [annualFees, setAnnualFees] = useState("");
   const [saving, setSaving] = useState(false);
@@ -114,12 +115,12 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
     if (!open) return;
     const hasValue = [
       clientType, fullName, panValue, gstinValue, phone, altPhone, email, address,
-      city, state, pin, dob, gstRegDate, compRegDate, annualFees,
+      city, state, pin, dob, gstRegDate, gstFilingFreq, compRegDate, annualFees,
     ].some(Boolean) || selectedServices.length > 0 || selectedMcaFilings.length > 0;
     setIsDirty(hasValue);
   }, [
     open, clientType, fullName, panValue, gstinValue, phone, altPhone, email, address,
-    city, state, pin, dob, gstRegDate, compRegDate, annualFees, selectedServices,
+    city, state, pin, dob, gstRegDate, gstFilingFreq, compRegDate, annualFees, selectedServices,
     selectedMcaFilings,
   ]);
 
@@ -139,6 +140,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
     setPin("");
     setDob("");
     setGstRegDate("");
+    setGstFilingFreq("");
     setCompRegDate("");
     setAnnualFees("");
     setIsDirty(false);
@@ -163,6 +165,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
     setPin("");
     setDob(client?.date_of_birth ?? "");
     setGstRegDate(client?.gst_reg_date ?? "");
+    setGstFilingFreq(client?.gst_filing_freq ?? "");
     setCompRegDate("");
     setAnnualFees(client?.annual_fees ? String(client.annual_fees) : "");
     setError(null);
@@ -210,6 +213,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
         pin,
         gstin: gstinValue,
         gst_reg_date: gstRegDate,
+        gst_filing_freq: gstFilingFreq,
         services_subscribed: selectedServices,
         mca_filings: selectedMcaFilings,
         annual_fees: annualFees ? Number(annualFees) : 0,
@@ -416,7 +420,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                 </div>
                 <div className="space-y-1.5">
                   <Label>GST Filing Frequency</Label>
-                  <Select>
+                  <Select value={gstFilingFreq} onValueChange={(v) => { setIsDirty(true); setGstFilingFreq(v); }}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Monthly">Monthly</SelectItem>

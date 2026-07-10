@@ -68,6 +68,20 @@ describe("computeDueDate", () => {
     expect(computeDueDate(r, 2025, { month: 3, year: 2026 })).toBe("2026-05-31");
     expect(computeDueDate(r, 2025, { month: 6, year: 2025 })).toBe("2025-07-31");
   });
+
+  it("computes QRMP GSTR-3B due date at the 22nd (Cat1) or 24th (Cat2) of the month after quarter-end", () => {
+    const cat1 = rule({ periodType: "quarterly", dueDateRule: { type: "fixed_day", day: 22, month_offset: 1 } });
+    const cat2 = rule({ periodType: "quarterly", dueDateRule: { type: "fixed_day", day: 24, month_offset: 1 } });
+    expect(computeDueDate(cat1, 2025, { month: 6, year: 2025 })).toBe("2025-07-22");
+    expect(computeDueDate(cat2, 2025, { month: 6, year: 2025 })).toBe("2025-07-24");
+    // Jan-Mar quarter rolls into the next calendar year.
+    expect(computeDueDate(cat1, 2025, { month: 3, year: 2026 })).toBe("2026-04-22");
+  });
+
+  it("computes QRMP GSTR-1 due date at the 13th of the month after quarter-end", () => {
+    const r = rule({ periodType: "quarterly", dueDateRule: { type: "fixed_day", day: 13, month_offset: 1 } });
+    expect(computeDueDate(r, 2025, { month: 9, year: 2025 })).toBe("2025-10-13");
+  });
 });
 
 describe("computeLateFee", () => {

@@ -13,6 +13,7 @@ export function guessField(header: string): string {
   if (/^type$|category|entity|constitution/.test(h)) return "type";
   if (/email|mail/.test(h)) return "email";
   if (/^pan$|pannumber|pancard/.test(h)) return "pan";
+  if (/gstfiling|filingfreq|qrmp/.test(h)) return "gst_filing_freq";
   if (/gst/.test(h)) return "gstin";
   if (/city|town/.test(h)) return "city";
   if (/state/.test(h)) return "state";
@@ -26,6 +27,17 @@ export function guessClientType(raw: string): ClientType {
   const v = raw.trim().toLowerCase().replace(/\blimited\b/g, "ltd");
   const match = CLIENT_TYPES.find((t) => t.toLowerCase() === v || v.includes(t.toLowerCase()) || t.toLowerCase().includes(v));
   return match ?? "Individual";
+}
+
+// Normalizes free-text spreadsheet values ("Q", "QRMP", "Qtrly", "monthly")
+// to the exact "Monthly"/"Quarterly" values the app's own Select uses —
+// generate-recurring-tasks and BulkTaskGenerator both check === "Quarterly".
+export function guessGstFilingFreq(raw: string): string {
+  const v = raw.trim().toLowerCase();
+  if (!v) return "";
+  if (/quarter|qrmp|qtr|^q$/.test(v)) return "Quarterly";
+  if (/month/.test(v)) return "Monthly";
+  return "";
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -89,6 +101,7 @@ export function mapAndValidateRow(
     const value = raw[header];
     if (field === "date_of_birth") mapped.date_of_birth = formatDate(value);
     else if (field === "type") mapped.type = guessClientType(String(value ?? ""));
+    else if (field === "gst_filing_freq") mapped.gst_filing_freq = guessGstFilingFreq(String(value ?? ""));
     else if (field === "annual_fees") mapped.annual_fees = Number(value) || 0;
     else (mapped as any)[field] = String(value ?? "").trim();
   }

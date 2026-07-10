@@ -30,6 +30,7 @@ const TARGET_FIELDS: { key: keyof ClientFormData | "skip"; label: string; requir
   { key: "email", label: "Email" },
   { key: "pan", label: "PAN" },
   { key: "gstin", label: "GSTIN" },
+  { key: "gst_filing_freq", label: "GST Filing Frequency" },
   { key: "city", label: "City" },
   { key: "state", label: "State" },
   { key: "annual_fees", label: "Annual Fees" },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guessField, guessClientType, formatDate, mapAndValidateRow } from "@/lib/clientImport";
+import { guessField, guessClientType, guessGstFilingFreq, formatDate, mapAndValidateRow } from "@/lib/clientImport";
 import { validatePAN, validateGSTIN } from "@/lib/indianTaxUtils";
 
 describe("guessField", () => {
@@ -13,10 +13,27 @@ describe("guessField", () => {
     expect(guessField("State")).toBe("state");
     expect(guessField("Email")).toBe("email");
     expect(guessField("GST Number")).toBe("gstin");
+    expect(guessField("GST Filing Frequency")).toBe("gst_filing_freq");
   });
 
   it("falls back to skip for an unrecognized header", () => {
     expect(guessField("Random Notes Column")).toBe("skip");
+  });
+});
+
+describe("guessGstFilingFreq", () => {
+  it("normalizes common free-text variants to Monthly/Quarterly", () => {
+    expect(guessGstFilingFreq("Monthly")).toBe("Monthly");
+    expect(guessGstFilingFreq("monthly")).toBe("Monthly");
+    expect(guessGstFilingFreq("Quarterly")).toBe("Quarterly");
+    expect(guessGstFilingFreq("QRMP")).toBe("Quarterly");
+    expect(guessGstFilingFreq("Q")).toBe("Quarterly");
+    expect(guessGstFilingFreq("Qtrly")).toBe("Quarterly");
+  });
+
+  it("returns empty string for blank or unrecognized input", () => {
+    expect(guessGstFilingFreq("")).toBe("");
+    expect(guessGstFilingFreq("???")).toBe("");
   });
 });
 
