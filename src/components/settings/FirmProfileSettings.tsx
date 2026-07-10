@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, Save, Upload, Loader2 } from "lucide-react";
 import { fetchFirmProfileFromSupabase, saveFirmProfileToSupabase, type FirmProfile } from "@/data/Settings";
+import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
 
 const indianStates = [
@@ -19,6 +20,7 @@ const indianStates = [
 ];
 
 export function FirmProfileSettings() {
+  const { isAdmin } = useUserRole();
   const [profile, setProfile] = useState<FirmProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -162,8 +164,11 @@ export function FirmProfileSettings() {
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
-        <Button onClick={handleSave} className="gap-2">
+      <div className="flex flex-col items-end gap-1.5">
+        {!isAdmin && (
+          <p className="text-xs text-muted-foreground">Only firm admins can edit the firm profile.</p>
+        )}
+        <Button onClick={handleSave} disabled={!isAdmin || saving} className="gap-2">
           <Save className="h-4 w-4" />
           Save Firm Profile
         </Button>

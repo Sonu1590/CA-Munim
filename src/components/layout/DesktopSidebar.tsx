@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useFinancialYear } from "@/context/financialYear";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const navItems = [
   { label: "Dashboard", icon: Home, path: "/" },
@@ -13,7 +14,7 @@ const navItems = [
   { label: "Tasks & Deadlines", icon: ClipboardList, path: "/tasks" },
   { label: "Documents", icon: FolderOpen, path: "/documents" },
   { label: "WhatsApp Center", icon: MessageCircle, path: "/whatsapp", beta: true },
-  { label: "Billing & Fees", icon: Receipt, path: "/billing" },
+  { label: "Billing & Fees", icon: Receipt, path: "/billing", adminOnly: true },
   { label: "Reports", icon: BarChart3, path: "/reports" },
   { label: "Penalty Calculator", icon: Calculator, path: "/penalty-calculator" },
   { label: "Settings", icon: Settings, path: "/settings" },
@@ -40,6 +41,8 @@ function getInitials(name: string): string {
 export function DesktopSidebar() {
   const navigate = useNavigate();
   const { selectedFY, setSelectedFY, availableFinancialYears } = useFinancialYear();
+  const { isAdmin } = useUserRole();
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
   const [firm, setFirm] = useState<FirmInfo>({
     firmName: "",
     caName: "",
@@ -137,7 +140,7 @@ export function DesktopSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}

@@ -112,6 +112,10 @@ Two clients ("dummy client", "sss") share PAN `ABCDE1234F`; two others share pho
 **Files:** `src/hooks/useClients.ts`
 `addClient`'s insert and `updateClient`'s `.update({...})` payload were never kept in sync — `addClient` wrote `gst_filing_freq`, `updateClient` didn't. Editing an existing client's GST Filing Frequency (or presumably other fields with the same gap) showed no error and the mutation returned success, but the value silently never persisted. Found and confirmed live: edited a test client, `PATCH .../clients` returned 204, but a direct DB query still showed `gst_filing_freq: null`; fixed by adding it to `updateClient`'s update object, then re-verified the edit-save-reload round trip persists correctly. `mca_filings` has the identical gap and is still open — see spawned follow-up task.
 
+### M9. `invoices` has no real due date — aging/overdue logic is anchored to invoice_date
+**Files:** `src/data/Billing.ts` (`dueDate: row.invoice_date`), `src/components/billing/FeesDashboard.tsx`, `src/data/Reports.ts` (`computeReceivablesAging`)
+The `invoices` table has no `due_date` column — only `invoice_date` (date) and a free-text `payment_terms` field (values seen live: `null`, `"Due on receipt"`). Every place that needs a due date (`FeesDashboard`'s overdue check, the receivables aging report added 2026-07-10) treats `dueDate` as literally equal to `invoice_date`, so "overdue"/aging is really "days since invoiced," not "days past the agreed payment term." A firm using 15/30/45-day terms will see wrong overdue flags and wrong aging buckets. Real fix: add a `due_date` column to `invoices` (computed at creation time from a structured payment-terms selector — e.g. "Net 15/30/45" dropdown instead of free text — defaulting to `invoice_date` for "due on receipt"), backfill existing rows, and switch every `dueDate` reference off the `invoice_date` proxy. Not done as part of the aging report work since it's a schema change plus an invoice-creation-flow UI change, bigger than "build a report from existing data."
+
 ---
 
 ## Low / Cleanup
