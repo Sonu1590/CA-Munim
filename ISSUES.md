@@ -108,6 +108,10 @@ From the Supabase linter:
 **Live app:** `/clients`
 Two clients ("dummy client", "sss") share PAN `ABCDE1234F`; two others share phone `7507327755`. PAN has a fixed legal format and should be unique per firm; there's no validation or dedupe, which will cause confusion and bad reminders.
 
+### M8. `updateClient` silently drops several `ClientFormData` fields — FIXED for `gst_filing_freq` (2026-07-10)
+**Files:** `src/hooks/useClients.ts`
+`addClient`'s insert and `updateClient`'s `.update({...})` payload were never kept in sync — `addClient` wrote `gst_filing_freq`, `updateClient` didn't. Editing an existing client's GST Filing Frequency (or presumably other fields with the same gap) showed no error and the mutation returned success, but the value silently never persisted. Found and confirmed live: edited a test client, `PATCH .../clients` returned 204, but a direct DB query still showed `gst_filing_freq: null`; fixed by adding it to `updateClient`'s update object, then re-verified the edit-save-reload round trip persists correctly. `mca_filings` has the identical gap and is still open — see spawned follow-up task.
+
 ---
 
 ## Low / Cleanup

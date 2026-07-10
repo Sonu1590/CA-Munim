@@ -320,6 +320,7 @@ if (!staffRow?.firm_id) {
           state: formData.state,
           gstin: formData.gstin?.toUpperCase(),
           gst_reg_date: formData.gst_reg_date || null,
+          gst_filing_freq: formData.gst_filing_freq,
           services_subscribed: formData.services_subscribed,
           annual_fees: formData.annual_fees,
           notes: formData.notes,

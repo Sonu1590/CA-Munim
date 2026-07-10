@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import Dashboard from "@/pages/Index";
 import { useDashboard } from "@/hooks/useDashboard";
+import { FinancialYearProvider } from "@/context/financialYear";
 
 vi.mock("@/hooks/useDashboard", () => ({
   useDashboard: vi.fn(),
@@ -22,6 +23,7 @@ describe("Dashboard page", () => {
     mockUseDashboard.mockReturnValue({
       metrics: { totalClients: 0, overdueTasks: 0, pendingFees: 0, dueThisWeek: 0 },
       complianceAlerts: [],
+      digest: [],
       activity: [],
       monthlyWork: { completed: 0, total: 0, byType: [] },
       loading: true,
@@ -30,7 +32,7 @@ describe("Dashboard page", () => {
       refetch: vi.fn(),
     });
 
-    render(<Dashboard />);
+    render(<FinancialYearProvider><Dashboard /></FinancialYearProvider>);
 
     expect(screen.getByText("Loading dashboard...")).toBeInTheDocument();
     expect(screen.queryByText("Total Clients")).not.toBeInTheDocument();
@@ -62,6 +64,24 @@ describe("Dashboard page", () => {
           urgency: "overdue",
         },
       ],
+      digest: [
+        {
+          id: "task-1",
+          taskType: "GSTR-3B",
+          clientId: "client-1",
+          clientName: "Mock Client",
+          dueDate: "2026-05-01",
+          daysOverdue: 3,
+        },
+        {
+          id: "task-2",
+          taskType: "TDS Challan",
+          clientId: "client-2",
+          clientName: "Another Client",
+          dueDate: "2026-05-04",
+          daysOverdue: 0,
+        },
+      ],
       activity: [
         {
           id: "inv-1",
@@ -90,7 +110,7 @@ describe("Dashboard page", () => {
       refetch: vi.fn(),
     });
 
-    render(<Dashboard />);
+    render(<FinancialYearProvider><Dashboard /></FinancialYearProvider>);
 
     expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
     expect(screen.getByText("Welcome back, CA R Sharma")).toBeInTheDocument();
@@ -100,10 +120,16 @@ describe("Dashboard page", () => {
     expect(screen.getAllByText(/1,25,000/)).toHaveLength(2);
     expect(screen.getByText("7")).toBeInTheDocument();
 
-    expect(screen.getByText("GSTR-3B")).toBeInTheDocument();
-    expect(screen.getByText("TDS Challan")).toBeInTheDocument();
+    expect(screen.getAllByText("GSTR-3B")).toHaveLength(2); // compliance alert card + digest item
+    expect(screen.getAllByText("TDS Challan")).toHaveLength(2);
     expect(screen.getByText("11 days overdue")).toBeInTheDocument();
     expect(screen.getByText("4 clients affected")).toBeInTheDocument();
+
+    expect(screen.getByText("2 items need attention")).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.textContent === "GSTR-3B for Mock Client")).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.textContent === "TDS Challan for Another Client")).toBeInTheDocument();
+    expect(screen.getByText("3 days overdue")).toBeInTheDocument();
+    expect(screen.getByText("Due today")).toBeInTheDocument();
 
     expect(screen.getByText("Invoice INV-001 sent to Mock Client - Rs. 1,25,000")).toBeInTheDocument();
     expect(screen.getByText("Document received from Mock Client: bank-statement.pdf")).toBeInTheDocument();
@@ -119,6 +145,7 @@ describe("Dashboard page", () => {
     mockUseDashboard.mockReturnValue({
       metrics: { totalClients: 0, overdueTasks: 0, pendingFees: 0, dueThisWeek: 0 },
       complianceAlerts: [],
+      digest: [],
       activity: [],
       monthlyWork: { completed: 0, total: 0, byType: [] },
       loading: false,
@@ -127,9 +154,10 @@ describe("Dashboard page", () => {
       refetch: vi.fn(),
     });
 
-    render(<Dashboard />);
+    render(<FinancialYearProvider><Dashboard /></FinancialYearProvider>);
 
     expect(screen.getByText("Welcome back, CA")).toBeInTheDocument();
+    expect(screen.getByText("Nothing due or overdue — you're caught up.")).toBeInTheDocument();
     expect(screen.getByText("No upcoming compliance deadlines in the next 30 days.")).toBeInTheDocument();
     expect(screen.getByText("No recent activity yet. Start by adding clients and creating tasks.")).toBeInTheDocument();
     expect(screen.getByText("No tasks this month")).toBeInTheDocument();

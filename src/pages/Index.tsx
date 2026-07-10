@@ -1,5 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { MetricCards } from "@/components/dashboard/MetricCards";
+import { TodayDigest } from "@/components/dashboard/TodayDigest";
 import { ComplianceAlerts } from "@/components/dashboard/ComplianceAlerts";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { MonthlyWork } from "@/components/dashboard/MonthlyWork";
@@ -12,6 +13,7 @@ const Dashboard = () => {
   const {
     metrics,
     complianceAlerts,
+    digest,
     activity,
     monthlyWork,
     loading,
@@ -52,6 +54,7 @@ const Dashboard = () => {
         ) : (
           <>
             {/* Pass real metrics to existing components */}
+            <TodayDigest items={digest} />
             <MetricCards metrics={metrics} />
             <ComplianceAlerts alerts={complianceAlerts} />
             <div className="grid md:grid-cols-2 gap-6">
