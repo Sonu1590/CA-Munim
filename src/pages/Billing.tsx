@@ -10,11 +10,13 @@ import { CreateInvoiceModal } from "@/components/billing/CreateInvoiceModal";
 import { RecordPaymentModal } from "@/components/billing/RecordPaymentModal";
 import { FeesDashboard } from "@/components/billing/FeesDashboard";
 import { fetchInvoicesFromSupabase, Invoice, InvoiceStatus } from "@/data/Billing";
-import { Plus, Search, Loader2, AlertCircle } from "lucide-react";
+import { Plus, Search, Loader2, AlertCircle, ShieldAlert } from "lucide-react";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const statusFilters: (InvoiceStatus | "All")[] = ["All", "Draft", "Sent", "Paid", "Partially Paid", "Overdue", "Cancelled"];
 
 export default function Billing() {
+  const { isAdmin, loading: roleLoading } = useUserRole();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [createOpen, setCreateOpen] = useState(false);
@@ -50,12 +52,26 @@ export default function Billing() {
     });
   }, [invoices, search, statusFilter]);
 
-  if (loading) {
+  if (roleLoading || loading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <span className="ml-3 text-muted-foreground">Loading invoices...</span>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // Enforced server-side too (invoices/payments RLS is admin-only) — this
+  // is just so a staff member sees a clear message instead of an empty
+  // list or a raw permission error.
+  if (!isAdmin) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
+          <ShieldAlert className="h-10 w-10 text-muted-foreground" />
+          <p className="text-muted-foreground">Billing & Fees is only available to firm admins.</p>
         </div>
       </AppLayout>
     );

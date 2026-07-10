@@ -7,14 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Users, Plus, Mail, Phone, Shield, ShieldCheck, ShieldAlert, Loader2 } from "lucide-react";
+import { Users, Plus, Mail, Phone, ShieldCheck, Shield, Loader2 } from "lucide-react";
 import { fetchStaffFromSupabase, addStaffToSupabase, updateStaffActiveStatus, type StaffMember } from "@/data/Settings";
+import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
 
-const roleIcons = { "Senior CA": ShieldCheck, "Article Clerk": Shield, "Admin Staff": ShieldAlert };
-const roleColors = { "Senior CA": "bg-primary/10 text-primary", "Article Clerk": "bg-accent/10 text-accent", "Admin Staff": "bg-muted text-muted-foreground" };
-const getRole = (role: StaffMember["role"] | string): StaffMember["role"] =>
-  role === "Senior CA" || role === "Article Clerk" || role === "Admin Staff" ? role : "Admin Staff";
+const roleIcons = { admin: ShieldCheck, staff: Shield };
+const roleColors = { admin: "bg-primary/10 text-primary", staff: "bg-muted text-muted-foreground" };
+const roleLabels = { admin: "Admin", staff: "Staff" };
 const getInitials = (name: string) =>
   (name || "Staff Member")
     .split(" ")
@@ -29,11 +29,12 @@ const formatJoinedDate = (date: string) => {
 };
 
 export function StaffManagement() {
+  const { isAdmin } = useUserRole();
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newStaff, setNewStaff] = useState({ name: "", role: "Article Clerk" as StaffMember["role"], email: "", phone: "" });
+  const [newStaff, setNewStaff] = useState({ name: "", role: "staff" as StaffMember["role"], jobTitle: "", email: "", phone: "" });
   const staffList = Array.isArray(staff) ? staff : [];
 
   useEffect(() => {
@@ -73,13 +74,14 @@ export function StaffManagement() {
       const member = await addStaffToSupabase({
         name: newStaff.name.trim(),
         role: newStaff.role,
+        jobTitle: newStaff.jobTitle.trim() || undefined,
         email: newStaff.email.trim(),
         phone: newStaff.phone.trim(),
         isActive: true,
       });
       setStaff((prev) => [...prev, member]);
       setShowAddModal(false);
-      setNewStaff({ name: "", role: "Article Clerk", email: "", phone: "" });
+      setNewStaff({ name: "", role: "staff", jobTitle: "", email: "", phone: "" });
       toast.success("Staff member added.", {
         description: `Share the app URL with them to create their login. They should sign up with this email: ${newStaff.email}`,
       });
@@ -95,7 +97,9 @@ export function StaffManagement() {
           <h3 className="text-lg font-semibold flex items-center gap-2"><Users className="h-5 w-5 text-primary" />Staff Members</h3>
           <p className="text-sm text-muted-foreground">{staffList.filter((s) => s.isActive).length} active, {staffList.filter((s) => !s.isActive).length} inactive</p>
         </div>
-        <Button onClick={() => setShowAddModal(true)} className="gap-2"><Plus className="h-4 w-4" />Add Staff</Button>
+        {isAdmin && (
+          <Button onClick={() => setShowAddModal(true)} className="gap-2"><Plus className="h-4 w-4" />Add Staff</Button>
+        )}
       </div>
 
       <div className="grid gap-4">
@@ -106,8 +110,7 @@ export function StaffManagement() {
         ) : staffList.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">No staff members found.</div>
         ) : staffList.map((member) => {
-          const role = getRole(member.role);
-          const RoleIcon = roleIcons[role];
+          const RoleIcon = roleIcons[member.role];
           const memberName = member.name || "Staff Member";
           return (
             <Card key={member.id} className={!member.isActive ? "opacity-60" : ""}>
@@ -118,10 +121,10 @@ export function StaffManagement() {
                       {getInitials(memberName)}
                     </div>
                     <div>
-                      <p className="font-medium">{memberName}</p>
+                      <p className="font-medium">{memberName}{member.jobTitle ? <span className="text-muted-foreground font-normal"> · {member.jobTitle}</span> : null}</p>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <Badge variant="secondary" className={`gap-1 text-xs ${roleColors[role]}`}>
-                          <RoleIcon className="h-3 w-3" />{role}
+                        <Badge variant="secondary" className={`gap-1 text-xs ${roleColors[member.role]}`}>
+                          <RoleIcon className="h-3 w-3" />{roleLabels[member.role]}
                         </Badge>
                         <span className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" />{member.email || "No email"}</span>
                         <span className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" />{member.phone || "No phone"}</span>
@@ -136,7 +139,7 @@ export function StaffManagement() {
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
                       <Label htmlFor={`active-${member.id}`} className="text-xs">{member.isActive ? "Active" : "Inactive"}</Label>
-                      <Switch id={`active-${member.id}`} checked={member.isActive} onCheckedChange={() => toggleActive(member.id)} />
+                      <Switch id={`active-${member.id}`} checked={member.isActive} disabled={!isAdmin} onCheckedChange={() => toggleActive(member.id)} />
                     </div>
                   </div>
                 </div>
@@ -163,16 +166,16 @@ export function StaffManagement() {
           <div className="space-y-4">
             <div><Label>Full Name</Label><Input className="mt-1.5" value={newStaff.name} onChange={(e) => setNewStaff((p) => ({ ...p, name: e.target.value }))} /></div>
             <div>
-              <Label>Role</Label>
+              <Label>Access Role</Label>
               <Select value={newStaff.role} onValueChange={(v) => setNewStaff((p) => ({ ...p, role: v as StaffMember["role"] }))}>
                 <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Senior CA">Senior CA</SelectItem>
-                  <SelectItem value="Article Clerk">Article Clerk</SelectItem>
-                  <SelectItem value="Admin Staff">Admin Staff</SelectItem>
+                  <SelectItem value="staff">Staff</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            <div><Label>Job Title (optional)</Label><Input className="mt-1.5" placeholder="e.g. Senior CA, Article Clerk" value={newStaff.jobTitle} onChange={(e) => setNewStaff((p) => ({ ...p, jobTitle: e.target.value }))} /></div>
             <div><Label>Email</Label><Input className="mt-1.5" type="email" value={newStaff.email} onChange={(e) => setNewStaff((p) => ({ ...p, email: e.target.value }))} /></div>
             <div><Label>Phone</Label><Input className="mt-1.5" value={newStaff.phone} onChange={(e) => setNewStaff((p) => ({ ...p, phone: e.target.value }))} /></div>
           </div>

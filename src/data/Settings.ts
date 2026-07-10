@@ -25,7 +25,8 @@ export interface FirmProfile {
 export interface StaffMember {
   id: string;
   name: string;
-  role: "Senior CA" | "Article Clerk" | "Admin Staff";
+  role: "admin" | "staff";
+  jobTitle?: string;
   email: string;
   phone: string;
   isActive: boolean;
@@ -88,12 +89,7 @@ export const mockFirmProfile: FirmProfile = {
   upiId: "sharma.ca@hdfcbank",
 };
 
-export const mockStaff: StaffMember[] = [
-  { id: "1", name: "Priya Mehta", role: "Senior CA", email: "priya@sharma-ca.in", phone: "9876543211", isActive: true, joinedDate: "2023-04-01", tasksCompleted: 145, tasksPending: 12 },
-  { id: "2", name: "Amit Kumar", role: "Article Clerk", email: "amit@sharma-ca.in", phone: "9876543212", isActive: true, joinedDate: "2024-01-15", tasksCompleted: 78, tasksPending: 8 },
-  { id: "3", name: "Neha Singh", role: "Article Clerk", email: "neha@sharma-ca.in", phone: "9876543213", isActive: true, joinedDate: "2024-06-01", tasksCompleted: 42, tasksPending: 15 },
-  { id: "4", name: "Rohit Verma", role: "Admin Staff", email: "rohit@sharma-ca.in", phone: "9876543214", isActive: false, joinedDate: "2023-08-01", tasksCompleted: 30, tasksPending: 0 },
-];
+export const mockStaff: StaffMember[] = [];
 
 export const mockInvoiceSettings: InvoiceSettings = {
   prefix: "INV",
@@ -132,13 +128,7 @@ export const filingCategories: FilingCategory[] = [
 
 const toBool = (value: any) => typeof value === "boolean" ? value : String(value).toLowerCase() === "true";
 
-const toStaffRole = (value: any): StaffMember["role"] => {
-  if (value === "Senior CA" || value === "Article Clerk" || value === "Admin Staff") return value;
-  const normalized = String(value ?? "").toLowerCase();
-  if (normalized.includes("senior")) return "Senior CA";
-  if (normalized.includes("article") || normalized.includes("clerk") || normalized === "staff") return "Article Clerk";
-  return "Admin Staff";
-};
+const toStaffRole = (value: any): StaffMember["role"] => (value === "admin" ? "admin" : "staff");
 
 const extractSupabaseError = (err: any): string => {
   if (!err) return "";
@@ -318,7 +308,7 @@ export async function fetchStaffFromSupabase(): Promise<StaffMember[]> {
 
   const { data, error } = await supabase
     .from("staff")
-    .select(`id, name, role, email, phone, active, created_at`)
+    .select(`id, name, role, job_title, email, phone, active, created_at`)
     .eq("firm_id", firmId)
     .order("created_at", { ascending: false });
 
@@ -329,6 +319,7 @@ export async function fetchStaffFromSupabase(): Promise<StaffMember[]> {
     id: row.id,
     name: row.name ?? "",
     role: toStaffRole(row.role),
+    jobTitle: row.job_title ?? undefined,
     email: row.email ?? "",
     phone: row.phone ?? "",
     isActive: toBool(row.active),
@@ -345,10 +336,11 @@ export async function addStaffToSupabase(staff: Omit<StaffMember, "id" | "joined
     firm_id: firmId,
     name: staff.name,
     role: staff.role,
+    job_title: staff.jobTitle || null,
     email: staff.email,
     phone: staff.phone,
     active: staff.isActive,
-  }]).select("id, name, role, email, phone, active, created_at").single();
+  }]).select("id, name, role, job_title, email, phone, active, created_at").single();
 
   if (error) throw getStaffError(error, "Unable to add staff member.");
   if (!data) throw new Error("Unable to add staff member.");
@@ -357,6 +349,7 @@ export async function addStaffToSupabase(staff: Omit<StaffMember, "id" | "joined
     id: data.id,
     name: data.name ?? "",
     role: toStaffRole(data.role),
+    jobTitle: data.job_title ?? undefined,
     email: data.email ?? "",
     phone: data.phone ?? "",
     isActive: toBool(data.active),
