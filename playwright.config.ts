@@ -1,4 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
+import { config } from 'dotenv';
+
+// Nothing else in this repo auto-loads e2e/.env.test — helpers/auth.ts's
+// requireTestEnv() reads TEST_USER_EMAIL/TEST_USER_PASSWORD straight from
+// process.env, so without this every run needs them exported manually.
+config({ path: 'e2e/.env.test' });
 
 export default defineConfig({
   testDir: './e2e',
