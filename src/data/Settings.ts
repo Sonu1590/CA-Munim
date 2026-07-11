@@ -372,23 +372,37 @@ export async function updateStaffActiveStatus(id: string, isActive: boolean): Pr
 }
 
 export async function fetchInvoiceSettingsFromSupabase(): Promise<InvoiceSettings> {
-  const { data, error } = await supabase.from("invoice_settings").select(`
-    prefix,
-    reset_per_fy,
-    payment_terms,
-    footer_notes,
-    gst_rate,
-    signatory_name,
-    signature_url
-  `).single();
+  const firmId = await getCurrentFirmId();
 
-  if (error || !data) return mockInvoiceSettings;
+  // Real columns are reset_annually/default_terms/default_notes, not the
+  // reset_per_fy/payment_terms/footer_notes this used to query — that typo'd
+  // select() always errored and silently fell back to mockInvoiceSettings on
+  // every load (M13, the same L5 failure mode: mock-on-error hid a schema
+  // mismatch). .maybeSingle() (not .single()) + firm scoping so a brand-new
+  // firm that has never saved settings gets `data: null, error: null` — a
+  // legitimate "no row yet" case — instead of a thrown "no rows" error.
+  const { data, error } = await supabase
+    .from("invoice_settings")
+    .select(`
+      prefix,
+      reset_annually,
+      default_terms,
+      default_notes,
+      gst_rate,
+      signatory_name,
+      signature_url
+    `)
+    .eq("firm_id", firmId)
+    .maybeSingle();
+
+  if (error) throw new Error(extractSupabaseError(error) || "Unable to load invoice settings.");
+  if (!data) return mockInvoiceSettings; // no row saved yet for this firm — show sensible defaults, not an error
 
   return {
     prefix: data.prefix ?? mockInvoiceSettings.prefix,
-    resetPerFY: toBool(data.reset_per_fy),
-    paymentTerms: data.payment_terms ?? mockInvoiceSettings.paymentTerms,
-    footerNotes: data.footer_notes ?? mockInvoiceSettings.footerNotes,
+    resetPerFY: toBool(data.reset_annually),
+    paymentTerms: data.default_terms ?? mockInvoiceSettings.paymentTerms,
+    footerNotes: data.default_notes ?? mockInvoiceSettings.footerNotes,
     gstRate: Number(data.gst_rate ?? mockInvoiceSettings.gstRate),
     signatoryName: data.signatory_name ?? mockInvoiceSettings.signatoryName,
     signatureUrl: data.signature_url ?? mockInvoiceSettings.signatureUrl,
@@ -396,16 +410,23 @@ export async function fetchInvoiceSettingsFromSupabase(): Promise<InvoiceSetting
 }
 
 export async function saveInvoiceSettingsToSupabase(settings: InvoiceSettings): Promise<InvoiceSettings> {
+  const firmId = await getCurrentFirmId();
+
+  // Previously upserted a hardcoded id:1 with no firm_id at all — RLS's
+  // `firm_id = get_my_firm_id()` check (applies to INSERT/UPDATE too) rejected
+  // every save silently. onConflict targets firm_id (now unique — see the
+  // M13 migration) so each firm gets exactly one settings row that updates
+  // in place rather than erroring or duplicating on repeat saves.
   const { error } = await supabase.from("invoice_settings").upsert({
-    id: 1,
+    firm_id: firmId,
     prefix: settings.prefix,
-    reset_per_fy: settings.resetPerFY,
-    payment_terms: settings.paymentTerms,
-    footer_notes: settings.footerNotes,
+    reset_annually: settings.resetPerFY,
+    default_terms: settings.paymentTerms,
+    default_notes: settings.footerNotes,
     gst_rate: settings.gstRate,
     signatory_name: settings.signatoryName,
     signature_url: settings.signatureUrl,
-  }, { onConflict: "id" });
+  }, { onConflict: "firm_id" });
 
   if (error) throw error;
   return settings;
