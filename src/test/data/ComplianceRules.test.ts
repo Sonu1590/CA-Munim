@@ -104,6 +104,27 @@ describe("computeLateFee", () => {
     expect(result?.amount).toBe(16000); // 0.04% of 4cr
   });
 
+  it("picks GSTR-9's per-day rate by turnover slab, not just the cap (Notification 07/2023)", () => {
+    const r = rule({
+      lateFeeRule: {
+        slabs: [
+          { turnover_upto: 50_000_000, per_day: 50, max_percentage: 0.0004 },
+          { turnover_upto: 200_000_000, per_day: 100, max_percentage: 0.0004 },
+          { turnover_upto: null, per_day: 200, max_percentage: 0.005 },
+        ],
+      },
+    });
+    // 1000 days accrued is enough to hit the cap for the <=5cr and 5-20cr
+    // slabs (50-100/day), isolating each slab's own per_day + max_percentage.
+    expect(computeLateFee(r, 1000, { turnover: 40_000_000 })?.amount).toBe(16000); // <=5cr: 0.04% of 4cr
+    expect(computeLateFee(r, 1000, { turnover: 100_000_000 })?.amount).toBe(40000); // 5-20cr: 0.04% of 10cr
+    // >20cr's 200/day accrues slower relative to its larger 0.50% cap, so it
+    // needs more days to actually hit that cap (200 x 10000 > 0.5% of 30cr).
+    expect(computeLateFee(r, 10_000, { turnover: 300_000_000 })?.amount).toBe(1_500_000); // >20cr: 0.50% of 30cr
+    // Below the cap, the >20cr slab is a plain per-day accrual.
+    expect(computeLateFee(r, 1000, { turnover: 300_000_000 })?.amount).toBe(200_000);
+  });
+
   it("uses the 234F income-based cap for ITR", () => {
     const r = rule({ lateFeeRule: { flat_above_5L: 5000, flat_below_5L: 1000 } });
     expect(computeLateFee(r, 5, { incomeBelow5L: true })?.amount).toBe(1000);
