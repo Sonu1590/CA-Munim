@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { roundMoney } from '@/lib/indianTaxUtils'
 
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'partially_paid'
 
@@ -37,6 +38,7 @@ export interface InvoiceFormData {
   notes?: string
   payment_terms?: string
   send_whatsapp?: boolean
+  gst_applicable?: boolean // defaults to true — matches CreateInvoiceModal's default-on toggle
 }
 
 export interface Payment {
@@ -165,14 +167,19 @@ export function useBilling() {
         .eq('id', formData.client_id)
         .single()
 
-      const subtotal = formData.line_items.reduce((sum, item) => sum + item.amount, 0)
+      const subtotal = roundMoney(formData.line_items.reduce((sum, item) => sum + item.amount, 0))
       const isSameState = clientRow?.state === firmState
-      const gstAmount = subtotal * 0.18
+      // gst_applicable defaults to true so any caller that predates this
+      // field keeps its existing (GST-always-on) behavior.
+      const gstApplicable = formData.gst_applicable !== false
+      const gstAmount = gstApplicable ? roundMoney(subtotal * 0.18) : 0
 
-      const cgst = isSameState ? gstAmount / 2 : 0
-      const sgst = isSameState ? gstAmount / 2 : 0
-      const igst = !isSameState ? gstAmount : 0
-      const total = subtotal + gstAmount
+      const cgst = gstApplicable && isSameState ? roundMoney(gstAmount / 2) : 0
+      const sgst = gstApplicable && isSameState ? roundMoney(gstAmount / 2) : 0
+      const igst = gstApplicable && !isSameState ? gstAmount : 0
+      // Sum the already-rounded line items, not gstAmount again, so the
+      // parts printed on the invoice always add up to exactly this total.
+      const total = roundMoney(subtotal + cgst + sgst + igst)
 
       const invoiceNumber = await getNextInvoiceNumber(staffRow.firm_id)
 

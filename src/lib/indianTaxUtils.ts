@@ -1,5 +1,17 @@
 // Utility functions for Indian tax/compliance UI helpers
 
+// Rounds to 2 decimals (paise) at the point money is calculated, not just
+// displayed. subtotal * 0.09-style GST math left unrounded produces real
+// float artifacts (e.g. 100.10 * 0.09 === 9.008999999999999, not 9.09) that
+// get stored verbatim into a numeric column and compound in every
+// downstream total/balance built on top of it — not just a display
+// glitch. Not a full integer-paise migration (that's a much larger,
+// separate change spanning every money column and consumer); this closes
+// the specific leak at each calculation site.
+export function roundMoney(amount: number): number {
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+}
+
 export const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 export const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 
@@ -117,4 +129,21 @@ export function getFinancialYear(date: Date | string | null | undefined, fallbac
 
 export function getCurrentFinancialYear(date = new Date()): string {
   return getFinancialYear(date, "");
+}
+
+// A rolling window of "FY YYYY-YY" strings anchored to the current date,
+// not a fixed list — a hardcoded array silently stops covering "current
+// FY" a few years after whoever wrote it stopped maintaining it (this
+// list itself shipped fixed at 2022-23..2027-28 and would have started
+// silently excluding both the current FY and a growing back-catalog of
+// intermediate years once "now" moved past April 2028).
+export function generateFinancialYears(yearsBack = 5, yearsAhead = 1, asOf = new Date()): string[] {
+  const currentFY = getCurrentFinancialYear(asOf);
+  const currentStartYear = Number(currentFY.match(/FY (\d{4})/)?.[1] ?? asOf.getFullYear());
+  const years: string[] = [];
+  for (let offset = -yearsBack; offset <= yearsAhead; offset++) {
+    const startYear = currentStartYear + offset;
+    years.push(`FY ${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`);
+  }
+  return years;
 }
