@@ -4,6 +4,41 @@ import { roundMoney } from '@/lib/indianTaxUtils'
 
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'partially_paid'
 
+// (M9) A real, structured set the UI can drive and due_date can be computed
+// from — replacing the old free-text payment_terms, which in practice was
+// only ever 'Due on receipt' or null and the create-invoice UI never even
+// exposed a way to set.
+export type PaymentTerms = 'due_on_receipt' | 'net_15' | 'net_30' | 'net_45'
+
+export const PAYMENT_TERMS_OPTIONS: { value: PaymentTerms; label: string }[] = [
+  { value: 'due_on_receipt', label: 'Due on Receipt' },
+  { value: 'net_15', label: 'Net 15' },
+  { value: 'net_30', label: 'Net 30' },
+  { value: 'net_45', label: 'Net 45' },
+]
+
+const PAYMENT_TERMS_DAYS: Record<PaymentTerms, number> = {
+  due_on_receipt: 0,
+  net_15: 15,
+  net_30: 30,
+  net_45: 45,
+}
+
+/**
+ * Mirrors the DB backfill/CASE logic in the invoice_due_date migration.
+ * Pure calendar-date arithmetic anchored to UTC throughout (Date.UTC on the
+ * way in, getUTCDate/toISOString on the way out) — constructing from
+ * `dateString + 'T00:00:00'` would parse in the runtime's local timezone,
+ * so serializing back via toISOString() could roll the date back a day
+ * whenever the runtime's local zone is behind UTC.
+ */
+export function computeInvoiceDueDate(invoiceDate: string, paymentTerms: PaymentTerms): string {
+  const [year, month, day] = invoiceDate.split('-').map(Number)
+  const due = new Date(Date.UTC(year, month - 1, day))
+  due.setUTCDate(due.getUTCDate() + PAYMENT_TERMS_DAYS[paymentTerms])
+  return due.toISOString().split('T')[0]
+}
+
 export interface LineItem {
   description: string
   sacCode: string
@@ -17,6 +52,7 @@ export interface Invoice {
   clientName: string
   clientState?: string
   invoiceDate: string
+  dueDate: string
   financialYear: string
   lineItems: LineItem[]
   subtotal: number
@@ -26,7 +62,7 @@ export interface Invoice {
   total: number
   status: InvoiceStatus
   notes?: string
-  paymentTerms?: string
+  paymentTerms: PaymentTerms
   createdAt: string
 }
 
@@ -36,7 +72,7 @@ export interface InvoiceFormData {
   financial_year: string
   line_items: LineItem[]
   notes?: string
-  payment_terms?: string
+  payment_terms?: PaymentTerms // defaults to 'net_15' — matches invoices.payment_terms's DB default
   send_whatsapp?: boolean
   gst_applicable?: boolean // defaults to true — matches CreateInvoiceModal's default-on toggle
 }
@@ -68,6 +104,7 @@ export function useBilling() {
           invoice_number,
           client_id,
           invoice_date,
+          due_date,
           financial_year,
           line_items,
           subtotal,
@@ -92,6 +129,7 @@ export function useBilling() {
         clientName: row.clients?.name ?? '',
         clientState: row.clients?.state,
         invoiceDate: row.invoice_date,
+        dueDate: row.due_date,
         financialYear: row.financial_year,
         lineItems: row.line_items ?? [],
         subtotal: row.subtotal ?? 0,
@@ -182,6 +220,8 @@ export function useBilling() {
       const total = roundMoney(subtotal + cgst + sgst + igst)
 
       const invoiceNumber = await getNextInvoiceNumber(staffRow.firm_id)
+      const paymentTerms = formData.payment_terms ?? 'net_15'
+      const dueDate = computeInvoiceDueDate(formData.invoice_date, paymentTerms)
 
       const { data: inserted, error: insertErr } = await supabase
         .from('invoices')
@@ -190,6 +230,7 @@ export function useBilling() {
           client_id: formData.client_id,
           invoice_number: invoiceNumber,
           invoice_date: formData.invoice_date,
+          due_date: dueDate,
           financial_year: formData.financial_year,
           line_items: formData.line_items,
           subtotal,
@@ -199,7 +240,7 @@ export function useBilling() {
           total,
           status: 'draft',
           notes: formData.notes,
-          payment_terms: formData.payment_terms,
+          payment_terms: paymentTerms,
         })
         .select('id')
         .single()
