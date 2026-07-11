@@ -49,7 +49,19 @@ interface FixedDayRule {
   q4_exception?: { day: number; month: number };
 }
 
-type DueDateRule = FixedDateRule | FixedDayRule;
+// "relative_to_agm": MGT-7/AOC-4/ADT-1 due dates aren't anchored to the FY
+// itself — they're N days after the company's AGM, which is held sometime
+// after FY end (clients.agm_due_month, the calendar month a client's AGM
+// falls in — captured on the client record, not derivable from the FY
+// alone). Always resolves against the calendar year after the FY starts
+// (agm_due_month is by definition after FY end), matching FixedDateRule's
+// annual default.
+interface RelativeToAgmRule {
+  type: "relative_to_agm";
+  offset_days: number;
+}
+
+type DueDateRule = FixedDateRule | FixedDayRule | RelativeToAgmRule;
 
 interface LateFeeRule {
   type?: "flat";
@@ -113,8 +125,10 @@ export function selectRuleForFY(rules: ComplianceRule[], filingType: string, fyS
  * `period` is only needed for monthly/quarterly rules — the calendar
  * month/year of the return period being filed (e.g. March 2026 for the
  * FY2025-26 Q4/year-end return), not the due date itself.
+ * `agmDueMonth` (1-12) is only needed for "relative_to_agm" rules
+ * (MGT-7/AOC-4/ADT-1) — a client's clients.agm_due_month.
  */
-export function computeDueDate(rule: ComplianceRule, fyStartYear: number, period?: { month: number; year: number }): string | null {
+export function computeDueDate(rule: ComplianceRule, fyStartYear: number, period?: { month: number; year: number }, agmDueMonth?: number): string | null {
   const dueDateRule = rule.dueDateRule;
   if (!dueDateRule) return null;
 
@@ -122,6 +136,23 @@ export function computeDueDate(rule: ComplianceRule, fyStartYear: number, period
     const yearOffset = dueDateRule.year_offset ?? (rule.periodType === "annual" ? 1 : dueDateRule.month <= 3 ? 1 : 0);
     const year = fyStartYear + yearOffset;
     return `${year}-${pad(dueDateRule.month)}-${pad(dueDateRule.day)}`;
+  }
+
+  if (dueDateRule.type === "relative_to_agm") {
+    if (agmDueMonth == null) return null;
+    // AGM is always in the calendar year after the FY starts. Pure UTC
+    // arithmetic throughout (Date.UTC in, getUTCDate/toISOString out) —
+    // constructing from a locally-interpreted date string here would risk
+    // the same off-by-one-day bug computeInvoiceDueDate had before it was
+    // fixed (see useBilling.ts).
+    const agmYear = fyStartYear + 1;
+    // Date.UTC(year, monthIndex, 0) is day 0 of monthIndex, i.e. the last
+    // day of the previous (0-indexed) month — since agmDueMonth is already
+    // 1-indexed, passing it directly as monthIndex lands on the last day
+    // of agmDueMonth itself.
+    const dueDate = new Date(Date.UTC(agmYear, agmDueMonth, 0));
+    dueDate.setUTCDate(dueDate.getUTCDate() + dueDateRule.offset_days);
+    return dueDate.toISOString().split("T")[0];
   }
 
   // fixed_day needs a period to offset from.
