@@ -103,8 +103,9 @@ From the Supabase linter:
 - Leaked-password protection (HaveIBeenPwned) is **disabled** in Auth — enable it.
 - Many tables are `SELECT`-exposed to `anon`/`authenticated` in the GraphQL schema; review whether `anon` needs any of them.
 
-### M6. Duplicate firm RLS policies with different logic
+### M6. Duplicate firm RLS policies with different logic — FIXED incidentally, trail gap closed (2026-07-11)
 `firms` has both the older `auth.uid() = id` policies and the newer `id = get_my_firm_id()` policies simultaneously. Because policies are OR'd, this widens access unpredictably and makes the effective rule hard to reason about. Consolidate to a single scheme.
+**Re-checked against the live DB:** already resolved, no code change needed. The old `auth.uid() = id`-keyed policies ("Allow authenticated users to insert/select/update own firm") were dropped by the H1/H2 fix (`20260702140000_ensure_my_firm_rpc.sql`), which moved firm creation to the `ensure_my_firm_rpc()` RPC — this was never tagged `(M6)` even though it fixed it. Live `firms` now has exactly two policies, both scoped by `get_my_firm_id()`: `firms_select` (read) and `firms_update_admin` (admin-only write). No duplication, no OR'd widening, and intentionally no INSERT/DELETE policy (creation only via the RPC). One real gap found and fixed: `firms_select` itself had never been defined in any tracked migration (it predates this repo's migration-file convention) — `20260711180000_m6_firms_rls_trail.sql` adds it as a no-op-against-live migration so the schema is fully reproducible from migrations alone.
 
 ### M7. No PAN/phone uniqueness or validation on clients
 **Live app:** `/clients`
