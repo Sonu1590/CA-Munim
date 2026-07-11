@@ -9,6 +9,8 @@ import { ArrowLeft, FileText, IndianRupee, ListChecks } from "lucide-react";
 import { useClients } from "@/hooks/useClients";
 import { useTasks } from "@/hooks/useTasks";
 import { useBilling } from "@/hooks/useBilling";
+import { useUserRole } from "@/hooks/useUserRole";
+import { ClientCredentialsPanel } from "@/components/clients/ClientCredentialsPanel";
 
 const formatDate = (date?: string) => date ? new Date(`${date}T00:00:00`).toLocaleDateString("en-IN") : "-";
 
@@ -18,6 +20,7 @@ export default function ClientProfile() {
   const { clients, loading: clientsLoading } = useClients();
   const { tasks } = useTasks();
   const { invoices } = useBilling();
+  const { isAdmin } = useUserRole();
 
   const client = clients.find((item) => item.id === id);
   const clientTasks = useMemo(() => tasks.filter((task) => task.clientId === id), [tasks, id]);
@@ -66,6 +69,7 @@ export default function ClientProfile() {
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="billing">Billing</TabsTrigger>
+            {isAdmin && <TabsTrigger value="credentials">Credentials</TabsTrigger>}
             <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
 
@@ -107,6 +111,12 @@ export default function ClientProfile() {
               )) : <p className="p-4 text-sm text-muted-foreground">No invoices for this client yet.</p>}
             </CardContent></Card>
           </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="credentials">
+              <ClientCredentialsPanel clientId={client.id} />
+            </TabsContent>
+          )}
 
           <TabsContent value="activity">
             <Card><CardContent className="p-4 text-sm text-muted-foreground">Last updated {formatDate(client.lastActivity)}. More audit activity can be added here as workflow events are recorded.</CardContent></Card>
