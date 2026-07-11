@@ -63,6 +63,11 @@ interface LateFeeRule {
   flat_below_5L?: number;
   max_equals_tds?: boolean;
   flat?: boolean;
+  // GSTR-9 (Notification 07/2023): unlike the GST monthly/quarterly shape
+  // above (one per_day rate, cap scales by slab), GSTR-9's per-day rate
+  // itself changes by turnover slab, not just the cap. turnover_upto: null
+  // marks the last (unbounded) slab; slabs must be ascending by turnover_upto.
+  slabs?: { turnover_upto: number | null; per_day: number; max_percentage: number }[];
 }
 
 export async function fetchComplianceRulesFromSupabase(): Promise<ComplianceRule[]> {
@@ -166,6 +171,14 @@ export function computeLateFee(rule: ComplianceRule, daysLate: number, inputs: P
   if (feeRule.nil_per_day != null && inputs.isNilReturn) {
     const amount = Math.min(daysLate * feeRule.nil_per_day, feeRule.nil_max ?? Infinity);
     return { amount, breakdown: `Nil return: ₹${feeRule.nil_per_day}/day × ${daysLate} days${feeRule.nil_max ? ` (capped at ₹${feeRule.nil_max})` : ""}` };
+  }
+
+  if (feeRule.slabs) {
+    const turnover = inputs.turnover ?? 0;
+    const slab = feeRule.slabs.find((s) => s.turnover_upto == null || turnover <= s.turnover_upto) ?? feeRule.slabs[feeRule.slabs.length - 1];
+    const cap = Math.round(turnover * slab.max_percentage);
+    const amount = Math.min(daysLate * slab.per_day, cap);
+    return { amount, breakdown: `₹${slab.per_day}/day × ${daysLate} days (capped at ${(slab.max_percentage * 100).toFixed(2)}% of turnover = ₹${cap.toLocaleString("en-IN")})` };
   }
 
   if (feeRule.max_percentage != null) {
