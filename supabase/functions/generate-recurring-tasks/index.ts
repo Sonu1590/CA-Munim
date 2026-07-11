@@ -117,9 +117,16 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
 
-  const today = new Date()
-  const calMonth = today.getMonth() + 1 // 1-12
-  const calYear = today.getFullYear()
+  // Deno edge functions run in UTC regardless of the business's IST
+  // timezone. Shifting by the IST offset and reading UTC getters on the
+  // shifted instant (rather than local getters, which would apply the
+  // runtime's own UTC offset a second time) makes calMonth/calYear match
+  // IST regardless of runtime TZ. Matters most in the ~5.5-hour window
+  // right at IST midnight (18:30 UTC) — e.g. 31 Mar 23:00 UTC is already
+  // 1 Apr 04:30 IST, which flips the financial year.
+  const today = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
+  const calMonth = today.getUTCMonth() + 1 // 1-12
+  const calYear = today.getUTCFullYear()
   const fyStartYear = calMonth >= 4 ? calYear : calYear - 1
   const financialYear = `FY ${fyStartYear}-${String(fyStartYear + 1).slice(2)}`
 

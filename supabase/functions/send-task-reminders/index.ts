@@ -7,6 +7,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 // instead of being skipped forever once it falls outside a single day's window.
 const REMINDER_WINDOW_DAYS = 3
 
+// Deno edge functions run in UTC regardless of the business's IST
+// timezone. Shifting by the IST offset before extracting a calendar date
+// (rather than using the runtime's local getters/toISOString(), both of
+// which are UTC-anchored here) makes "today" match the IST calendar date
+// even in the ~5.5-hour window right at IST midnight (18:30 UTC), where
+// UTC and IST disagree on what day it is.
+function istDateString(d: Date): string {
+  return new Date(d.getTime() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
 // Mirrors toMetaPhone() in send-whatsapp/index.ts — duplicated rather than
 // shared, since each edge function is a standalone Deno deployable.
 function toMetaPhone(phone: string): string {
@@ -38,11 +48,10 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
 
-  const today = new Date()
-  const windowEnd = new Date(today)
-  windowEnd.setDate(windowEnd.getDate() + REMINDER_WINDOW_DAYS)
-  const todayStr = today.toISOString().slice(0, 10)
-  const windowEndStr = windowEnd.toISOString().slice(0, 10)
+  const now = new Date()
+  const windowEnd = new Date(now.getTime() + REMINDER_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+  const todayStr = istDateString(now)
+  const windowEndStr = istDateString(windowEnd)
 
   // Every firm's tasks in one pass — this is a scheduled system job, not a
   // per-user request, so it deliberately runs without firm scoping and

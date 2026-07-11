@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { generateFinancialYears } from '@/lib/indianTaxUtils'
 
 export type TaskStatus = "pending" | "in_progress" | "completed"
 export type TaskPriority = "low" | "medium" | "high" | "urgent"
@@ -64,14 +65,7 @@ export const dueDateRules: Record<string, string> = {
   "AOC-4": "30 days from AGM date",
 }
 
-export const financialYears = [
-  "FY 2022-23",
-  "FY 2023-24",
-  "FY 2024-25",
-  "FY 2025-26",
-  "FY 2026-27",
-  "FY 2027-28",
-]
+export const financialYears = generateFinancialYears()
 export const quarters = ["Q1 (Apr-Jun)", "Q2 (Jul-Sep)", "Q3 (Oct-Dec)", "Q4 (Jan-Mar)"]
 export const months = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"]
 

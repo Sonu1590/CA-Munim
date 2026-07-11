@@ -13,6 +13,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { useFinancialYear } from "@/context/financialYear";
 import { financialYears as availableFinancialYears } from "@/data/Tasks";
+import { roundMoney } from "@/lib/indianTaxUtils";
 
 interface CreateInvoiceModalProps {
   open: boolean;
@@ -68,11 +69,11 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
     });
   }, []);
 
-  const subtotal = lineItems.reduce((s, li) => s + (parseFloat(li.amount) || 0), 0);
-  const cgst = gstEnabled && isSameState ? subtotal * 0.09 : 0;
-  const sgst = gstEnabled && isSameState ? subtotal * 0.09 : 0;
-  const igst = gstEnabled && !isSameState ? subtotal * 0.18 : 0;
-  const grandTotal = subtotal + cgst + sgst + igst;
+  const subtotal = roundMoney(lineItems.reduce((s, li) => s + (parseFloat(li.amount) || 0), 0));
+  const cgst = gstEnabled && isSameState ? roundMoney(subtotal * 0.09) : 0;
+  const sgst = gstEnabled && isSameState ? roundMoney(subtotal * 0.09) : 0;
+  const igst = gstEnabled && !isSameState ? roundMoney(subtotal * 0.18) : 0;
+  const grandTotal = roundMoney(subtotal + cgst + sgst + igst);
 
   // ── Generate preview invoice number matching backend format ──────────────────
   const generateInvoiceNumberPreview = (): string => {
@@ -123,6 +124,7 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
         })),
         notes,
         send_whatsapp: sendWhatsApp,
+        gst_applicable: gstEnabled,
       }, "", firmState);
 
       if (!invoiceId) {
