@@ -70,6 +70,11 @@ const rocJurisdictions = [
 
 const mcaFilings = ["MGT-7", "AOC-4", "DIR-3 KYC", "ADT-1", "INC-20A", "PAS-3"];
 
+const months = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
 export function AddClientModal({ open, onOpenChange, onSave, client }: AddClientModalProps) {
   const [clientType, setClientType] = useState<string>("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -86,9 +91,20 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
   const [pin, setPin] = useState("");
   const [dob, setDob] = useState("");
   const [gstRegDate, setGstRegDate] = useState("");
+  const [gstTurnoverCategory, setGstTurnoverCategory] = useState("");
   const [gstFilingFreq, setGstFilingFreq] = useState("");
-  const [compRegDate, setCompRegDate] = useState("");
+  const [gstOnFees, setGstOnFees] = useState(true);
+  const [directorName, setDirectorName] = useState("");
+  const [aadhaarValue, setAadhaarValue] = useState("");
+  const [tanValue, setTanValue] = useState("");
+  const [itaxWard, setItaxWard] = useState("");
+  const [itrType, setItrType] = useState("");
+  const [cinLlpin, setCinLlpin] = useState("");
+  const [rocJurisdiction, setRocJurisdiction] = useState("");
+  const [agmDueMonth, setAgmDueMonth] = useState("");
   const [annualFees, setAnnualFees] = useState("");
+  const [billingFrequency, setBillingFrequency] = useState("");
+  const [preferredPaymentMode, setPreferredPaymentMode] = useState("");
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,12 +131,16 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
     if (!open) return;
     const hasValue = [
       clientType, fullName, panValue, gstinValue, phone, altPhone, email, address,
-      city, state, pin, dob, gstRegDate, gstFilingFreq, compRegDate, annualFees,
-    ].some(Boolean) || selectedServices.length > 0 || selectedMcaFilings.length > 0;
+      city, state, pin, dob, gstRegDate, gstTurnoverCategory, gstFilingFreq,
+      directorName, aadhaarValue, tanValue, itaxWard, itrType, cinLlpin,
+      rocJurisdiction, agmDueMonth, annualFees, billingFrequency, preferredPaymentMode,
+    ].some(Boolean) || selectedServices.length > 0 || selectedMcaFilings.length > 0 || !gstOnFees;
     setIsDirty(hasValue);
   }, [
     open, clientType, fullName, panValue, gstinValue, phone, altPhone, email, address,
-    city, state, pin, dob, gstRegDate, gstFilingFreq, compRegDate, annualFees, selectedServices,
+    city, state, pin, dob, gstRegDate, gstTurnoverCategory, gstFilingFreq, gstOnFees,
+    directorName, aadhaarValue, tanValue, itaxWard, itrType, cinLlpin, rocJurisdiction,
+    agmDueMonth, annualFees, billingFrequency, preferredPaymentMode, selectedServices,
     selectedMcaFilings,
   ]);
 
@@ -140,9 +160,20 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
     setPin("");
     setDob("");
     setGstRegDate("");
+    setGstTurnoverCategory("");
     setGstFilingFreq("");
-    setCompRegDate("");
+    setGstOnFees(true);
+    setDirectorName("");
+    setAadhaarValue("");
+    setTanValue("");
+    setItaxWard("");
+    setItrType("");
+    setCinLlpin("");
+    setRocJurisdiction("");
+    setAgmDueMonth("");
     setAnnualFees("");
+    setBillingFrequency("");
+    setPreferredPaymentMode("");
     setIsDirty(false);
     setError(null);
   };
@@ -152,7 +183,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
 
     setClientType(client?.type ?? "");
     setSelectedServices(client?.servicesSubscribed ?? []);
-    setSelectedMcaFilings([]);
+    setSelectedMcaFilings(client?.mca_filings ?? []);
     setFullName(client?.name ?? "");
     setPanValue(client?.pan ?? "");
     setGstinValue(client?.gstin ?? "");
@@ -162,12 +193,23 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
     setAddress(client?.address ?? "");
     setCity(client?.city ?? "");
     setState(client?.state ?? "");
-    setPin("");
+    setPin(client?.pin ?? "");
     setDob(client?.date_of_birth ?? "");
     setGstRegDate(client?.gst_reg_date ?? "");
+    setGstTurnoverCategory(client?.gst_turnover_category ?? "");
     setGstFilingFreq(client?.gst_filing_freq ?? "");
-    setCompRegDate("");
+    setGstOnFees(client?.gst_on_fees ?? true);
+    setDirectorName(client?.directors?.[0]?.name ?? "");
+    setAadhaarValue(client?.aadhaar_masked ?? "");
+    setTanValue(client?.tan ?? "");
+    setItaxWard(client?.itax_ward ?? "");
+    setItrType(client?.itr_type ?? "");
+    setCinLlpin(client?.cin_llpin ?? "");
+    setRocJurisdiction(client?.roc_jurisdiction ?? "");
+    setAgmDueMonth(client?.agm_due_month ? String(client.agm_due_month) : "");
     setAnnualFees(client?.annual_fees ? String(client.annual_fees) : "");
+    setBillingFrequency(client?.billing_frequency ?? "");
+    setPreferredPaymentMode(client?.preferred_payment_mode ?? "");
     setError(null);
     setIsDirty(false);
   }, [open, client]);
@@ -211,12 +253,24 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
         city,
         state,
         pin,
+        aadhaar_masked: aadhaarValue,
         gstin: gstinValue,
         gst_reg_date: gstRegDate,
+        gst_turnover_category: gstTurnoverCategory,
         gst_filing_freq: gstFilingFreq,
+        gst_on_fees: gstOnFees,
+        tan: tanValue,
+        itax_ward: itaxWard,
+        itr_type: itrType,
+        cin_llpin: cinLlpin,
+        roc_jurisdiction: rocJurisdiction,
+        directors: directorName.trim() ? [{ name: directorName.trim(), din: "" }] : [],
+        agm_due_month: agmDueMonth ? Number(agmDueMonth) : undefined,
         services_subscribed: selectedServices,
         mca_filings: selectedMcaFilings,
         annual_fees: annualFees ? Number(annualFees) : 0,
+        billing_frequency: billingFrequency,
+        preferred_payment_mode: preferredPaymentMode,
       });
       if (result === false || (typeof result === "object" && result !== null && "success" in result && !result.success)) {
         setError(
@@ -265,7 +319,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="fatherName">Father's / Director's Name</Label>
-                  <Input id="fatherName" placeholder="Optional" />
+                  <Input id="fatherName" placeholder="Optional" value={directorName} onChange={(e) => setDirectorName(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="dob">Date of Birth / Incorporation *</Label>
@@ -318,7 +372,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="aadhaar">Aadhaar Number</Label>
-                  <Input id="aadhaar" placeholder="XXXX-XXXX-1234" maxLength={14} />
+                  <Input id="aadhaar" placeholder="XXXX-XXXX-1234" maxLength={14} value={aadhaarValue} onChange={(e) => setAadhaarValue(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="phone">Phone *</Label>
@@ -409,7 +463,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                 </div>
                 <div className="space-y-1.5">
                   <Label>GST Turnover Category</Label>
-                  <Select>
+                  <Select value={gstTurnoverCategory} onValueChange={(v) => { setIsDirty(true); setGstTurnoverCategory(v); }}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
                       {["Nil", "Up to ₹1.5cr", "₹1.5cr–5cr", "Above ₹5cr"].map((v) => (
@@ -430,30 +484,20 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="tan">TAN Number</Label>
-                  <Input id="tan" className="font-mono uppercase" placeholder="Optional" />
+                  <Input id="tan" className="font-mono uppercase" placeholder="Optional" value={tanValue} onChange={(e) => setTanValue(e.target.value.toUpperCase())} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="ward">IT Ward / AO Code</Label>
-                  <Input id="ward" placeholder="Optional" />
+                  <Input id="ward" placeholder="Optional" value={itaxWard} onChange={(e) => setItaxWard(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>ITR Type</Label>
-                  <Select>
+                  <Select value={itrType} onValueChange={(v) => { setIsDirty(true); setItrType(v); }}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
                       {itrTypes.map((t) => (
                         <SelectItem key={t} value={t}>{t}</SelectItem>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Advance Tax Applicable</Label>
-                  <Select>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Yes">Yes</SelectItem>
-                      <SelectItem value="No">No</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -471,11 +515,11 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label htmlFor="cin">CIN / LLPIN</Label>
-                      <Input id="cin" className="font-mono uppercase" />
+                      <Input id="cin" className="font-mono uppercase" value={cinLlpin} onChange={(e) => setCinLlpin(e.target.value.toUpperCase())} />
                     </div>
                     <div className="space-y-1.5">
                       <Label>ROC Jurisdiction</Label>
-                      <Select>
+                      <Select value={rocJurisdiction} onValueChange={(v) => { setIsDirty(true); setRocJurisdiction(v); }}>
                         <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent>
                           {rocJurisdictions.map((r) => (
@@ -485,21 +529,16 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="compRegDate">Registration Date</Label>
-                      <DatePickerField
-                        id="compRegDate"
-                        value={compRegDate}
-                        onChange={(value) => {
-                          setIsDirty(true);
-                          setCompRegDate(value);
-                        }}
-                        placeholder="dd/mm/yyyy"
-                      />
-                      <FYHint date={compRegDate} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="authCap">Authorized Capital (₹)</Label>
-                      <Input id="authCap" type="number" placeholder="₹" />
+                      <Label>AGM Due Month</Label>
+                      <Select value={agmDueMonth} onValueChange={(v) => { setIsDirty(true); setAgmDueMonth(v); }}>
+                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>
+                          {months.map((m, idx) => (
+                            <SelectItem key={m} value={String(idx + 1)}>{m}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground mt-1">Drives MGT-7/AOC-4/ADT-1 due dates.</p>
                     </div>
                     <div className="space-y-1.5 sm:col-span-2">
                       <Label>MCA Filings Applicable</Label>
@@ -554,7 +593,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                 </div>
                 <div className="space-y-1.5">
                   <Label>GST on Fees (18%)</Label>
-                  <Select>
+                  <Select value={gstOnFees ? "Yes" : "No"} onValueChange={(v) => { setIsDirty(true); setGstOnFees(v === "Yes"); }}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Yes">Yes</SelectItem>
@@ -564,7 +603,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                 </div>
                 <div className="space-y-1.5">
                   <Label>Billing Frequency</Label>
-                  <Select>
+                  <Select value={billingFrequency} onValueChange={(v) => { setIsDirty(true); setBillingFrequency(v); }}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
                       {["Monthly", "Quarterly", "Annually", "Per Task"].map((f) => (
@@ -575,7 +614,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                 </div>
                 <div className="space-y-1.5">
                   <Label>Payment Mode</Label>
-                  <Select>
+                  <Select value={preferredPaymentMode} onValueChange={(v) => { setIsDirty(true); setPreferredPaymentMode(v); }}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
                       {["UPI", "Bank Transfer", "Cash", "Cheque"].map((m) => (
