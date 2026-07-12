@@ -61,7 +61,19 @@ interface RelativeToAgmRule {
   offset_days: number;
 }
 
-type DueDateRule = FixedDateRule | FixedDayRule | RelativeToAgmRule;
+// "relative_to_client_date": one-time, event-based filings (INC-20A, PAS-3)
+// due N days after a specific date already captured on the client record —
+// not derived from the FY at all, unlike every other rule shape here.
+// `field` names which clients column holds that date; the caller resolves
+// the actual value (computeDueDate takes it as a plain string, not a
+// client object, to keep this module free of a Client type dependency).
+interface RelativeToClientDateRule {
+  type: "relative_to_client_date";
+  field: "date_of_birth" | "last_allotment_date";
+  offset_days: number;
+}
+
+type DueDateRule = FixedDateRule | FixedDayRule | RelativeToAgmRule | RelativeToClientDateRule;
 
 interface LateFeeRule {
   type?: "flat";
@@ -127,8 +139,12 @@ export function selectRuleForFY(rules: ComplianceRule[], filingType: string, fyS
  * FY2025-26 Q4/year-end return), not the due date itself.
  * `agmDueMonth` (1-12) is only needed for "relative_to_agm" rules
  * (MGT-7/AOC-4/ADT-1) — a client's clients.agm_due_month.
+ * `clientDate` (YYYY-MM-DD) is only needed for "relative_to_client_date"
+ * rules (INC-20A/PAS-3) — whichever client column the rule's `field` names
+ * (the caller resolves which one, since this module doesn't know Client's
+ * shape).
  */
-export function computeDueDate(rule: ComplianceRule, fyStartYear: number, period?: { month: number; year: number }, agmDueMonth?: number): string | null {
+export function computeDueDate(rule: ComplianceRule, fyStartYear: number, period?: { month: number; year: number }, agmDueMonth?: number, clientDate?: string): string | null {
   const dueDateRule = rule.dueDateRule;
   if (!dueDateRule) return null;
 
@@ -151,6 +167,19 @@ export function computeDueDate(rule: ComplianceRule, fyStartYear: number, period
     // 1-indexed, passing it directly as monthIndex lands on the last day
     // of agmDueMonth itself.
     const dueDate = new Date(Date.UTC(agmYear, agmDueMonth, 0));
+    dueDate.setUTCDate(dueDate.getUTCDate() + dueDateRule.offset_days);
+    return dueDate.toISOString().split("T")[0];
+  }
+
+  if (dueDateRule.type === "relative_to_client_date") {
+    if (!clientDate) return null;
+    // Same pure-UTC-arithmetic discipline as relative_to_agm above —
+    // parsing the YYYY-MM-DD components directly into Date.UTC rather than
+    // `new Date(clientDate)`, which parses date-only strings as UTC but
+    // would still invite the local-timezone bug if clientDate ever carried
+    // a time component.
+    const [y, m, d] = clientDate.split("-").map(Number);
+    const dueDate = new Date(Date.UTC(y, m - 1, d));
     dueDate.setUTCDate(dueDate.getUTCDate() + dueDateRule.offset_days);
     return dueDate.toISOString().split("T")[0];
   }

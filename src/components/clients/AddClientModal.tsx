@@ -102,6 +102,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
   const [cinLlpin, setCinLlpin] = useState("");
   const [rocJurisdiction, setRocJurisdiction] = useState("");
   const [agmDueMonth, setAgmDueMonth] = useState("");
+  const [lastAllotmentDate, setLastAllotmentDate] = useState("");
   const [annualFees, setAnnualFees] = useState("");
   const [billingFrequency, setBillingFrequency] = useState("");
   const [preferredPaymentMode, setPreferredPaymentMode] = useState("");
@@ -133,14 +134,14 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
       clientType, fullName, panValue, gstinValue, phone, altPhone, email, address,
       city, state, pin, dob, gstRegDate, gstTurnoverCategory, gstFilingFreq,
       directorName, aadhaarValue, tanValue, itaxWard, itrType, cinLlpin,
-      rocJurisdiction, agmDueMonth, annualFees, billingFrequency, preferredPaymentMode,
+      rocJurisdiction, agmDueMonth, lastAllotmentDate, annualFees, billingFrequency, preferredPaymentMode,
     ].some(Boolean) || selectedServices.length > 0 || selectedMcaFilings.length > 0 || !gstOnFees;
     setIsDirty(hasValue);
   }, [
     open, clientType, fullName, panValue, gstinValue, phone, altPhone, email, address,
     city, state, pin, dob, gstRegDate, gstTurnoverCategory, gstFilingFreq, gstOnFees,
     directorName, aadhaarValue, tanValue, itaxWard, itrType, cinLlpin, rocJurisdiction,
-    agmDueMonth, annualFees, billingFrequency, preferredPaymentMode, selectedServices,
+    agmDueMonth, lastAllotmentDate, annualFees, billingFrequency, preferredPaymentMode, selectedServices,
     selectedMcaFilings,
   ]);
 
@@ -171,6 +172,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
     setCinLlpin("");
     setRocJurisdiction("");
     setAgmDueMonth("");
+    setLastAllotmentDate("");
     setAnnualFees("");
     setBillingFrequency("");
     setPreferredPaymentMode("");
@@ -207,6 +209,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
     setCinLlpin(client?.cin_llpin ?? "");
     setRocJurisdiction(client?.roc_jurisdiction ?? "");
     setAgmDueMonth(client?.agm_due_month ? String(client.agm_due_month) : "");
+    setLastAllotmentDate(client?.last_allotment_date ?? "");
     setAnnualFees(client?.annual_fees ? String(client.annual_fees) : "");
     setBillingFrequency(client?.billing_frequency ?? "");
     setPreferredPaymentMode(client?.preferred_payment_mode ?? "");
@@ -266,6 +269,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
         roc_jurisdiction: rocJurisdiction,
         directors: directorName.trim() ? [{ name: directorName.trim(), din: "" }] : [],
         agm_due_month: agmDueMonth ? Number(agmDueMonth) : undefined,
+        last_allotment_date: lastAllotmentDate,
         services_subscribed: selectedServices,
         mca_filings: selectedMcaFilings,
         annual_fees: annualFees ? Number(annualFees) : 0,
@@ -539,6 +543,19 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                         </SelectContent>
                       </Select>
                       <p className="text-[11px] text-muted-foreground mt-1">Drives MGT-7/AOC-4/ADT-1 due dates.</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="lastAllotmentDate">Last Share Allotment Date</Label>
+                      <DatePickerField
+                        id="lastAllotmentDate"
+                        value={lastAllotmentDate}
+                        onChange={(value) => {
+                          setIsDirty(true);
+                          setLastAllotmentDate(value);
+                        }}
+                        placeholder="dd/mm/yyyy"
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-1">Drives PAS-3 due date.</p>
                     </div>
                     <div className="space-y-1.5 sm:col-span-2">
                       <Label>MCA Filings Applicable</Label>
