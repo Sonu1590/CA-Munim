@@ -6,10 +6,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 // Runs daily, well before send-task-reminders, so a newly-generated task
 // already has lead time before that scan's 3-day window.
 //
-// Deliberately excludes: ROC forms that need an AGM date to compute a due
-// date (MGT-7, AOC-4, ADT-1 — clients.agm_due_month is a column but nothing
-// in the UI sets it yet), and event-based/one-time services (Company
-// Incorporation, IEC, MSME Registration, INC-20A, PAS-3).
+// MGT-7/AOC-4/ADT-1 (Companies Act ROC forms) are relative to a client's
+// AGM, not the FY -- clients.agm_due_month (now wired up in AddClientModal)
+// drives their due dates; clients who haven't set it are silently skipped
+// for just those three filing types, same as the QRMP skip below skips a
+// non-quarter-end month.
+//
+// Still deliberately excludes: event-based/one-time services (Company
+// Incorporation, IEC, MSME Registration, INC-20A, PAS-3) -- their due
+// dates are relative to an incorporation/allotment event date that isn't
+// captured per-client anywhere yet, a different and larger gap than AGM
+// month.
 //
 // GST cadence: clients.gst_filing_freq (now wired up in AddClientModal) is
 // read below to switch GSTR-1/GSTR-3B to quarterly QRMP rules for clients
@@ -33,9 +40,13 @@ const SERVICE_TASK_MAP: Record<string, { taskTypes: string[]; cadence: "monthly"
 }
 
 // mca_filings is a separate multi-select (MGT-7/AOC-4/DIR-3 KYC/ADT-1/
-// INC-20A/PAS-3) — only DIR-3 KYC has a due date computable from the FY
-// alone, so it's the only one auto-generated here.
-const RECURRING_MCA_FILINGS = new Set(["DIR-3 KYC"])
+// INC-20A/PAS-3). DIR-3 KYC's due date is computable from the FY alone;
+// MGT-7/AOC-4/ADT-1 additionally need clients.agm_due_month (checked
+// per-client below, not here — a client without it set is skipped just
+// for these three, not excluded from the whole recurrence pass).
+// INC-20A/PAS-3 remain excluded — event-based, no per-client date captured.
+const RECURRING_MCA_FILINGS = new Set(["DIR-3 KYC", "MGT-7", "AOC-4", "ADT-1"])
+const AGM_RELATIVE_MCA_FILINGS = new Set(["MGT-7", "AOC-4", "ADT-1"])
 
 // Mirrors src/lib/gstQrmp.ts (Deno edge functions can't share a module with
 // the Vite frontend) — CGST Notification 85/2020's QRMP state split.
@@ -61,13 +72,16 @@ const FILING_TYPE_MAP: Record<string, string> = {
   "ITR Filing": "ITR_NON_AUDIT",
   "Tax Audit": "TAX_AUDIT",
   "DIR-3 KYC": "DIR-3 KYC",
+  "MGT-7": "MGT-7",
+  "AOC-4": "AOC-4",
+  "ADT-1": "ADT-1",
 }
 
 const pad = (n: number) => String(n).padStart(2, "0")
 
 // Condensed port of computeDueDate from src/data/ComplianceRules.ts — same
 // duplication tradeoff as FILING_TYPE_MAP above.
-function computeDueDate(rule: any, fyStartYear: number, period?: { month: number; year: number }): string | null {
+function computeDueDate(rule: any, fyStartYear: number, period?: { month: number; year: number }, agmDueMonth?: number): string | null {
   const r = rule.due_date_rule
   if (!r) return null
 
@@ -75,6 +89,14 @@ function computeDueDate(rule: any, fyStartYear: number, period?: { month: number
     const yearOffset = r.year_offset ?? (rule.period_type === "annual" ? 1 : r.month <= 3 ? 1 : 0)
     const year = fyStartYear + yearOffset
     return `${year}-${pad(r.month)}-${pad(r.day)}`
+  }
+
+  if (r.type === "relative_to_agm") {
+    if (agmDueMonth == null) return null
+    const agmYear = fyStartYear + 1
+    const dueDate = new Date(Date.UTC(agmYear, agmDueMonth, 0))
+    dueDate.setUTCDate(dueDate.getUTCDate() + r.offset_days)
+    return dueDate.toISOString().split("T")[0]
   }
 
   if (!period) return null
@@ -149,7 +171,7 @@ serve(async (req) => {
 
   const { data: clients, error: clientsError } = await supabase
     .from('clients')
-    .select('id, firm_id, services_subscribed, mca_filings, gst_filing_freq, state')
+    .select('id, firm_id, services_subscribed, mca_filings, gst_filing_freq, state, agm_due_month')
     .eq('is_active', true)
   if (clientsError) {
     return new Response(JSON.stringify({ error: clientsError.message }), { status: 500 })
@@ -171,7 +193,11 @@ serve(async (req) => {
       }
     }
     for (const filing of (client.mca_filings as string[] | null) ?? []) {
-      if (RECURRING_MCA_FILINGS.has(filing)) wants.push({ taskType: filing, cadence: "annual" })
+      if (!RECURRING_MCA_FILINGS.has(filing)) continue
+      // Skip just this filing type, not the client's whole recurrence pass,
+      // when it needs an AGM month the client hasn't set yet.
+      if (AGM_RELATIVE_MCA_FILINGS.has(filing) && client.agm_due_month == null) continue
+      wants.push({ taskType: filing, cadence: "annual" })
     }
 
     for (const { taskType, cadence } of wants) {
@@ -202,7 +228,7 @@ serve(async (req) => {
           dueDate = computeDueDate(rule, fyStartYear, quarterlyPeriod)
           targetPeriod = calendarMonthToName(quarterlyPeriod.month)
         } else {
-          dueDate = computeDueDate(rule, completedFYStart)
+          dueDate = computeDueDate(rule, completedFYStart, undefined, client.agm_due_month as number | undefined)
           targetPeriod = "Annual"
           targetFY = `FY ${completedFYStart}-${String(completedFYStart + 1).slice(2)}`
         }

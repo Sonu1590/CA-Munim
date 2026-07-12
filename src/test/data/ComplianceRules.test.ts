@@ -82,6 +82,30 @@ describe("computeDueDate", () => {
     const r = rule({ periodType: "quarterly", dueDateRule: { type: "fixed_day", day: 13, month_offset: 1 } });
     expect(computeDueDate(r, 2025, { month: 9, year: 2025 })).toBe("2025-10-13");
   });
+
+  it("computes MGT-7/AOC-4/ADT-1 due dates relative to the client's AGM month", () => {
+    const mgt7 = rule({ periodType: "annual", dueDateRule: { type: "relative_to_agm", offset_days: 60 } });
+    const aoc4 = rule({ periodType: "annual", dueDateRule: { type: "relative_to_agm", offset_days: 30 } });
+    const adt1 = rule({ periodType: "annual", dueDateRule: { type: "relative_to_agm", offset_days: 15 } });
+    // FY 2025-26 (fyStartYear 2025) -> AGM falls in calendar year 2026.
+    // agm_due_month 9 (September) -> AGM due 30 Sep 2026.
+    expect(computeDueDate(aoc4, 2025, undefined, 9)).toBe("2026-10-30"); // 30 days after 30 Sep
+    expect(computeDueDate(mgt7, 2025, undefined, 9)).toBe("2026-11-29"); // 60 days after 30 Sep
+    expect(computeDueDate(adt1, 2025, undefined, 9)).toBe("2026-10-15"); // 15 days after 30 Sep
+  });
+
+  it("returns null for relative_to_agm rules when the client has no agm_due_month set", () => {
+    const mgt7 = rule({ periodType: "annual", dueDateRule: { type: "relative_to_agm", offset_days: 60 } });
+    expect(computeDueDate(mgt7, 2025)).toBeNull();
+  });
+
+  it("handles a February AGM month correctly (last day of Feb, non-leap and leap years)", () => {
+    const aoc4 = rule({ periodType: "annual", dueDateRule: { type: "relative_to_agm", offset_days: 30 } });
+    // FY 2026-27 -> AGM calendar year 2027, Feb has 28 days (not a leap year).
+    expect(computeDueDate(aoc4, 2026, undefined, 2)).toBe("2027-03-30"); // 28 Feb 2027 + 30 days
+    // FY 2027-28 -> AGM calendar year 2028, a leap year (Feb has 29 days).
+    expect(computeDueDate(aoc4, 2027, undefined, 2)).toBe("2028-03-30"); // 29 Feb 2028 + 30 days
+  });
 });
 
 describe("computeLateFee", () => {
