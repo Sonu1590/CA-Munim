@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Eye, EyeOff, Loader2, Plus, Trash2, Pencil, KeyRound, ShieldAlert, AlertTriangle } from "lucide-react";
+import { Eye, EyeOff, Loader2, Plus, Trash2, Pencil, KeyRound, ShieldAlert, AlertTriangle, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import {
   fetchClientPortalCredentials, saveClientPortalCredential, revealClientPortalCredential, deleteClientPortalCredential,
@@ -14,6 +15,17 @@ import {
   dscExpiryStatus,
   type ClientPortalCredential, type ClientDscRecord,
 } from "@/data/ClientCredentials";
+
+// (M10) A password re-confirmation is required before any reveal — a
+// deliberately deferred hardening step, added once it was clear the admin
+// role reveals were the only credential-vault control left unrated.
+// Verification is cached for a few minutes so an admin doing legitimate
+// bulk work (checking several clients' portal logins in a row) isn't
+// re-prompted on every single reveal; the server-side rate limit
+// (check_reveal_rate_limit(), called inside both reveal RPCs) is the real
+// backstop against abuse, this is just step-up friction against e.g. an
+// unattended unlocked tab.
+const REAUTH_VALID_MS = 5 * 60 * 1000;
 
 const dscStatusStyle: Record<string, string> = {
   expired: "bg-destructive/10 text-destructive",
@@ -32,12 +44,17 @@ const dscStatusLabel: Record<string, string> = {
 // One "Reveal" control for either a portal password or a DSC PIN — fetches
 // the plaintext on click (never preloaded with the list) and re-masks on a
 // second click without re-fetching, since the value is already in memory.
-function RevealField({ reveal }: { reveal: () => Promise<string> }) {
+// `ensureReAuth` (shared across every RevealField in the panel, so the
+// cached 5-minute verification window applies panel-wide, not per-field)
+// must resolve true before the actual reveal RPC is ever called.
+function RevealField({ reveal, ensureReAuth }: { reveal: () => Promise<string>; ensureReAuth: () => Promise<boolean> }) {
   const [value, setValue] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const toggle = async () => {
     if (value !== null) { setValue(null); return; }
+    const authed = await ensureReAuth();
+    if (!authed) return;
     setLoading(true);
     try {
       const v = await reveal();
@@ -56,12 +73,63 @@ function RevealField({ reveal }: { reveal: () => Promise<string> }) {
         type="button"
         onClick={toggle}
         disabled={loading}
-        title={value !== null ? "Hide" : "Reveal — this is logged in the Audit Trail"}
+        title={value !== null ? "Hide" : "Reveal — requires your password and is logged in the Audit Trail"}
         className="text-muted-foreground hover:text-foreground"
       >
         {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : value !== null ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
       </button>
     </span>
+  );
+}
+
+// Prompts for the signed-in admin's own password and re-verifies it via
+// Supabase Auth (the actual server-side check — this component just
+// orchestrates it) before letting a reveal proceed. `onConfirm` returns
+// whether the password was correct so the dialog can show an inline error
+// instead of just closing on failure.
+function ReAuthDialog({
+  open, onConfirm, onCancel,
+}: { open: boolean; onConfirm: (password: string) => Promise<boolean>; onCancel: () => void }) {
+  const [password, setPassword] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) { setPassword(""); setError(null); }
+  }, [open]);
+
+  const handleConfirm = async () => {
+    if (!password) return;
+    setVerifying(true);
+    setError(null);
+    const ok = await onConfirm(password);
+    setVerifying(false);
+    if (!ok) setError("Incorrect password.");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Lock className="h-4 w-4" />Confirm your password</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">Re-enter your password to reveal this credential. You won't be asked again for 5 minutes.</p>
+          <Input
+            type="password"
+            autoFocus
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleConfirm()}
+          />
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>Cancel</Button>
+          <Button onClick={handleConfirm} disabled={verifying || !password}>{verifying ? "Verifying..." : "Confirm"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -188,6 +256,40 @@ export function ClientCredentialsPanel({ clientId }: { clientId: string }) {
   const [credentialModal, setCredentialModal] = useState<"new" | ClientPortalCredential | null>(null);
   const [dscModal, setDscModal] = useState<"new" | ClientDscRecord | null>(null);
 
+  // (M10) Re-auth gate shared by every RevealField in this panel — see
+  // REAUTH_VALID_MS above. reAuthResolveRef holds whichever RevealField's
+  // toggle() is currently waiting on the dialog; only one reveal can be
+  // in flight at a time since it's a modal.
+  const [reAuthOpen, setReAuthOpen] = useState(false);
+  const lastVerifiedAtRef = useRef<number | null>(null);
+  const reAuthResolveRef = useRef<((ok: boolean) => void) | null>(null);
+
+  const ensureReAuth = (): Promise<boolean> => {
+    if (lastVerifiedAtRef.current && Date.now() - lastVerifiedAtRef.current < REAUTH_VALID_MS) {
+      return Promise.resolve(true);
+    }
+    setReAuthOpen(true);
+    return new Promise((resolve) => { reAuthResolveRef.current = resolve; });
+  };
+
+  const handleReAuthConfirm = async (password: string): Promise<boolean> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email) return false;
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email: user.email, password });
+    if (signInErr) return false;
+    lastVerifiedAtRef.current = Date.now();
+    setReAuthOpen(false);
+    reAuthResolveRef.current?.(true);
+    reAuthResolveRef.current = null;
+    return true;
+  };
+
+  const handleReAuthCancel = () => {
+    setReAuthOpen(false);
+    reAuthResolveRef.current?.(false);
+    reAuthResolveRef.current = null;
+  };
+
   const load = async () => {
     setLoading(true);
     setError(null);
@@ -264,7 +366,7 @@ export function ClientCredentialsPanel({ clientId }: { clientId: string }) {
                     <p className="text-xs text-muted-foreground">{c.username || "(no username)"}</p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    {c.hasPassword ? <RevealField reveal={() => revealClientPortalCredential(c.id)} /> : <span className="text-xs text-muted-foreground">(not set)</span>}
+                    {c.hasPassword ? <RevealField reveal={() => revealClientPortalCredential(c.id)} ensureReAuth={ensureReAuth} /> : <span className="text-xs text-muted-foreground">(not set)</span>}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCredentialModal(c)}><Pencil className="h-3.5 w-3.5" /></Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteCredential(c.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div>
@@ -302,7 +404,7 @@ export function ClientCredentialsPanel({ clientId }: { clientId: string }) {
                       </p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      {d.hasPin ? <RevealField reveal={() => revealClientDscPin(d.id)} /> : null}
+                      {d.hasPin ? <RevealField reveal={() => revealClientDscPin(d.id)} ensureReAuth={ensureReAuth} /> : null}
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDscModal(d)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteDsc(d.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
@@ -337,6 +439,8 @@ export function ClientCredentialsPanel({ clientId }: { clientId: string }) {
           />
         )}
       </Dialog>
+
+      <ReAuthDialog open={reAuthOpen} onConfirm={handleReAuthConfirm} onCancel={handleReAuthCancel} />
     </div>
   );
 }
