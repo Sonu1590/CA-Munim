@@ -36,6 +36,7 @@ export interface Client {
   roc_jurisdiction?: string
   directors?: { name: string; din: string }[]
   agm_due_month?: number
+  last_allotment_date?: string
   mca_filings?: string[]
   gst_on_fees?: boolean
   billing_frequency?: string
@@ -69,6 +70,7 @@ export interface ClientFormData {
   roc_jurisdiction?: string
   directors?: { name: string; din: string }[]
   agm_due_month?: number
+  last_allotment_date?: string
   mca_filings?: string[]
   services_subscribed?: string[]
   annual_fees?: number
@@ -160,6 +162,7 @@ export function useClients() {
           roc_jurisdiction,
           directors,
           agm_due_month,
+          last_allotment_date,
           mca_filings,
           services_subscribed,
           annual_fees,
@@ -231,6 +234,7 @@ export function useClients() {
           roc_jurisdiction: row.roc_jurisdiction ?? '',
           directors: row.directors ?? [],
           agm_due_month: row.agm_due_month ?? undefined,
+          last_allotment_date: row.last_allotment_date ?? '',
           mca_filings: row.mca_filings ?? [],
           gst_on_fees: row.gst_on_fees ?? true,
           billing_frequency: row.billing_frequency ?? '',
@@ -317,6 +321,7 @@ if (!staffRow?.firm_id) {
           roc_jurisdiction: formData.roc_jurisdiction,
           directors: formData.directors ?? [],
           agm_due_month: formData.agm_due_month,
+          last_allotment_date: formData.last_allotment_date || null,
           mca_filings: formData.mca_filings ?? [],
           services_subscribed: formData.services_subscribed ?? [],
           annual_fees: formData.annual_fees ?? 0,
@@ -381,6 +386,7 @@ if (!staffRow?.firm_id) {
           roc_jurisdiction: formData.roc_jurisdiction,
           directors: formData.directors,
           agm_due_month: formData.agm_due_month,
+          last_allotment_date: formData.last_allotment_date || null,
           mca_filings: formData.mca_filings,
           services_subscribed: formData.services_subscribed,
           annual_fees: formData.annual_fees,

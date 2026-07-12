@@ -106,6 +106,21 @@ describe("computeDueDate", () => {
     // FY 2027-28 -> AGM calendar year 2028, a leap year (Feb has 29 days).
     expect(computeDueDate(aoc4, 2027, undefined, 2)).toBe("2028-03-30"); // 29 Feb 2028 + 30 days
   });
+
+  it("computes INC-20A due date as 180 days from the client's incorporation date (date_of_birth)", () => {
+    const inc20a = rule({ periodType: "annual", dueDateRule: { type: "relative_to_client_date", field: "date_of_birth", offset_days: 180 } });
+    expect(computeDueDate(inc20a, 2025, undefined, undefined, "2025-01-01")).toBe("2025-06-30");
+  });
+
+  it("computes PAS-3 due date as 30 days from the client's last allotment date", () => {
+    const pas3 = rule({ periodType: "annual", dueDateRule: { type: "relative_to_client_date", field: "last_allotment_date", offset_days: 30 } });
+    expect(computeDueDate(pas3, 2025, undefined, undefined, "2026-01-01")).toBe("2026-01-31");
+  });
+
+  it("returns null for relative_to_client_date rules when the client date is missing", () => {
+    const inc20a = rule({ periodType: "annual", dueDateRule: { type: "relative_to_client_date", field: "date_of_birth", offset_days: 180 } });
+    expect(computeDueDate(inc20a, 2025)).toBeNull();
+  });
 });
 
 describe("computeLateFee", () => {
