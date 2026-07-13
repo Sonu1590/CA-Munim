@@ -7,13 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useClients } from "@/hooks/useClients";
-import { useBilling } from "@/hooks/useBilling";
+import { useBilling, computeInvoiceDueDate, PAYMENT_TERMS_OPTIONS, type PaymentTerms } from "@/hooks/useBilling";
 import { supabase } from "@/lib/supabase";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { useFinancialYear } from "@/context/financialYear";
 import { financialYears as availableFinancialYears } from "@/data/Tasks";
 import { roundMoney } from "@/lib/indianTaxUtils";
+import { formatDateIN } from "@/lib/downloads";
 
 interface CreateInvoiceModalProps {
   open: boolean;
@@ -34,6 +35,7 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split("T")[0]);
   const [fy, setFy] = useState(selectedFY);
   const [gstEnabled, setGstEnabled] = useState(true);
+  const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>("net_15");
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const [sendEmail, setSendEmail] = useState(false);
   const [notes, setNotes] = useState("");
@@ -101,6 +103,7 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
     setInvoiceDate(new Date().toISOString().split("T")[0]);
     setFy(selectedFY);
     setGstEnabled(true);
+    setPaymentTerms("net_15");
     setSendWhatsApp(true);
     setSendEmail(false);
     setNotes("");
@@ -123,6 +126,7 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
           amount: Number(li.amount),
         })),
         notes,
+        payment_terms: paymentTerms,
         send_whatsapp: sendWhatsApp,
         gst_applicable: gstEnabled,
       }, "", firmState);
@@ -277,10 +281,26 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
             </div>
           </div>
 
-          {/* Notes */}
-          <div>
-            <Label className="text-xs">Notes / Payment Terms</Label>
-            <Input placeholder="E.g., Payment due within 15 days" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          {/* Payment terms & notes */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Payment Terms</Label>
+              <Select value={paymentTerms} onValueChange={(v) => setPaymentTerms(v as PaymentTerms)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_TERMS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Due {formatDateIN(computeInvoiceDueDate(invoiceDate, paymentTerms))}
+              </p>
+            </div>
+            <div>
+              <Label className="text-xs">Notes</Label>
+              <Input placeholder="Optional note for the client" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
           </div>
 
           {/* Send options */}

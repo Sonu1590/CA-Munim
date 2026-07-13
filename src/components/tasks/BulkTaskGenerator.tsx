@@ -32,6 +32,18 @@ const FILING_TYPE_MAP: Record<string, string> = {
   "Tax Audit": "TAX_AUDIT",
   "Form 3CD": "TAX_AUDIT",
   "DIR-3 KYC": "DIR-3 KYC",
+  "MGT-7": "MGT-7",
+  "AOC-4": "AOC-4",
+  "ADT-1": "ADT-1",
+  "INC-20A": "INC-20A",
+  "PAS-3": "PAS-3",
+};
+
+// Which clients column feeds a "relative_to_client_date" rule's computeDueDate
+// call, keyed by this UI's TaskType label (see ComplianceRules.ts).
+const CLIENT_DATE_FIELD: Record<string, "date_of_birth" | "last_allotment_date"> = {
+  "INC-20A": "date_of_birth",
+  "PAS-3": "last_allotment_date",
 };
 
 interface Props {
@@ -110,9 +122,18 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
         : "GSTR-1_QRMP";
     }
 
+    const clientDateField = CLIENT_DATE_FIELD[type];
+    const clientDate = clientDateField ? client?.[clientDateField] : undefined;
+
     const rule = filingType ? selectRuleForFY(rules, filingType, fyStart) : undefined;
-    const dueDate = rule ? computeDueDate(rule, fyStart, periodFor(month, fyStart)) : null;
+    const dueDate = rule ? computeDueDate(rule, fyStart, periodFor(month, fyStart), client?.agm_due_month, clientDate) : null;
     if (!dueDate) {
+      // MGT-7/AOC-4/ADT-1 need clients.agm_due_month; INC-20A/PAS-3 need
+      // clients.date_of_birth/last_allotment_date — not every client has
+      // these set yet. Skip quietly rather than falling back to a made-up
+      // date, same as the QRMP skip below.
+      if (rule?.dueDateRule?.type === "relative_to_agm" || rule?.dueDateRule?.type === "relative_to_client_date") return null;
+
       console.error(`No compliance rule found for filing type "${filingType}" — falling back to 20th of following month.`);
       const { month: pMonth, year: pYear } = periodFor(month, fyStart);
       const nextMonth = pMonth === 12 ? 1 : pMonth + 1;
@@ -122,18 +143,23 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
     return dueDate;
   };
 
-  const { plannedTasks, skippedQrmp } = useMemo(() => {
+  const { plannedTasks, skippedQrmp, skippedMissingClientData } = useMemo(() => {
     const plannedTasks: { clientId: string; month: string; dueDate: string }[] = [];
     let skippedQrmp = 0;
+    let skippedMissingClientData = 0;
     for (const clientId of selectedClients) {
       const client = clients.find((c) => c.id === clientId);
       for (const month of selectedMonths) {
         const dueDate = calculateDueDate(taskType, month, client);
-        if (dueDate === null) { skippedQrmp++; continue; }
+        if (dueDate === null) {
+          if (["MGT-7", "AOC-4", "ADT-1", "INC-20A", "PAS-3"].includes(taskType)) skippedMissingClientData++;
+          else skippedQrmp++;
+          continue;
+        }
         plannedTasks.push({ clientId, month, dueDate });
       }
     }
-    return { plannedTasks, skippedQrmp };
+    return { plannedTasks, skippedQrmp, skippedMissingClientData };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClients, selectedMonths, taskType, clients, rules, currentFY]);
 
@@ -313,6 +339,11 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
             {skippedQrmp > 0 && (
               <p className="text-xs text-muted-foreground">
                 {skippedQrmp} client-month{skippedQrmp === 1 ? "" : "s"} skipped — quarterly (QRMP) filers have no return due outside quarter-end months.
+              </p>
+            )}
+            {skippedMissingClientData > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {skippedMissingClientData} client-month{skippedMissingClientData === 1 ? "" : "s"} skipped — client is missing the date this filing type's due date is computed from (AGM Due Month, Date of Birth/Incorporation, or Last Share Allotment Date — Edit Client → Company / ROC Details).
               </p>
             )}
           </div>

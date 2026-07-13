@@ -25,7 +25,24 @@ export interface Client {
   lastActivity: string
   city: string
   state: string
+  pin?: string
+  aadhaar_masked?: string
   gst_filing_freq?: string
+  gst_turnover_category?: string
+  tan?: string
+  itax_ward?: string
+  itr_type?: string
+  cin_llpin?: string
+  roc_jurisdiction?: string
+  directors?: { name: string; din: string }[]
+  agm_due_month?: number
+  last_allotment_date?: string
+  mca_filings?: string[]
+  gst_on_fees?: boolean
+  billing_frequency?: string
+  preferred_payment_mode?: string
+  client_upi_id?: string
+  notes?: string
   servicesSubscribed: string[]
 }
 
@@ -41,6 +58,7 @@ export interface ClientFormData {
   city: string
   state: string
   pin?: string
+  aadhaar_masked?: string
   gstin?: string
   gst_reg_date?: string
   gst_turnover_category?: string
@@ -52,6 +70,7 @@ export interface ClientFormData {
   roc_jurisdiction?: string
   directors?: { name: string; din: string }[]
   agm_due_month?: number
+  last_allotment_date?: string
   mca_filings?: string[]
   services_subscribed?: string[]
   annual_fees?: number
@@ -132,9 +151,26 @@ export function useClients() {
           gst_reg_date,
           city,
           state,
+          pin,
+          aadhaar_masked,
           gst_filing_freq,
+          gst_turnover_category,
+          tan,
+          itax_ward,
+          itr_type,
+          cin_llpin,
+          roc_jurisdiction,
+          directors,
+          agm_due_month,
+          last_allotment_date,
+          mca_filings,
           services_subscribed,
           annual_fees,
+          gst_on_fees,
+          billing_frequency,
+          preferred_payment_mode,
+          client_upi_id,
+          notes,
           updated_at,
           tasks(id, status),
           invoices(total, status)
@@ -187,7 +223,24 @@ export function useClients() {
           lastActivity: row.updated_at?.split('T')[0] ?? '',
           city: row.city ?? '',
           state: row.state ?? '',
+          pin: row.pin ?? '',
+          aadhaar_masked: row.aadhaar_masked ?? '',
           gst_filing_freq: row.gst_filing_freq ?? '',
+          gst_turnover_category: row.gst_turnover_category ?? '',
+          tan: row.tan ?? '',
+          itax_ward: row.itax_ward ?? '',
+          itr_type: row.itr_type ?? '',
+          cin_llpin: row.cin_llpin ?? '',
+          roc_jurisdiction: row.roc_jurisdiction ?? '',
+          directors: row.directors ?? [],
+          agm_due_month: row.agm_due_month ?? undefined,
+          last_allotment_date: row.last_allotment_date ?? '',
+          mca_filings: row.mca_filings ?? [],
+          gst_on_fees: row.gst_on_fees ?? true,
+          billing_frequency: row.billing_frequency ?? '',
+          preferred_payment_mode: row.preferred_payment_mode ?? '',
+          client_upi_id: row.client_upi_id ?? '',
+          notes: row.notes ?? '',
           servicesSubscribed: row.services_subscribed ?? [],
         }
       })
@@ -256,6 +309,7 @@ if (!staffRow?.firm_id) {
           city: formData.city,
           state: formData.state,
           pin: formData.pin,
+          aadhaar_masked: formData.aadhaar_masked,
           gstin: formData.gstin?.toUpperCase(),
           gst_reg_date: formData.gst_reg_date || null,
           gst_turnover_category: formData.gst_turnover_category,
@@ -267,6 +321,7 @@ if (!staffRow?.firm_id) {
           roc_jurisdiction: formData.roc_jurisdiction,
           directors: formData.directors ?? [],
           agm_due_month: formData.agm_due_month,
+          last_allotment_date: formData.last_allotment_date || null,
           mca_filings: formData.mca_filings ?? [],
           services_subscribed: formData.services_subscribed ?? [],
           annual_fees: formData.annual_fees ?? 0,
@@ -318,11 +373,27 @@ if (!staffRow?.firm_id) {
           address: formData.address,
           city: formData.city,
           state: formData.state,
+          pin: formData.pin,
+          aadhaar_masked: formData.aadhaar_masked,
           gstin: formData.gstin?.toUpperCase(),
           gst_reg_date: formData.gst_reg_date || null,
+          gst_turnover_category: formData.gst_turnover_category,
           gst_filing_freq: formData.gst_filing_freq,
+          tan: formData.tan?.toUpperCase(),
+          itax_ward: formData.itax_ward,
+          itr_type: formData.itr_type,
+          cin_llpin: formData.cin_llpin,
+          roc_jurisdiction: formData.roc_jurisdiction,
+          directors: formData.directors,
+          agm_due_month: formData.agm_due_month,
+          last_allotment_date: formData.last_allotment_date || null,
+          mca_filings: formData.mca_filings,
           services_subscribed: formData.services_subscribed,
           annual_fees: formData.annual_fees,
+          gst_on_fees: formData.gst_on_fees,
+          billing_frequency: formData.billing_frequency,
+          preferred_payment_mode: formData.preferred_payment_mode,
+          client_upi_id: formData.client_upi_id,
           notes: formData.notes,
           updated_at: new Date().toISOString(),
         })
