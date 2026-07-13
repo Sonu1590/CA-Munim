@@ -64,7 +64,10 @@ export async function fillInvoiceForm(
   await dialog.getByPlaceholder(/Amount/).first().fill(options.amount ?? '1000');
 
   if (options.notes) {
-    await dialog.getByPlaceholder('E.g., Payment due within 15 days').fill(options.notes);
+    // CreateInvoiceModal split the old combined "Notes / Payment Terms" free
+    // text field into a real Payment Terms <Select> plus a separate Notes
+    // input (M9) — the placeholder changed accordingly.
+    await dialog.getByPlaceholder('Optional note for the client').fill(options.notes);
   }
 }
 

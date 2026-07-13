@@ -203,18 +203,36 @@ test.describe('Settings - invoice settings', () => {
     await expect(page.getByRole('button', { name: /save invoice settings/i })).toBeEnabled();
   });
 
-  // NOT a round-trip-success test like Firm Profile/Compliance — this
-  // documents a real, currently-broken save path (ISSUES.md M15):
-  // saveInvoiceSettingsToSupabase writes a `footer_notes` column that
-  // doesn't exist in `invoice_settings` (the real column is
-  // `default_notes`), so every save fails with a schema-cache error. The
-  // fetch side silently falls back to mockInvoiceSettings on any error, so
-  // the form never actually shows the firm's real settings either — this
-  // panel currently cannot persist anything for any firm.
-  test('saving currently fails with a schema error (M15 — footer_notes column does not exist)', async ({ page }) => {
+  // Real round-trip test — ISSUES.md M13 (wrong column names + RLS-rejected
+  // saves) is now fixed on main, confirmed here by actually changing a
+  // value, saving, reloading, and seeing the change persisted, then
+  // restoring the original value so the firm's real settings end up
+  // unchanged. (An earlier version of this test asserted the *broken*
+  // save-fails error from before the fix landed; that assertion now
+  // correctly fails on its own, which is how the fix was confirmed before
+  // updating this test.)
+  test('changing the invoice prefix persists across a reload, then is restored', async ({ page }) => {
     await expect(page.getByText('Loading invoice settings...')).not.toBeVisible({ timeout: 10_000 });
+    const prefixInput = page.locator('div').filter({ hasText: 'Invoice Number Prefix' }).last().locator('input');
+    const originalPrefix = await prefixInput.inputValue();
+
+    const testPrefix = `PW${Date.now().toString().slice(-6)}`;
+    await prefixInput.fill(testPrefix);
     await page.getByRole('button', { name: /save invoice settings/i }).click();
-    await expectToast(page, /could not find the 'footer_notes' column/i, 15_000);
+    await expectToast(page, /invoice settings saved/i, 15_000);
+
+    // The Tabs component isn't URL-driven (defaultValue="firm"), so a
+    // reload lands back on Firm Profile — switch back to Invoice.
+    await page.reload();
+    await waitForSettingsPage(page);
+    await settingsTab(page, 'Invoice').click();
+    await expect(page.getByText('Loading invoice settings...')).not.toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(`Preview: ${testPrefix}-2526-001`)).toBeVisible();
+
+    // Restore the original value so the firm's real settings are unchanged.
+    await prefixInput.fill(originalPrefix);
+    await page.getByRole('button', { name: /save invoice settings/i }).click();
+    await expectToast(page, /invoice settings saved/i, 15_000);
   });
 });
 
