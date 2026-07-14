@@ -9,11 +9,13 @@
  * - Credentials tab (admin-only — the e2e test account is a verified firm
  *   admin, so this is exercised directly): Portal Credentials and DSC
  *   Register CRUD, including the "Reveal" control that fetches plaintext
- *   on demand (ISSUES.md M10 notes this has no re-auth/rate-limit — a
- *   deliberate, accepted gap, not something to flag again here).
+ *   on demand. ISSUES.md's M10 note (reveal had no re-auth/rate-limit) is
+ *   now fixed on main — every reveal is gated behind a "Confirm your
+ *   password" dialog (cached 5 minutes) plus a server-side rate limit; see
+ *   the "credentials tab - re-auth on reveal (M10)" describe block below.
  */
 import { test, expect } from '@playwright/test';
-import { signIn, expectToast } from './helpers/auth';
+import { signIn, expectToast, TEST_USER } from './helpers/auth';
 import { createClient, goToClients, searchClients, viewClientProfile } from './helpers/clients';
 import { dateOffset, unique } from './helpers/utils';
 import {
@@ -28,6 +30,7 @@ import {
   revealField,
   hideField,
   credentialsDialog,
+  reAuthDialog,
 } from './helpers/clientProfile';
 
 async function openProfile(page: import('@playwright/test').Page) {
@@ -164,5 +167,80 @@ test.describe('Client Profile - credentials tab (admin)', () => {
     await saveCredentialDialog(page);
     await expectToast(page, /holder name is required/i);
     await expect(credentialsDialog(page)).toBeVisible();
+  });
+});
+
+test.describe('Client Profile - re-auth on reveal (M10)', () => {
+  // A fresh page/context per test here (rather than reusing openProfile's
+  // page across cases) matters: the re-auth verification is cached for 5
+  // minutes for the lifetime of the component, so the only reliable way to
+  // guarantee the dialog appears is a brand-new session that has never
+  // revealed anything yet.
+  async function addPortalCredentialForReAuthTests(page: import('@playwright/test').Page) {
+    const client = await openProfile(page);
+    await profileTab(page, 'Credentials').click();
+    const portalName = `ReAuth Portal ${unique('reauth')}`;
+    await openAddPortalCredentialModal(page);
+    await fillPortalCredentialForm(page, { portalName, password: 'ReAuthSecret1' });
+    await saveCredentialDialog(page);
+    await expectToast(page, /credential added/i, 10_000);
+    return { client, portalName };
+  }
+
+  test('first reveal in a session prompts for the password', async ({ page }) => {
+    const { portalName } = await addPortalCredentialForReAuthTests(page);
+    const row = portalCredentialRow(page, portalName);
+
+    await row.locator('button:has(svg.lucide-eye)').click();
+    await expect(reAuthDialog(page)).toBeVisible({ timeout: 5_000 });
+    await expect(reAuthDialog(page).getByText(/re-enter your password to reveal/i)).toBeVisible();
+    await expect(row.getByText('ReAuthSecret1', { exact: true })).not.toBeVisible();
+  });
+
+  test('wrong password shows an inline error and does not reveal', async ({ page }) => {
+    const { portalName } = await addPortalCredentialForReAuthTests(page);
+    const row = portalCredentialRow(page, portalName);
+
+    await row.locator('button:has(svg.lucide-eye)').click();
+    const dialog = reAuthDialog(page);
+    await expect(dialog).toBeVisible({ timeout: 5_000 });
+    await dialog.locator('input[type="password"]').fill('DefinitelyWrongPassword123');
+    await dialog.getByRole('button', { name: 'Confirm' }).click();
+
+    await expect(dialog.getByText('Incorrect password.')).toBeVisible({ timeout: 10_000 });
+    await expect(dialog).toBeVisible(); // stays open for a retry
+    await expect(row.getByText('ReAuthSecret1', { exact: true })).not.toBeVisible();
+  });
+
+  test('cancel closes the dialog without revealing', async ({ page }) => {
+    const { portalName } = await addPortalCredentialForReAuthTests(page);
+    const row = portalCredentialRow(page, portalName);
+
+    await row.locator('button:has(svg.lucide-eye)').click();
+    const dialog = reAuthDialog(page);
+    await expect(dialog).toBeVisible({ timeout: 5_000 });
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+
+    await expect(dialog).not.toBeVisible();
+    await expect(row.getByText('ReAuthSecret1', { exact: true })).not.toBeVisible();
+    // Still masked, not stuck in a loading state.
+    await expect(row.getByText('••••••••')).toBeVisible();
+  });
+
+  test('correct password reveals, and a second reveal in the same session is not re-prompted', async ({ page }) => {
+    const { portalName } = await addPortalCredentialForReAuthTests(page);
+    const row = portalCredentialRow(page, portalName);
+
+    // First reveal — goes through revealField()'s re-auth handling.
+    await revealField(row, TEST_USER.password);
+    await expect(row.getByText('ReAuthSecret1', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await hideField(row);
+    await expect(row.getByText('••••••••')).toBeVisible();
+
+    // Second reveal within the 5-minute cache window — dialog must not
+    // reappear; revealField() would otherwise hang waiting on nothing.
+    await row.locator('button:has(svg.lucide-eye)').click();
+    await expect(reAuthDialog(page)).not.toBeVisible({ timeout: 3_000 });
+    await expect(row.getByText('ReAuthSecret1', { exact: true })).toBeVisible({ timeout: 10_000 });
   });
 });

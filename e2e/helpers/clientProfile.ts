@@ -4,7 +4,7 @@
  * including the (admin-only) Credentials / DSC Register tab.
  */
 import { Page, Locator, expect } from '@playwright/test';
-import { expectToast } from './auth';
+import { expectToast, TEST_USER } from './auth';
 
 export function clientProfileHeading(page: Page, clientName: string) {
   return page.getByRole('heading', { name: clientName, exact: true });
@@ -81,9 +81,26 @@ export function dscRecordRow(page: Page, holderName: string) {
   return page.locator('p.text-sm.font-medium', { hasText: holderName }).locator('xpath=ancestor::div[contains(@class,"flex items-center justify-between gap-3")][1]');
 }
 
-export async function revealField(row: Locator) {
+export function reAuthDialog(page: Page) {
+  return page.getByRole('dialog').filter({ hasText: 'Confirm your password' });
+}
+
+/** (M10) The first reveal in a panel — or any reveal once the 5-minute
+ * cache window has lapsed — prompts for the signed-in admin's own password
+ * via a "Confirm your password" dialog before the actual reveal RPC runs.
+ * Handles that dialog transparently so callers don't need to know whether
+ * this particular reveal will trigger it. */
+export async function revealField(row: Locator, password: string = TEST_USER.password) {
+  const page = row.page();
   const eyeButton = row.locator('button:has(svg.lucide-eye)');
   await eyeButton.click();
+
+  const dialog = reAuthDialog(page);
+  if (await dialog.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await dialog.locator('input[type="password"]').fill(password);
+    await dialog.getByRole('button', { name: 'Confirm' }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+  }
 }
 
 export async function hideField(row: Locator) {
