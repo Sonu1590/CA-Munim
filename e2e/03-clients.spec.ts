@@ -207,15 +207,13 @@ test.describe('Clients — search and filter', () => {
     await filterClientsByType(page, 'Individual');
     await expect(page.locator('table tbody tr', { hasText: seededClient.name })).toBeVisible();
 
+    // Assert directly that the Individual-type seeded client drops out of a
+    // Private Ltd filter, rather than assuming the whole list goes empty —
+    // this shared test project has accumulated real Private Ltd clients
+    // from many past sessions (confirmed live: 3 as of 2026-07), so a
+    // "table is empty" assumption is no longer a safe thing to assert here.
     await filterClientsByType(page, 'Private Ltd');
-    const visible = await page.locator('table tbody tr', { hasText: seededClient.name }).isVisible().catch(() => false);
-    if (visible) {
-      await expect(page.locator('table tbody tr', { hasText: 'Private Ltd' }).first()).toBeVisible();
-    } else {
-      await expect(
-        page.getByText('No clients found matching your search').or(page.getByText('No clients added yet'))
-      ).toBeVisible();
-    }
+    await expect(page.locator('table tbody tr', { hasText: seededClient.name })).not.toBeVisible();
   });
 
   test('clearing search restores broader results', async ({ page }) => {
