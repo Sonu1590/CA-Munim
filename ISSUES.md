@@ -16,17 +16,27 @@ The public upload page (`/upload/:token`) that clients use to send documents to 
 **Where:** RLS policy `doc_requests_public_token` on `public.document_requests`
 The policy grants `SELECT` to role `public` (includes the anonymous key) with the condition `(upload_token IS NOT NULL)`. That is not scoped to a specific token — it exposes **all** document-request rows across **all firms** (client_id, document_type, due_date, upload_token) to anyone with the public anon key. The upload portal only needs to read the single row matching its token. This is a cross-tenant data leak.
 **Fix:** scope the public policy to the exact token being requested (e.g., require `upload_token = <requested token>` via a security-definer RPC or a per-token filter), and prefer a narrow lookup rather than an "is not null" predicate.
+**Confirmed fixed, fix shape (2026-07-14, in response to external review):** `20260702130000_upload_request_lookup.sql` — exactly the recommended shape. Adds `public.get_upload_request(p_token text)`, a `SECURITY DEFINER` RPC (`set search_path = ''`) that looks up a single row by `upload_token = p_token`, then drops the old `doc_requests_public_token` policy entirely so `anon` has no direct `SELECT` on the table at all — every read goes through the token-scoped RPC.
 
 ### C3. Real test-account credentials committed to git
 **File:** `src/.env.test` (tracked in commit `84857b6`)
 Contains a live-looking `TEST_USER_EMAIL` / `TEST_USER_PASSWORD`. Even though `.gitignore` lists `.env.test` at the root, this file lives under `src/` and is committed. Credentials in the repo are a standing exposure.
 **Fix:** remove from git history, rotate the account password, and keep test creds only in CI secrets / untracked local files.
+**Open question (2026-07-14, raised by external review):** the file removal is tagged `(C3)`, but nothing in this repo's history confirms the account's *password* was actually rotated afterward — deleting the file doesn't purge git history, so the old value is still recoverable by anyone who clones the repo. Needs the user to confirm directly with Supabase Auth (can't be verified by reading code); if not yet rotated, do it before anything else on this list.
+
+### C4. Live cron-trigger secret committed in plaintext to a public repo — FIXED (2026-07-14)
+**Files:** `supabase/migrations/20260707120000_scheduled_reminders.sql`, `supabase/migrations/20260708060000_recurring_task_cron.sql`
+Both migrations inlined the literal `x-cron-secret` value (`ktYNhaQ6lKbNr6fNU8wtimgWX3V744Dg`) used to authorize `pg_cron` calling `send-task-reminders`/`generate-recurring-tasks`. Since `verify_jwt` can't apply to a cron-triggered call (no user session to attach a JWT to — see the original migration's own comment), this shared-secret header was the *only* gate on those functions, and the repo being public meant anyone could read it straight out of the migration file, then call either function directly: real WhatsApp template sends to real client phone numbers on the firm's Meta bill (degrading the number's quality rating), or unbounded task generation. Root cause per the original migration's comment: there's no MCP tool to set Edge Function secrets (Dashboard/CLI only), so the value had to be manually kept in sync between the DB cron job and the function's env var, and inlining it in a migration was the shortcut that made that sync possible — at the cost of committing it.
+
+**Fix:** rotated to a new secret, stored *only* in Supabase Vault (`pgsodium`-backed, already used by the client-credential-vault feature) via `vault.create_secret()`, run by hand against the live project — not committed to a migration, for the same reason the leak happened in the first place. Both `cron.job` rows were repointed (`cron.alter_job`, also run by hand) to build the `x-cron-secret` header from `(select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret')` instead of a literal. `supabase/migrations/20260714210000_rotate_cron_secret_to_vault.sql` captures the *structural* change (the vault-lookup command) so it's reproducible from migrations, but deliberately contains no secret value — a fresh environment rebuilt from migrations alone would need its own `vault.create_secret('cron_secret', ...)` run by hand, same as `CRON_SECRET` already required manual setup per project.
+**Still needs the user to do, outside what this session can do:** the Edge Functions' own `CRON_SECRET` env var must be updated to the same new value — that's function config, not database state, and there's still no MCP tool for it. `supabase` CLI is installed and this project is linked, but not logged in (`supabase secrets list` fails with "Access token not provided"). Run: `supabase login`, then `supabase secrets set CRON_SECRET=rAm_wOlO58H5_G_38bJp0tI81y5bnZzXDpQh0OjFga8 --project-ref djzsjkjdvzqxybltikmr`. **Until that command runs, the daily cron calls will 401 silently** (DB now sends the new secret, function still checks the old one) — reminders/recurring-task generation just won't fire, which is a functional regression but not a security one; the exposure itself is already closed the moment this command runs, since the old leaked value stops being valid.
+**Deliberately not done:** git history rewrite to purge the old literal from the two original migration files. Per the same reasoning as L2 below — the value is dead the moment the env var is updated, rotation alone neutralizes the leak, and rewriting a public repo's history has its own risks. Left the original two migration files untouched (accurate historical record); the new migration supersedes their cron-job effect when replayed in order.
 
 ---
 
 ## High
 
-### H1. Three inconsistent firm-creation paths with conflicting `firms.id` semantics
+### H1. Three inconsistent firm-creation paths with conflicting `firms.id` semantics — FIXED
 **Files:** `src/hooks/useAuth.ts` (`signUp`), `src/App.tsx` (`bootstrapMissingRecords`), DB trigger `handle_new_user`
 - `useAuth.signUp` inserts a firm with `id: data.user.id` (firm id **equals** auth user id).
 - `handle_new_user` (DB trigger) inserts a firm with an **auto-generated UUID** and links via `staff.firm_id`.
@@ -34,11 +44,13 @@ Contains a live-looking `TEST_USER_EMAIL` / `TEST_USER_PASSWORD`. Even though `.
 
 `fetchFirmProfileFromSupabase` (`src/data/Settings.ts`) assumes `firms.id = user.id` as its primary query, only falling back to the staff join if that fails. Depending on which path created the account, the firm id means different things. This is fragile and a likely source of "profile not found" / onboarding edge cases.
 **Fix:** pick one canonical path (the DB trigger is the right place) and make the client code stop assuming `firm.id === user.id`.
+**Confirmed fixed (2026-07-14, in response to external review asking whether H1/H2 were addressed):** `47d6af2` ("Collapse conflicting firm-creation paths and fix RLS-blocked repair (H1/H2)") and the `20260702140000_ensure_my_firm_rpc.sql` migration it shipped with — the DB trigger is now the sole creation path, and `Settings.ts`/`App.tsx` route through `ensure_my_firm()` rather than assuming `firm.id === user.id`. See `src/App.tsx`'s `resolveStatus`/`bootstrapMissingRecords` (documented in the root `CLAUDE.md`'s "Auth resolution" section) for the current single-source-of-truth design this replaced the three-path mess with.
 
-### H2. `bootstrapMissingRecords` firm insert is blocked by RLS and fails silently
+### H2. `bootstrapMissingRecords` firm insert is blocked by RLS and fails silently — FIXED
 **File:** `src/App.tsx`
 The `firms` INSERT policy "Allow authenticated users to insert own firm" has `WITH CHECK (auth.uid() = id)`. `bootstrapMissingRecords` inserts a firm with an auto-generated `id` (≠ `auth.uid()`), so the insert is rejected by RLS. The error is swallowed (`catch` only logs), so a user whose signup trigger failed can land in a broken state (no firm, no staff) with no visible error. The recovery path cannot actually recover.
 **Fix:** perform bootstrap via a `SECURITY DEFINER` RPC, or align the insert to satisfy the policy.
+**Confirmed fixed** alongside H1 in the same `47d6af2` / `ensure_my_firm_rpc` change — `bootstrapMissingRecords` now calls the `ensure_my_firm()` RPC (`SECURITY DEFINER`, resolves/creates the caller's firm server-side) instead of a raw client-side insert, so it's no longer blocked by the `auth.uid() = id` policy.
 
 ### H3. Fees Dashboard shows contradictory numbers
 **Live app:** `/billing` → Fees Dashboard
@@ -153,6 +165,12 @@ Two fields were removed rather than bound: **Advance Tax Applicable** and **Auth
 `client_upi_id` and `notes` are not addressed here — they have no UI representation at all (not a broken binding, just an absent feature), out of scope for a "stop silently discarding input" fix.
 
 Verified live: signed in as the real e2e test user, inserted a client with every affected field filled via the exact `addClient`/`updateClient` payload shapes, confirmed all values round-tripped correctly on read, then updated with different values and confirmed the change persisted (not a duplicate row), then cleaned up.
+
+### M17. `fetchInvoicesFromSupabase` fabricated GST for `INV-MOCK*` rows at read time — FIXED (2026-07-14)
+**Files:** `src/data/Billing.ts`
+Flagged by external review (Fable). One live row (`INV-MOCK-0001`, a `draft`, never sent to a client) had `cgst`/`sgst`/`igst` all `0` despite a nonzero subtotal — leftover seed/demo data, not a real invoice. Rather than surfacing that, the read layer special-cased any `INV-MOCK*`-prefixed invoice number with zero stored tax and invented an 18% intra-state split on every fetch, while the stored `total` column stayed at the bare subtotal — the exact "computed vs. stored disagree" bug class M11/M12 already fixed for the create path, just reintroduced at read time for this one row. Confirmed via `information_schema`/a direct query that exactly one row in the live table matched the fallback's condition, so this wasn't a systemic issue masking many bad rows.
+**Fix:** wrote the real numbers once instead of fabricating them forever — `20260714220000_fix_inv_mock_gst_fabrication.sql` sets `cgst=450, sgst=450, igst=0, total=5900` on that row (matching the fallback's own prior assumption, so nothing a user had already seen changes), then deleted the `mockGstFallback`/`fallbackTax` branch from `fetchInvoicesFromSupabase` entirely — it now reads `cgst`/`sgst`/`igst` straight off the row like every other invoice. Verified: re-queried the live row post-migration (`cgst: 450, sgst: 450, igst: 0, total: 5900`), confirmed no other `INV-MOCK*` rows exist, `npx tsc --noEmit` clean, `useBilling.test.ts` (3 tests) still passing.
+Note: M15/M16 are reserved by the in-flight `test/e2e-coverage-expansion` branch (not yet merged) for its own two findings — numbered M17 here to avoid a collision when it merges.
 
 ---
 
