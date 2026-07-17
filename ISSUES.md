@@ -172,6 +172,12 @@ Flagged by external review (Fable). One live row (`INV-MOCK-0001`, a `draft`, ne
 **Fix:** wrote the real numbers once instead of fabricating them forever — `20260714220000_fix_inv_mock_gst_fabrication.sql` sets `cgst=450, sgst=450, igst=0, total=5900` on that row (matching the fallback's own prior assumption, so nothing a user had already seen changes), then deleted the `mockGstFallback`/`fallbackTax` branch from `fetchInvoicesFromSupabase` entirely — it now reads `cgst`/`sgst`/`igst` straight off the row like every other invoice. Verified: re-queried the live row post-migration (`cgst: 450, sgst: 450, igst: 0, total: 5900`), confirmed no other `INV-MOCK*` rows exist, `npx tsc --noEmit` clean, `useBilling.test.ts` (3 tests) still passing.
 Note: M15/M16 are reserved by the in-flight `test/e2e-coverage-expansion` branch (not yet merged) for its own two findings — numbered M17 here to avoid a collision when it merges.
 
+### M18. Create Invoice accepts ₹0 line-item amounts — FIXED (2026-07-15)
+**File:** `src/components/billing/CreateInvoiceModal.tsx`
+Found by the QA automation agent's `16-billing-validation-edge-cases.spec.ts` (on the in-flight `test/e2e-coverage-expansion` branch): `handleSubmit`'s validation was `!li.description || !li.amount`, a truthiness check — and `"0"` is a non-empty string, so it's truthy and sails through. Confirmed live: filling a line item amount of `0` produced the normal "Invoice created successfully!" toast and wrote a real row (`subtotal: 0, total: 0`), consuming a real invoice number with no DB constraint catching it either.
+**Fix:** added `Number(li.amount) > 0` as an explicit check alongside the existing one, with its own error message ("Each line item amount must be greater than ₹0"). Also rejects negative amounts and non-numeric garbage (`Number(...)` on those is `<= 0` or `NaN`, and `NaN > 0` is `false`), not just `0` — the original bug report was specifically about zero, but the same truthiness gap let all three through.
+**Verification note:** typecheck clean; did not click through the live authenticated UI (same constraint as other UI-only fixes this session — the route needs login and this session doesn't type credentials into browser forms). `16-billing-validation-edge-cases.spec.ts` on the QA branch currently documents the *old* (buggy) behavior per that session's "confirmed but unfixed" convention — its assertion needs flipping to expect the new error toast instead of a successful ₹0 invoice once that branch next syncs with main.
+
 ---
 
 ## Low / Cleanup
