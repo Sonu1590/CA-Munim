@@ -113,6 +113,7 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
   const handleSubmit = async () => {
     if (!clientId) return toast.error("Please select a client");
     if (lineItems.some((li) => !li.description || !li.amount)) return toast.error("Please fill all line items");
+    if (lineItems.some((li) => !(Number(li.amount) > 0))) return toast.error("Each line item amount must be greater than ₹0");
 
     setSubmitting(true);
     try {
