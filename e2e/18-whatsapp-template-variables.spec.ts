@@ -4,8 +4,9 @@
  * WhatsApp template `{{variable}}` compilation edge cases not already
  * covered by 07-whatsapp.spec.ts.
  *
- * One test here documents a real, currently-unfixed bug (ISSUES.md M20)
- * rather than asserting ideal behavior — see the comment on it.
+ * One test here documents a real, currently-unfixed bug (ISSUES.md H7,
+ * originally filed as M20 and elevated to High once H5 landed — see the
+ * comment on it) rather than asserting ideal behavior.
  */
 import { test, expect } from './helpers/coverage';
 import { signIn, expectToast } from './helpers/auth';
@@ -42,20 +43,22 @@ test.describe('WhatsApp template variables - unknown/malformed placeholders', ()
 });
 
 test.describe('WhatsApp template variables - firm identity placeholders', () => {
-  // ISSUES.md M20 (related to the already-documented H5): compileTemplateForClient
+  // ISSUES.md H7 (originally filed as M20, then elevated): compileTemplateForClient
   // (src/data/WhatsappApi.ts) hardcodes firm_name/ca_name/ca_phone to
   // "Sharma & Associates"/"CA Rajesh Sharma"/"9876543210" — it has no firm
   // parameter at all, and neither caller (BulkSender, DeliveryStatus's
   // retry) passes the signed-in firm's real profile. Every one of the 8
   // default templates signs off with "— {{firm_name}}", so this isn't an
-  // edge case: it's what every firm sees by default. H5 currently means
-  // the *actual* WhatsApp delivery is always Meta's generic "hello_world"
-  // sandbox template regardless, so this doesn't yet reach a real client's
-  // phone — but it's already visibly wrong in the in-app preview (this
-  // test's assertion) and in what gets logged to whatsapp_sent_messages,
-  // and would become directly client-facing the moment H5 is fixed without
-  // this also being fixed.
-  test('the bulk-send preview shows the hardcoded demo firm name, not the real signed-in firm (M20)', async ({ page }) => {
+  // edge case: it's what every firm sees by default. This was filed as
+  // Medium when H5 (real Meta sends ignoring the selected template/
+  // variables) was still open, since nothing with real variables reached a
+  // client's phone yet either way. H5 is now fixed and the 4 production
+  // templates are registered with Meta (PENDING review as of this
+  // writing) — once approved, sending any of them pulls parameters from
+  // this exact hardcoded map straight to a real client's phone, with no
+  // further code change needed to trigger it. See ISSUES.md H7 for the
+  // full severity writeup.
+  test('the bulk-send preview shows the hardcoded demo firm name, not the real signed-in firm (H7)', async ({ page }) => {
     await signIn(page);
     await goToWhatsApp(page, 'bulk');
     await expect(page.getByText('Loading templates...')).not.toBeVisible({ timeout: 10_000 });
