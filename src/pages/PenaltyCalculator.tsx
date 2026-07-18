@@ -22,6 +22,8 @@ export default function PenaltyCalculator() {
   const [filingId, setFilingId] = useState("");
   const [dueDate, setDueDate] = useState<Date>();
   const [actualDate, setActualDate] = useState<Date>();
+  const [dueDateOpen, setDueDateOpen] = useState(false);
+  const [actualDateOpen, setActualDateOpen] = useState(false);
   const [turnover, setTurnover] = useState("");
   const [isNilReturn, setIsNilReturn] = useState(false);
   const [incomeBelow5L, setIncomeBelow5L] = useState(false);
@@ -85,7 +87,7 @@ export default function PenaltyCalculator() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Original Due Date</Label>
-                <Popover>
+                <Popover open={dueDateOpen} onOpenChange={setDueDateOpen} modal>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className={cn("w-full justify-start text-left font-normal mt-1", !dueDate && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
@@ -93,14 +95,23 @@ export default function PenaltyCalculator() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={dueDate} onSelect={setDueDate} initialFocus className="p-3 pointer-events-auto" />
+                    <Calendar
+                      mode="single"
+                      selected={dueDate}
+                      onSelect={(date) => {
+                        setDueDate(date);
+                        setDueDateOpen(false);
+                      }}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
                   </PopoverContent>
                 </Popover>
                 <FYHint date={dueDate} />
               </div>
               <div>
                 <Label>Actual Filing Date</Label>
-                <Popover>
+                <Popover open={actualDateOpen} onOpenChange={setActualDateOpen} modal>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className={cn("w-full justify-start text-left font-normal mt-1", !actualDate && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
@@ -108,7 +119,16 @@ export default function PenaltyCalculator() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={actualDate} onSelect={setActualDate} initialFocus className="p-3 pointer-events-auto" />
+                    <Calendar
+                      mode="single"
+                      selected={actualDate}
+                      onSelect={(date) => {
+                        setActualDate(date);
+                        setActualDateOpen(false);
+                      }}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
                   </PopoverContent>
                 </Popover>
                 <FYHint date={actualDate} />

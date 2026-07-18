@@ -65,6 +65,7 @@ export function AddTaskModal({
   const [period, setPeriod] = useState("Q1");
 
   const [dueDate, setDueDate] = useState<Date>();
+  const [dueDateOpen, setDueDateOpen] = useState(false);
 
   const [priority, setPriority] = useState<TaskPriority>("medium");
 
@@ -335,7 +336,7 @@ export function AddTaskModal({
               Due Date
             </label>
 
-            <Popover>
+            <Popover open={dueDateOpen} onOpenChange={setDueDateOpen} modal>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -362,7 +363,10 @@ export function AddTaskModal({
                 <Calendar
                   mode="single"
                   selected={dueDate}
-                  onSelect={setDueDate}
+                  onSelect={(date) => {
+                    setDueDate(date);
+                    setDueDateOpen(false);
+                  }}
                   initialFocus
                 />
               </PopoverContent>
