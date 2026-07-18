@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { compileTemplateForClient, defaultTemplates, fetchMessageTemplatesFromSupabase, MessageTemplate, sendBulkWhatsAppMessages,TemplateCategory } from "@/data/WhatsappApi";
 import { fetchClientsFromSupabase, type Client } from "@/data/Clients";
+import { fetchFirmProfileFromSupabase, type FirmProfile } from "@/data/Settings";
 import { Send, ChevronRight, ChevronLeft, Search, Clock, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
@@ -36,6 +37,7 @@ export function BulkSender() {
 
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [firmProfile, setFirmProfile] = useState<FirmProfile | null>(null);
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [clientsLoading, setClientsLoading] = useState(true);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
@@ -73,8 +75,20 @@ export function BulkSender() {
       }
     };
 
+    const loadFirmProfile = async () => {
+      try {
+        const profile = await fetchFirmProfileFromSupabase();
+        setFirmProfile(profile);
+      } catch {
+        // Non-fatal — compileTemplateForClient falls back to generic
+        // placeholder text ("Your CA Firm") rather than a fabricated name.
+        setFirmProfile(null);
+      }
+    };
+
     loadTemplates();
     loadClients();
+    loadFirmProfile();
   }, []);
 
   const getFilteredClients = () => {
@@ -105,12 +119,12 @@ export function BulkSender() {
 
   const renderPreview = (client: Client) => {
     if (!template) return "";
-    return compileTemplateForClient(template, client, selectedFY).text;
+    return compileTemplateForClient(template, client, selectedFY, firmProfile ?? undefined).text;
   };
 
   const getTemplateParameters = (client: Client): string[] => {
     if (!template) return [];
-    return compileTemplateForClient(template, client, selectedFY).parameters;
+    return compileTemplateForClient(template, client, selectedFY, firmProfile ?? undefined).parameters;
   };
 
   const handleSend = async () => {

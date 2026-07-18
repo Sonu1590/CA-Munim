@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { compileTemplateForClient, fetchMessageTemplatesFromSupabase, fetchSentMessagesFromSupabase, sendBulkWhatsAppMessages, SentMessage } from "@/data/WhatsappApi";
 import { fetchClientsFromSupabase } from "@/data/Clients";
+import { fetchFirmProfileFromSupabase } from "@/data/Settings";
 import { useFinancialYear } from "@/context/financialYear";
 import { Search, RefreshCw, Check, CheckCheck, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -47,9 +48,10 @@ export function DeliveryStatus() {
   const handleRetry = async (msg: SentMessage) => {
     setRetryingId(msg.id);
     try {
-      const [allClients, allTemplates] = await Promise.all([
+      const [allClients, allTemplates, firmProfile] = await Promise.all([
         fetchClientsFromSupabase(),
         fetchMessageTemplatesFromSupabase(),
+        fetchFirmProfileFromSupabase().catch(() => null),
       ]);
 
       const client = allClients.find((c) => c.id === msg.clientId);
@@ -58,7 +60,7 @@ export function DeliveryStatus() {
       const template = allTemplates.find((t) => t.name === msg.templateName);
       if (!template) throw new Error("This template no longer exists.");
 
-      const { text, parameters } = compileTemplateForClient(template, client, selectedFY);
+      const { text, parameters } = compileTemplateForClient(template, client, selectedFY, firmProfile ?? undefined);
 
       await sendBulkWhatsAppMessages(
         [{ id: client.id, name: client.name, phone: client.phone }],

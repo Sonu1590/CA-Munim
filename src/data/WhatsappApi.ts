@@ -22,13 +22,14 @@ export interface MessageTemplate {
 export function compileTemplateForClient(
   template: MessageTemplate,
   client: { name: string; pendingFees?: number; servicesSubscribed?: string[] },
-  financialYear: string
+  financialYear: string,
+  firm?: { firmName?: string; caName?: string; phone?: string }
 ): { text: string; parameters: string[] } {
   const replacements: Record<string, string> = {
     client_name: client.name,
-    firm_name: "Sharma & Associates",
-    ca_name: "CA Rajesh Sharma",
-    ca_phone: "9876543210",
+    firm_name: firm?.firmName || "Your CA Firm",
+    ca_name: firm?.caName || "Your CA",
+    ca_phone: firm?.phone || "N/A",
     due_date: new Date().toLocaleDateString("en-IN"),
     filing_type: client.servicesSubscribed?.[0] ?? "Compliance filing",
     doc_name: "N/A",

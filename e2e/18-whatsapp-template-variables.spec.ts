@@ -3,10 +3,6 @@
  *
  * WhatsApp template `{{variable}}` compilation edge cases not already
  * covered by 07-whatsapp.spec.ts.
- *
- * One test here documents a real, currently-unfixed bug (ISSUES.md H7,
- * originally filed as M20 and elevated to High once H5 landed — see the
- * comment on it) rather than asserting ideal behavior.
  */
 import { test, expect } from './helpers/coverage';
 import { signIn, expectToast } from './helpers/auth';
@@ -43,22 +39,11 @@ test.describe('WhatsApp template variables - unknown/malformed placeholders', ()
 });
 
 test.describe('WhatsApp template variables - firm identity placeholders', () => {
-  // ISSUES.md H7 (originally filed as M20, then elevated): compileTemplateForClient
-  // (src/data/WhatsappApi.ts) hardcodes firm_name/ca_name/ca_phone to
-  // "Sharma & Associates"/"CA Rajesh Sharma"/"9876543210" — it has no firm
-  // parameter at all, and neither caller (BulkSender, DeliveryStatus's
-  // retry) passes the signed-in firm's real profile. Every one of the 8
-  // default templates signs off with "— {{firm_name}}", so this isn't an
-  // edge case: it's what every firm sees by default. This was filed as
-  // Medium when H5 (real Meta sends ignoring the selected template/
-  // variables) was still open, since nothing with real variables reached a
-  // client's phone yet either way. H5 is now fixed and the 4 production
-  // templates are registered with Meta (PENDING review as of this
-  // writing) — once approved, sending any of them pulls parameters from
-  // this exact hardcoded map straight to a real client's phone, with no
-  // further code change needed to trigger it. See ISSUES.md H7 for the
-  // full severity writeup.
-  test('the bulk-send preview shows the hardcoded demo firm name, not the real signed-in firm (H7)', async ({ page }) => {
+  // ISSUES.md H7 (fixed): compileTemplateForClient now takes an optional
+  // firm parameter, populated from fetchFirmProfileFromSupabase() by both
+  // callers (BulkSender's preview/send, DeliveryStatus's retry) instead of
+  // hardcoding "Sharma & Associates"/"CA Rajesh Sharma"/"9876543210".
+  test('the bulk-send preview shows the real signed-in firm name, not demo data (H7)', async ({ page }) => {
     await signIn(page);
     await goToWhatsApp(page, 'bulk');
     await expect(page.getByText('Loading templates...')).not.toBeVisible({ timeout: 10_000 });
@@ -87,8 +72,8 @@ test.describe('WhatsApp template variables - firm identity placeholders', () => 
     await expect(page.getByText('Preview Messages')).toBeVisible();
     const previewBubble = page.locator('div.rounded-xl.bg-\\[\\#dcf8c6\\]').first();
     await expect(previewBubble).toBeVisible({ timeout: 10_000 });
-    await expect(previewBubble.getByText('Sharma & Associates', { exact: false })).toBeVisible();
-    // The real signed-in firm's name never appears in the compiled message.
-    await expect(previewBubble.getByText('BE10X User', { exact: false })).not.toBeVisible();
+    await expect(previewBubble.getByText('BE10X User', { exact: false })).toBeVisible();
+    // The hardcoded demo firm name never appears in the compiled message.
+    await expect(previewBubble.getByText('Sharma & Associates', { exact: false })).not.toBeVisible();
   });
 });
