@@ -30,6 +30,7 @@ dev-dist
 
 # Playwright
 playwright-report/
+playwright-results.json
 test-results/
 blob-report/
 
@@ -43,6 +44,8 @@ trace.zip
 
 # Coverage
 coverage/
+coverage-e2e/
+.nyc_output/
 
 # Vercel
 .vercel

@@ -1,0 +1,8 @@
+{
+  "all": true,
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["src/test/**", "src/components/ui/**", "src/**/*.d.ts", "src/main.tsx", "src/vite-env.d.ts"],
+  "reporter": ["text", "html", "text-summary"],
+  "report-dir": "coverage-e2e",
+  "temp-dir": ".nyc_output"
+}

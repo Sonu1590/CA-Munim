@@ -11,7 +11,7 @@
  * - Forgot password
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/coverage';
 import {
   signIn,
   signOut,
