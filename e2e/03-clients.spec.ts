@@ -11,7 +11,7 @@
  * - Error resilience
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/coverage';
 import { signIn, expectToast } from './helpers/auth';
 import {
   goToClients,

@@ -293,7 +293,7 @@ describe("AuthPage", () => {
 
     await waitFor(() => {
       expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalledWith("reset@example.com", {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       });
     });
     expect(mockToast.success).toHaveBeenCalledWith("Password reset email sent. Check your inbox.");

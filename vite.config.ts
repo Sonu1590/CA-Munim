@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
+import istanbul from "vite-plugin-istanbul";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -16,6 +17,16 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     mode === "development" && componentTagger(),
+    // Only instruments source when COVERAGE=true (set by npm run
+    // test:e2e:coverage) — never in normal dev/build, so day-to-day work
+    // isn't slowed down or shipped with instrumentation.
+    process.env.COVERAGE === "true" &&
+      istanbul({
+        include: "src/*",
+        exclude: ["node_modules", "src/test/**", "src/components/ui/**"],
+        extension: [".ts", ".tsx"],
+        requireEnv: false,
+      }),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico"],

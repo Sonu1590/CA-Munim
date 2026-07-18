@@ -13,7 +13,7 @@
  * - FY badge is current
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/coverage';
 import { signIn } from './helpers/auth';
 import { getCurrentFY } from './helpers/utils';
 import {
