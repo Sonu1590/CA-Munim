@@ -8,7 +8,7 @@
 
 ## Critical
 
-### C1. Client upload portal never actually uploads files
+### C1. Client upload portal never actually uploads files — FIXED (`f1e7e2b`)
 **File:** `src/pages/UploadPortal.tsx` (`handleFiles`, `handleSubmit`)
 The public upload page (`/upload/:token`) that clients use to send documents to their CA **simulates** an upload with a `setInterval` progress bar and never writes the file anywhere. `handleSubmit` only updates `document_requests.status = 'uploaded'`. There is no `supabase.storage.from('ca-munim-documents').upload(...)` call. Result: the CA sees the request marked "uploaded," but the actual document does not exist. This defeats the core purpose of the document-collection feature. A private storage bucket `ca-munim-documents` exists but is never written to.
 
@@ -60,7 +60,7 @@ The `firms` INSERT policy "Allow authenticated users to insert own firm" has `WI
 **Fix:** perform bootstrap via a `SECURITY DEFINER` RPC, or align the insert to satisfy the policy.
 **Confirmed fixed** alongside H1 in the same `47d6af2` / `ensure_my_firm_rpc` change — `bootstrapMissingRecords` now calls the `ensure_my_firm()` RPC (`SECURITY DEFINER`, resolves/creates the caller's firm server-side) instead of a raw client-side insert, so it's no longer blocked by the `auth.uid() = id` policy.
 
-### H3. Fees Dashboard shows contradictory numbers
+### H3. Fees Dashboard shows contradictory numbers — FIXED (`b7b0e00`)
 **Live app:** `/billing` → Fees Dashboard
 The summary cards report **Total Outstanding ₹30,680** and **Overdue Invoices 4**, while the list below says **"No outstanding invoices 🎉"**. The four invoices are all in `Draft` status. The aggregate cards and the list use different definitions of "outstanding" (drafts are counted in one but excluded from the other). Users can't trust either number.
 **Fix:** define "outstanding" once (drafts should almost certainly be excluded) and use it consistently for cards, counts, and the list.
@@ -97,7 +97,7 @@ Domain review (2026-07-06) found the hardcoded Indian tax/compliance rules ship 
 
 ## Medium
 
-### M1. TypeScript compilation errors in shipped code
+### M1. TypeScript compilation errors in shipped code — FIXED (`a578a45`)
 `npx tsc --noEmit` reports 5 errors:
 - `src/components/dashboard/QuickActions.tsx:86` and `src/pages/Clients.tsx:165` — comparing a `ClientMutationResult` object to a boolean (`=== true`/`=== false`), so the check is always the wrong branch.
 - `src/components/tasks/AddTaskModal.tsx:145` — `string` assigned to `TaskPriority`.
@@ -105,7 +105,7 @@ Domain review (2026-07-06) found the hardcoded Indian tax/compliance rules ship 
 
 The `ClientMutationResult` comparisons (M1a) are real logic bugs: `addClient`/`updateClient` return `{ success, error }`, and code comparing that object with `=== true` will never take the success branch — success/error toasts and modal-close behavior may be wrong.
 
-### M2. `send-whatsapp` edge function has no auth/authorization or input validation
+### M2. `send-whatsapp` edge function has no auth/authorization or input validation — FIXED (`02a29a7`)
 **File:** `supabase/functions/send-whatsapp/index.ts`
 - `Access-Control-Allow-Origin: '*'` — any origin can call it.
 - It reads `phoneNumbers` from the body and blindly sends WhatsApp templates to each, with no check that the caller owns those clients (or is even authenticated within the function). `config.toml` sets `verify_jwt = true`, which requires a valid JWT, but the function itself does no per-firm authorization — any authenticated user could send to arbitrary phone numbers, burning the firm's WhatsApp quota / spamming.
@@ -116,11 +116,11 @@ The `ClientMutationResult` comparisons (M1a) are real logic bugs: `addClient`/`u
 **File:** `.env` (untracked, but present locally)
 A real-looking `WHATSAPP_ACCESS_TOKEN` is in the working tree. It is not in git history (good), but confirm it is only stored as a Supabase function secret in production and rotate it if it has been shared. Long-lived Meta tokens are high-value.
 
-### M4. Document-received flow is in-memory mock only
+### M4. Document-received flow is in-memory mock only — FIXED (`b22f388`)
 **File:** `src/lib/taskChecklistStore.ts`
 `taskChecklistStore` seeds from `mockTasks` and keeps checklist state in a module-level `Map`. `markReceivedByLabel` (called by the upload portal on submit) mutates this in-memory mock, not the database. So "document received" never persists and resets on reload, and it operates against mock tasks rather than the signed-in firm's real tasks.
 
-### M5. Supabase security advisor warnings
+### M5. Supabase security advisor warnings — FIXED (`a01aa70`)
 From the Supabase linter:
 - `subscription_plans` has RLS enabled but **no policy** → table returns nothing to everyone (or is misconfigured).
 - `get_my_firm_id` and `handle_new_user` are `SECURITY DEFINER` with a **mutable `search_path`** — should be pinned (`SET search_path = ''` / explicit schema) to prevent search-path hijacking.
@@ -131,7 +131,7 @@ From the Supabase linter:
 `firms` has both the older `auth.uid() = id` policies and the newer `id = get_my_firm_id()` policies simultaneously. Because policies are OR'd, this widens access unpredictably and makes the effective rule hard to reason about. Consolidate to a single scheme.
 **Re-checked against the live DB:** already resolved, no code change needed. The old `auth.uid() = id`-keyed policies ("Allow authenticated users to insert/select/update own firm") were dropped by the H1/H2 fix (`20260702140000_ensure_my_firm_rpc.sql`), which moved firm creation to the `ensure_my_firm_rpc()` RPC — this was never tagged `(M6)` even though it fixed it. Live `firms` now has exactly two policies, both scoped by `get_my_firm_id()`: `firms_select` (read) and `firms_update_admin` (admin-only write). No duplication, no OR'd widening, and intentionally no INSERT/DELETE policy (creation only via the RPC). One real gap found and fixed: `firms_select` itself had never been defined in any tracked migration (it predates this repo's migration-file convention) — `20260711180000_m6_firms_rls_trail.sql` adds it as a no-op-against-live migration so the schema is fully reproducible from migrations alone.
 
-### M7. No PAN/phone uniqueness or validation on clients
+### M7. No PAN/phone uniqueness or validation on clients — FIXED (`5699f88`)
 **Live app:** `/clients`
 Two clients ("dummy client", "sss") share PAN `ABCDE1234F`; two others share phone `7507327755`. PAN has a fixed legal format and should be unique per firm; there's no validation or dedupe, which will cause confusion and bad reminders.
 
@@ -218,13 +218,13 @@ Currently latent for actual message *delivery* because of H5 (the real Meta send
 ### L2. Committed Supabase config in git history
 `VITE_SUPABASE_URL` and the publishable anon key were committed (`.env`, commit `80c9007`). The anon key is designed to be public, so impact is low, but committing `.env` at all is a bad pattern — ensure the root `.env` stays untracked (the `.gitignore` currently contains an unresolved merge conflict, see L3).
 
-### L3. Unresolved merge-conflict markers in `.gitignore`
+### L3. Unresolved merge-conflict markers in `.gitignore` — FIXED (`c96e5f2`)
 `.gitignore` contains `<<<<<<< HEAD` / `=======` / `>>>>>>>` markers. It still works by luck but should be cleaned up.
 
-### L4. Onboarding/auth resolution falls back to "onboarding" on any error
+### L4. Onboarding/auth resolution falls back to "onboarding" on any error — FIXED (`d674c12`)
 `resolveStatus` in `src/App.tsx` treats any query error as "go to onboarding." A transient network/RLS error will bounce a fully-onboarded user back into onboarding. Consider distinguishing transient errors from a genuine "no record" state.
 
-### L5. Compliance content hardcoded/stale
+### L5. Compliance content hardcoded/stale — FIXED (`a752464`)
 `src/data/Settings.ts` ships hardcoded `mockComplianceUpdates` and `mockFirmProfile` (Sharma & Associates) dated 2025. Confirm these mocks aren't surfacing anywhere in production UI.
 
 ---
