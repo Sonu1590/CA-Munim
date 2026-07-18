@@ -25,7 +25,7 @@
  *      TEST_USER's actual password and break every other spec's signIn()
  *      for the rest of this shared test account's life.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/coverage';
 import { signIn, expectToast, switchToSignUpTab, authModeTab } from './helpers/auth';
 
 test.describe('Forgot Password - email enumeration and mode gating', () => {

@@ -22,7 +22,7 @@
  * leaving a handful of small dummy files from real upload-path runs is a
  * negligible cost against the value of testing that path for real.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/coverage';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';

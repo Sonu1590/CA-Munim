@@ -14,7 +14,7 @@
  *   password" dialog (cached 5 minutes) plus a server-side rate limit; see
  *   the "credentials tab - re-auth on reveal (M10)" describe block below.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/coverage';
 import { signIn, expectToast, TEST_USER } from './helpers/auth';
 import { createClient, goToClients, searchClients, viewClientProfile } from './helpers/clients';
 import { dateOffset, unique } from './helpers/utils';

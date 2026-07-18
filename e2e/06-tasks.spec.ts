@@ -12,7 +12,7 @@
  * - Bulk Task Generator wizard
  * - Mobile layout, navigation, and refresh
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/coverage';
 import { signIn, expectToast, TEST_TASK } from './helpers/auth';
 import { createClient, goToClients } from './helpers/clients';
 import {

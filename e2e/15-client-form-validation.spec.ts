@@ -6,7 +6,7 @@
  * not GSTIN). GSTIN gets the same kind of live-validation UI as PAN — a
  * checkmark/X icon plus a state-code preview — and had zero coverage.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/coverage';
 import { signIn } from './helpers/auth';
 import { goToClients, openAddClientModal, clientDialog } from './helpers/clients';
 

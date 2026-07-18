@@ -11,7 +11,7 @@
  *   live WhatsApp API)
  * - Mobile layout, navigation, and refresh
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/coverage';
 import { signIn, expectToast } from './helpers/auth';
 import { unique } from './helpers/utils';
 import {

@@ -20,7 +20,7 @@
  * - Compliance (filing categories): toggles one category off then back on
  *   in the same test, so the firm's real config ends the test unchanged.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/coverage';
 import { signIn, expectToast } from './helpers/auth';
 import { unique } from './helpers/utils';
 import { settingsPageHeading, settingsTab, goToSettings, waitForSettingsPage } from './helpers/settings';

@@ -8,7 +8,7 @@
  *   Client Ledger, Compliance Calendar, Staff Productivity
  * - Tab switching, mobile short labels, navigation, and refresh
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/coverage';
 import { signIn } from './helpers/auth';
 import {
   reportsPageHeading,

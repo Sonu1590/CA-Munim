@@ -9,7 +9,7 @@
  * Allotment Date (PAS-3) — confirming they actually round-trip through a
  * save + edit-reopen, the same way ISSUES.md's M14 entry verified live.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/coverage';
 import { signIn, expectToast } from './helpers/auth';
 import {
   goToClients,

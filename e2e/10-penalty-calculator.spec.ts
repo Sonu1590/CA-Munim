@@ -12,7 +12,7 @@
  *   ComplianceRules.test.ts (see ISSUES.md H6)
  * - FY hint, navigation, and mobile layout
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/coverage';
 import { signIn } from './helpers/auth';
 import {
   penaltyCalculatorHeading,
