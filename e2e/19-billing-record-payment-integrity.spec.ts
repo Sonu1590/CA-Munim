@@ -1,32 +1,20 @@
 /**
  * e2e/19-billing-record-payment-integrity.spec.ts
  *
- * Documents a real, currently-unfixed CRITICAL bug — ISSUES.md C5 — rather
- * than asserting ideal behavior. Existing coverage (05-billing.spec.ts's
- * "Billing - payment" describe block) only tests the amount-validation
- * error path; nothing previously exercised an actual successful
- * submission all the way through.
- *
- * RecordPaymentModal's "Record Payment" button shows a real-looking
- * success toast ("Full payment of ₹X recorded — Invoice marked as Paid")
- * and closes the dialog, but never calls useBilling's recordPayment() —
- * no payments row is inserted and the invoice's status is never updated.
- * Same bug class as the already-documented C1 (upload portal never
- * uploads) — a feature that fully simulates success with no backing
- * write. See ISSUES.md C5 for the full writeup, including direct-DB
- * confirmation (payments count = 0, invoice status still 'draft' after a
- * "successful" full payment).
- *
- * Once C5 is fixed, this test's final assertion should flip from "still
- * shows Draft" to "now shows Paid".
+ * ISSUES.md C5 (fixed): RecordPaymentModal previously showed a real-looking
+ * success toast and closed the dialog without ever calling useBilling's
+ * recordPayment() — no payments row was inserted and the invoice's status
+ * never changed. Now wired through properly; this test reloads the page
+ * after a "successful" payment to bypass any client-side optimistic state
+ * and confirm the real row was actually updated, not just the UI.
  */
 import { test, expect } from './helpers/coverage';
 import { signIn } from './helpers/auth';
 import { createClient, goToClients } from './helpers/clients';
 import { goToBilling, createInvoiceForClient, invoiceRow, billingSearchInput, invoiceDialog, waitForBillingPage } from './helpers/billing';
 
-test.describe('Billing - Record Payment does not persist (C5)', () => {
-  test('a "successful" full payment shows a Paid toast but the invoice is still Draft after reload', async ({ page }) => {
+test.describe('Billing - Record Payment persists (C5)', () => {
+  test('a full payment shows a Paid toast and the invoice is Paid after reload', async ({ page }) => {
     await signIn(page);
     await goToClients(page);
     const client = await createClient(page);
@@ -50,19 +38,17 @@ test.describe('Billing - Record Payment does not persist (C5)', () => {
     await page.getByRole('option', { name: 'UPI', exact: true }).click();
     await dialog.getByRole('button', { name: 'Record Payment' }).click();
 
-    // The UI claims success...
     await expect(page.getByText(/full payment of ₹1,180 recorded — invoice marked as paid/i)).toBeVisible({ timeout: 10_000 });
     await expect(dialog).not.toBeVisible({ timeout: 8_000 });
 
-    // ...but nothing was actually written. Reload to bypass any client-side
-    // optimistic state and re-fetch the real row from Supabase.
+    // Reload to bypass any client-side optimistic state and re-fetch the
+    // real row from Supabase — confirms the write actually happened.
     await page.reload();
     await waitForBillingPage(page);
     await billingSearchInput(page).fill(client.name);
     const rowAfterReload = invoiceRow(page, client.name);
     await expect(rowAfterReload).toBeVisible({ timeout: 10_000 });
-    // This is the bug: it should say "Paid" and it still says "Draft".
-    await expect(rowAfterReload.getByText('Draft', { exact: true })).toBeVisible();
-    await expect(rowAfterReload.getByText('Paid', { exact: true })).not.toBeVisible();
+    await expect(rowAfterReload.getByText('Paid', { exact: true })).toBeVisible();
+    await expect(rowAfterReload.getByText('Draft', { exact: true })).not.toBeVisible();
   });
 });

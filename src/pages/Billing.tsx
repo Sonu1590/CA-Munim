@@ -147,6 +147,7 @@ export default function Billing() {
           open={!!paymentInvoice}
           onOpenChange={(open) => !open && setPaymentInvoice(null)}
           invoice={paymentInvoice}
+          onRecorded={loadInvoices}
         />
       </div>
     </AppLayout>

@@ -279,7 +279,8 @@ export function useBilling() {
     amount: number,
     mode: string,
     reference?: string,
-    notes?: string
+    notes?: string,
+    paymentDate?: string
   ): Promise<boolean> => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -299,7 +300,7 @@ export function useBilling() {
           invoice_id: invoiceId,
           client_id: clientId,
           amount,
-          payment_date: new Date().toISOString().split('T')[0],
+          payment_date: paymentDate ?? new Date().toISOString().split('T')[0],
           mode,
           reference,
           notes,

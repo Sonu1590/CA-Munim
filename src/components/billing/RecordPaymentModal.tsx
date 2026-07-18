@@ -5,38 +5,54 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Invoice, PaymentMode } from "@/data/Billing";
+import { useBilling } from "@/hooks/useBilling";
 import { toast } from "@/components/ui/sonner";
 
 interface RecordPaymentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   invoice: Invoice | null;
+  onRecorded?: () => Promise<void> | void;
 }
 
 const paymentModes: PaymentMode[] = ["UPI", "NEFT", "RTGS", "IMPS", "Cash", "Cheque", "Demand Draft"];
 
-export function RecordPaymentModal({ open, onOpenChange, invoice }: RecordPaymentModalProps) {
+export function RecordPaymentModal({ open, onOpenChange, invoice, onRecorded }: RecordPaymentModalProps) {
+  const { recordPayment } = useBilling();
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
   const [amount, setAmount] = useState("");
   const [mode, setMode] = useState<string>("");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   if (!invoice) return null;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const amt = parseFloat(amount);
     if (!amt || amt <= 0) return toast.error("Enter a valid amount");
     if (!mode) return toast.error("Select a payment mode");
     if (amt > invoice.amountDue) return toast.error(`Amount cannot exceed ₹${invoice.amountDue.toLocaleString("en-IN")}`);
 
-    const isFullPayment = amt >= invoice.amountDue;
-    toast.success(
-      isFullPayment
-        ? `Full payment of ₹${amt.toLocaleString("en-IN")} recorded — Invoice marked as Paid`
-        : `Partial payment of ₹${amt.toLocaleString("en-IN")} recorded — Remaining: ₹${(invoice.amountDue - amt).toLocaleString("en-IN")}`
-    );
-    onOpenChange(false);
+    setSubmitting(true);
+    try {
+      const success = await recordPayment(invoice.id, invoice.clientId, amt, mode, reference, notes, paymentDate);
+      if (!success) {
+        toast.error("Could not record payment. Please try again.");
+        return;
+      }
+
+      const isFullPayment = amt >= invoice.amountDue;
+      toast.success(
+        isFullPayment
+          ? `Full payment of ₹${amt.toLocaleString("en-IN")} recorded — Invoice marked as Paid`
+          : `Partial payment of ₹${amt.toLocaleString("en-IN")} recorded — Remaining: ₹${(invoice.amountDue - amt).toLocaleString("en-IN")}`
+      );
+      await onRecorded?.();
+      onOpenChange(false);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -108,9 +124,9 @@ export function RecordPaymentModal({ open, onOpenChange, invoice }: RecordPaymen
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button className="bg-primary text-primary-foreground" onClick={handleSubmit}>
-              Record Payment
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
+            <Button className="bg-primary text-primary-foreground" onClick={handleSubmit} disabled={submitting}>
+              {submitting ? "Recording..." : "Record Payment"}
             </Button>
           </div>
         </div>
