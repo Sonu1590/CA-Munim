@@ -1,25 +1,17 @@
 /**
  * e2e/20-fake-reminder-buttons.spec.ts
  *
- * Documents a real, currently-unfixed CRITICAL bug — ISSUES.md C6 — rather
- * than asserting ideal behavior. Existing coverage (02-dashboard.spec.ts's
- * button-presence check, 04-documents.spec.ts's and 05-billing.spec.ts's
- * "reminder reports success" tests) all correctly describe current
- * behavior as written, but none of them prove *nothing is actually sent*
- * — this file adds that proof via network-request monitoring, for all
- * three "Send Reminder" buttons in the app:
+ * ISSUES.md C6 (fixed): all three "Send Reminder" buttons now do something
+ * real instead of faking success.
  *
- * - Dashboard (ComplianceAlerts.tsx): no onClick handler at all — not
- *   even a fake toast, a pure no-op.
- * - Documents Pending Requests (BulkDocumentStatus.tsx): shows a
- *   "Reminder sent to ..." toast, fires zero network requests.
- * - Billing Fees Dashboard (FeesDashboard.tsx): same shape as Documents.
- *
- * None of the three call sendBulkWhatsAppMessages (the real, H5-fixed
- * send function) or any other messaging/logging function. Once C6 is
- * fixed, these assertions should flip to: a real request fires (to
- * sendBulkWhatsAppMessages's underlying edge function or equivalent), and
- * the Dashboard button gets a real handler + feedback.
+ * - Dashboard (ComplianceAlerts.tsx): represents N clients affected by one
+ *   filing type, not a single client — silently bulk-sending with no
+ *   review step would be its own bad idea, so this one now navigates to
+ *   the WhatsApp Bulk Sender (?tab=bulk) instead of sending directly.
+ * - Documents Pending Requests (BulkDocumentStatus.tsx) and Billing Fees
+ *   Dashboard (FeesDashboard.tsx): both represent one real client, so
+ *   both now call sendQuickReminder — a real Meta send via the same
+ *   H5-fixed edge function path as the Bulk Sender.
  */
 import { test, expect } from './helpers/coverage';
 import { signIn } from './helpers/auth';
@@ -40,8 +32,8 @@ function trackApiRequests(page: import('@playwright/test').Page) {
   return requests;
 }
 
-test.describe('Fake reminder buttons (C6)', () => {
-  test('Dashboard "Send Reminder" has no handler — no toast, no request, nothing happens', async ({ page }) => {
+test.describe('Reminder buttons actually do something (C6)', () => {
+  test('Dashboard "Send Reminder" navigates to the WhatsApp Bulk Sender', async ({ page }) => {
     await signIn(page);
     await page.goto('/');
     await expect(page.locator('.animate-spin').first()).not.toBeVisible({ timeout: 10_000 });
@@ -51,16 +43,25 @@ test.describe('Fake reminder buttons (C6)', () => {
       test.skip(true, 'No compliance alerts with a Send Reminder button exist today');
     }
 
-    const requests = trackApiRequests(page);
-    const toastCountBefore = await page.locator('[data-sonner-toast]').count();
     await btn.click();
-    await page.waitForTimeout(1_500);
-
-    expect(await page.locator('[data-sonner-toast]').count()).toBe(toastCountBefore);
-    expect(requests).toEqual([]);
+    await expect(page).toHaveURL(/\/whatsapp\?tab=bulk/, { timeout: 10_000 });
   });
 
-  test('Documents "Remind" shows a success toast but fires zero requests', async ({ page }) => {
+  // Both remaining tests use a real (fake-phone) e2e test client, so the
+  // Meta send itself is expected to fail — right now it fails even earlier
+  // than that, since the 4 production templates registered for H5/H7 are
+  // still PENDING Meta review, not yet APPROVED (confirmed live: Meta
+  // returns "(#132001) Template name does not exist in the translation"
+  // for a template that isn't approved yet, caught and surfaced as a
+  // normal error toast — this is expected, not a bug). The assertion that
+  // matters is that a real network request fires and some toast appears —
+  // not the exact wording, which depends on Meta's live response and
+  // shouldn't be hard-coded into a brittle pattern.
+  test('Documents "Remind" fires a real network request', async ({ page }) => {
+    // Real send now goes through the edge function to Meta's Graph API —
+    // slower than the old fake instant toast, and the default 30s test
+    // timeout can be tight on a cold edge function + real external call.
+    test.setTimeout(45_000);
     await signIn(page);
     await goToClients(page);
     const client = await createClient(page);
@@ -76,13 +77,17 @@ test.describe('Fake reminder buttons (C6)', () => {
 
     const requests = trackApiRequests(page);
     await remindBtn.click();
-    await expect(page.getByText(/reminder sent to/i)).toBeVisible({ timeout: 10_000 });
-    await page.waitForTimeout(1_500);
-    // The toast is real; the requests list proves nothing backed it.
-    expect(requests).toEqual([]);
+    // Wait for any toast (success or error) rather than matching exact
+    // text — a real attempt now always ends in one or the other, unlike
+    // the old no-op, and the button re-enabling confirms the async flow
+    // actually completed.
+    await expect(page.locator('[data-sonner-toast]').first()).toBeVisible({ timeout: 20_000 });
+    await expect(remindBtn).toBeEnabled({ timeout: 10_000 });
+    expect(requests.length).toBeGreaterThan(0);
   });
 
-  test('Billing Fees Dashboard "Send Reminder" shows a success toast but fires zero requests', async ({ page }) => {
+  test('Billing Fees Dashboard "Send Reminder" fires a real network request', async ({ page }) => {
+    test.setTimeout(45_000);
     await signIn(page);
     await goToBilling(page);
     await page.getByRole('tab', { name: 'Fees Dashboard' }).click();
@@ -99,8 +104,8 @@ test.describe('Fake reminder buttons (C6)', () => {
 
     const requests = trackApiRequests(page);
     await reminderBtn.click();
-    await expect(page.getByText(/reminder sent to/i)).toBeVisible({ timeout: 10_000 });
-    await page.waitForTimeout(1_500);
-    expect(requests).toEqual([]);
+    await expect(page.locator('[data-sonner-toast]').first()).toBeVisible({ timeout: 20_000 });
+    await expect(reminderBtn).toBeEnabled({ timeout: 10_000 });
+    expect(requests.length).toBeGreaterThan(0);
   });
 });

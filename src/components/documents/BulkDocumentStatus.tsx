@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
-import { fetchDocumentRequestsFromSupabase } from "@/data/Documents";
+import { fetchDocumentRequestsFromSupabase, type DocumentRequest } from "@/data/Documents";
+import { sendQuickReminder } from "@/data/WhatsappApi";
+import { supabase } from "@/lib/supabase";
+import { useFinancialYear } from "@/context/financialYear";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,9 +17,11 @@ const statusColors: Record<string, string> = {
 };
 
 export function BulkDocumentStatus() {
-  const [requests, setRequests] = useState<any[]>([]);
+  const { selectedFY } = useFinancialYear();
+  const [requests, setRequests] = useState<DocumentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [remindingId, setRemindingId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadRequests = async () => {
@@ -33,6 +38,24 @@ export function BulkDocumentStatus() {
     };
     loadRequests();
   }, []);
+
+  const handleSendReminder = async (req: DocumentRequest) => {
+    setRemindingId(req.id);
+    try {
+      const { data: client, error: clientErr } = await supabase.from("clients").select("phone").eq("id", req.clientId).single();
+      if (clientErr || !client) throw new Error("Could not look up this client's phone number.");
+      await sendQuickReminder(
+        { id: req.clientId, name: req.clientName, phone: client.phone, servicesSubscribed: [req.documentType] },
+        "Documents Pending",
+        selectedFY
+      );
+      toast.success(`Reminder sent to ${req.clientName}`);
+    } catch (err: any) {
+      toast.error(err?.message ?? `Failed to send reminder to ${req.clientName}`);
+    } finally {
+      setRemindingId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -96,9 +119,10 @@ export function BulkDocumentStatus() {
                         size="sm"
                         variant="outline"
                         className="text-[#25D366] border-[#25D366]/30 hover:bg-[#25D366]/10 gap-1"
-                        onClick={() => toast.success(`Reminder sent to ${req.clientName}`)}
+                        disabled={remindingId === req.id}
+                        onClick={() => handleSendReminder(req)}
                       >
-                        <MessageCircle className="h-3.5 w-3.5" />
+                        {remindingId === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
                         Remind
                       </Button>
                     )}
@@ -125,9 +149,10 @@ export function BulkDocumentStatus() {
                   size="sm"
                   variant="outline"
                   className="w-full text-[#25D366] border-[#25D366]/30 hover:bg-[#25D366]/10 gap-1"
-                  onClick={() => toast.success(`Reminder sent to ${req.clientName}`)}
+                  disabled={remindingId === req.id}
+                  onClick={() => handleSendReminder(req)}
                 >
-                  <MessageCircle className="h-3.5 w-3.5" />
+                  {remindingId === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
                   Send Reminder
                 </Button>
               )}

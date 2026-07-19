@@ -1,4 +1,5 @@
 import { MessageCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 interface ComplianceAlert {
@@ -35,6 +36,8 @@ function formatDueDate(dateStr: string): string {
 }
 
 export function ComplianceAlerts({ alerts }: ComplianceAlertsProps) {
+  const navigate = useNavigate();
+
   // Show placeholder cards while loading
   if (!alerts || alerts.length === 0) {
     return (
@@ -85,7 +88,11 @@ export function ComplianceAlerts({ alerts }: ComplianceAlertsProps) {
                   {Math.abs(a.daysUntilDue)} days overdue
                 </p>
               )}
-              <button className="flex items-center gap-1.5 text-xs font-medium bg-whatsapp text-whatsapp-foreground px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity w-full justify-center">
+              <button
+                type="button"
+                onClick={() => navigate("/whatsapp?tab=bulk")}
+                className="flex items-center gap-1.5 text-xs font-medium bg-whatsapp text-whatsapp-foreground px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity w-full justify-center"
+              >
                 <MessageCircle className="h-3.5 w-3.5" />
                 Send Reminder
               </button>

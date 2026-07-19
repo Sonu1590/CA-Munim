@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { fetchFirmProfileFromSupabase } from "@/data/Settings";
 
 export type TemplateCategory = "GST" | "Income Tax" | "TDS" | "ROC" | "Billing" | "General";
 
@@ -52,6 +53,40 @@ export function compileTemplateForClient(
   const text = template.body.replace(/\{\{(\w+)\}\}/g, (_match, key) => replacements[key] ?? "N/A");
   const parameters = template.variables.map((key) => replacements[key] ?? "N/A");
   return { text, parameters };
+}
+
+/**
+ * One-click "remind this single client" used by the Fees Dashboard and
+ * Pending Documents pages — picks a live template by (partial) name match,
+ * compiles it for this one client with the real firm profile, and sends via
+ * the same Meta path as the Bulk Sender. Throws with a clear message rather
+ * than silently no-op'ing if the client has no phone or no matching
+ * template exists, so the caller's catch block can show a real error
+ * instead of a fake success toast (ISSUES.md C6).
+ */
+export async function sendQuickReminder(
+  client: { id: string; name: string; phone: string; pendingFees?: number; servicesSubscribed?: string[] },
+  templateNameContains: string,
+  financialYear: string
+): Promise<void> {
+  if (!client.phone) throw new Error(`${client.name} has no phone number on file.`);
+
+  const [templates, firm] = await Promise.all([
+    fetchMessageTemplatesFromSupabase(),
+    fetchFirmProfileFromSupabase().catch(() => null),
+  ]);
+
+  const template = templates.find((t) => t.name.toLowerCase().includes(templateNameContains.toLowerCase()));
+  if (!template) throw new Error(`No "${templateNameContains}" template found — create one in WhatsApp > Templates first.`);
+
+  const { text, parameters } = compileTemplateForClient(template, client, financialYear, firm ?? undefined);
+
+  await sendBulkWhatsAppMessages(
+    [{ id: client.id, name: client.name, phone: client.phone }],
+    template,
+    { [client.id]: text },
+    { [client.id]: parameters }
+  );
 }
 
 export interface SentMessage {

@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Invoice } from "@/data/Billing";
-import { IndianRupee, TrendingUp, AlertTriangle, Clock } from "lucide-react";
+import { sendQuickReminder } from "@/data/WhatsappApi";
+import { supabase } from "@/lib/supabase";
+import { IndianRupee, TrendingUp, AlertTriangle, Clock, Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 interface FeesDashboardProps {
@@ -10,6 +13,26 @@ interface FeesDashboardProps {
 }
 
 export function FeesDashboard({ invoices }: FeesDashboardProps) {
+  const [remindingId, setRemindingId] = useState<string | null>(null);
+
+  const handleSendReminder = async (inv: Invoice) => {
+    setRemindingId(inv.id);
+    try {
+      const { data: client, error } = await supabase.from("clients").select("phone").eq("id", inv.clientId).single();
+      if (error || !client) throw new Error("Could not look up this client's phone number.");
+      await sendQuickReminder(
+        { id: inv.clientId, name: inv.clientName, phone: client.phone, pendingFees: inv.amountDue },
+        "Invoice Payment Due",
+        inv.financialYear
+      );
+      toast.success(`Reminder sent to ${inv.clientName}`);
+    } catch (err: any) {
+      toast.error(err?.message ?? `Failed to send reminder to ${inv.clientName}`);
+    } finally {
+      setRemindingId(null);
+    }
+  };
+
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
@@ -125,9 +148,10 @@ export function FeesDashboard({ invoices }: FeesDashboardProps) {
                         size="sm"
                         variant="outline"
                         className="text-xs h-7"
-                        onClick={() => toast.success(`Reminder sent to ${inv.clientName}`)}
+                        disabled={remindingId === inv.id}
+                        onClick={() => handleSendReminder(inv)}
                       >
-                        Send Reminder
+                        {remindingId === inv.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Send Reminder"}
                       </Button>
                     </div>
                   </div>

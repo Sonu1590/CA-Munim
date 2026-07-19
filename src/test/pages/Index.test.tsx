@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import Dashboard from "@/pages/Index";
 import { useDashboard } from "@/hooks/useDashboard";
 import { FinancialYearProvider } from "@/context/financialYear";
@@ -32,7 +33,7 @@ describe("Dashboard page", () => {
       refetch: vi.fn(),
     });
 
-    render(<FinancialYearProvider><Dashboard /></FinancialYearProvider>);
+    render(<MemoryRouter><FinancialYearProvider><Dashboard /></FinancialYearProvider></MemoryRouter>);
 
     expect(screen.getByText("Loading dashboard...")).toBeInTheDocument();
     expect(screen.queryByText("Total Clients")).not.toBeInTheDocument();
@@ -110,7 +111,7 @@ describe("Dashboard page", () => {
       refetch: vi.fn(),
     });
 
-    render(<FinancialYearProvider><Dashboard /></FinancialYearProvider>);
+    render(<MemoryRouter><FinancialYearProvider><Dashboard /></FinancialYearProvider></MemoryRouter>);
 
     expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
     expect(screen.getByText("Welcome back, CA R Sharma")).toBeInTheDocument();
@@ -154,7 +155,7 @@ describe("Dashboard page", () => {
       refetch: vi.fn(),
     });
 
-    render(<FinancialYearProvider><Dashboard /></FinancialYearProvider>);
+    render(<MemoryRouter><FinancialYearProvider><Dashboard /></FinancialYearProvider></MemoryRouter>);
 
     expect(screen.getByText("Welcome back, CA")).toBeInTheDocument();
     expect(screen.getByText("Nothing due or overdue — you're caught up.")).toBeInTheDocument();
