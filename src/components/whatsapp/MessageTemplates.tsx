@@ -95,10 +95,20 @@ export function MessageTemplates() {
     }
   };
 
-  const handleDuplicate = (t: MessageTemplate) => {
-    const dup: MessageTemplate = { ...t, id: `t-${Date.now()}`, name: `${t.name} (Copy)`, isDefault: false };
-    setTemplates((prev) => [...prev, dup]);
-    toast.success("Template duplicated");
+  const handleDuplicate = async (t: MessageTemplate) => {
+    try {
+      const saved = await saveMessageTemplateToSupabase({
+        name: `${t.name} (Copy)`,
+        category: t.category,
+        body: t.body,
+        variables: t.variables,
+        isDefault: false,
+      });
+      setTemplates((prev) => [...prev, saved]);
+      toast.success("Template duplicated");
+    } catch (err: any) {
+      toast.error(err.message ?? "Unable to duplicate template");
+    }
   };
 
   return (

@@ -10,10 +10,11 @@
  *   firm data. The "save" tests click Save WITHOUT changing any field
  *   (a same-value round trip) to verify the persistence path works without
  *   altering the shared test firm's real configuration.
- * - WhatsApp Config: this panel never loads existing config — it starts
- *   blank and Save would overwrite the firm's real `whatsapp_config` with
- *   fake test values, so these tests exercise validation only and never
- *   click Save.
+ * - WhatsApp Config: Test Connection now performs a real check against the
+ *   platform's shared Meta WhatsApp credentials (not a firm-specific
+ *   integration — there isn't one), and Notification Preferences load the
+ *   firm's real saved `whatsapp_config` on mount. Save is never clicked
+ *   here to avoid overwriting the shared test firm's real preferences.
  * - Staff Management: adds one real, disposable staff row (safe — no auth
  *   account is created, just a DB row) and toggles its own Active switch;
  *   the existing "BE10X User" staff row is never touched.
@@ -140,19 +141,24 @@ test.describe('Settings - WhatsApp config', () => {
     await goToSettings(page, 'WhatsApp');
   });
 
-  test('shows provider config and notification preferences', async ({ page }) => {
+  test('shows connection status and notification preferences', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'WhatsApp Business API' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Notification Preferences' })).toBeVisible();
     await expect(page.getByRole('button', { name: /test connection/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /save whatsapp settings/i })).toBeVisible();
   });
 
-  test('test connection requires an API key first', async ({ page }) => {
-    // Deliberately not clicking Save anywhere in this describe block — this
-    // panel never loads existing config, so Save would overwrite the firm's
-    // real whatsapp_config with blank/fake test values.
-    await page.getByRole('button', { name: /test connection/i }).click();
-    await expectToast(page, /enter wati api key/i);
+  test('test connection fires a real check against the shared Meta WhatsApp credentials', async ({ page }) => {
+    // Deliberately not clicking Save anywhere in this describe block — it
+    // would overwrite the shared test firm's real saved preferences.
+    test.setTimeout(30_000);
+    const btn = page.getByRole('button', { name: /test connection/i });
+    await btn.click();
+    // Real network round-trip to Meta's Graph API — assert a toast appears
+    // (success or failure) and the button re-enables, not exact wording,
+    // since the result depends on the platform's live Meta credentials.
+    await expect(page.locator('[data-sonner-toast]').first()).toBeVisible({ timeout: 20_000 });
+    await expect(btn).toBeEnabled({ timeout: 10_000 });
   });
 });
 
