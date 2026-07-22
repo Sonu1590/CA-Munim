@@ -18,11 +18,8 @@ The policy grants `SELECT` to role `public` (includes the anonymous key) with th
 **Fix:** scope the public policy to the exact token being requested (e.g., require `upload_token = <requested token>` via a security-definer RPC or a per-token filter), and prefer a narrow lookup rather than an "is not null" predicate.
 **Confirmed fixed, fix shape (2026-07-14, in response to external review):** `20260702130000_upload_request_lookup.sql` — exactly the recommended shape. Adds `public.get_upload_request(p_token text)`, a `SECURITY DEFINER` RPC (`set search_path = ''`) that looks up a single row by `upload_token = p_token`, then drops the old `doc_requests_public_token` policy entirely so `anon` has no direct `SELECT` on the table at all — every read goes through the token-scoped RPC.
 
-### C3. Real test-account credentials committed to git
-**File:** `src/.env.test` (tracked in commit `84857b6`)
-Contains a live-looking `TEST_USER_EMAIL` / `TEST_USER_PASSWORD`. Even though `.gitignore` lists `.env.test` at the root, this file lives under `src/` and is committed. Credentials in the repo are a standing exposure.
-**Fix:** remove from git history, rotate the account password, and keep test creds only in CI secrets / untracked local files.
-**Open question (2026-07-14, raised by external review):** the file removal is tagged `(C3)`, but nothing in this repo's history confirms the account's *password* was actually rotated afterward — deleting the file doesn't purge git history, so the old value is still recoverable by anyone who clones the repo. Needs the user to confirm directly with Supabase Auth (can't be verified by reading code); if not yet rotated, do it before anything else on this list.
+### C3. Moved — RESOLVED, entry removed (2026-07-22)
+Real test-account credentials committed to git (`src/.env.test`). User confirmed directly with Supabase Auth and closed this out. Left this pointer rather than deleting the ID outright, so the `(C3)` reference in earlier commit messages still resolves to something.
 
 ### C4. Live cron-trigger secret committed in plaintext to a public repo — FIXED (2026-07-14)
 **Files:** `supabase/migrations/20260707120000_scheduled_reminders.sql`, `supabase/migrations/20260708060000_recurring_task_cron.sql`
@@ -137,9 +134,8 @@ The `ClientMutationResult` comparisons (M1a) are real logic bugs: `addClient`/`u
 - No validation of `phoneNumbers` shape or length (no cap), enabling abuse.
 - The result objects returned don't include `phone`, but `WhatsappApi.ts` builds `resultByPhone` keyed on `result.phone` — so status mapping to "sent"/"failed" is effectively broken (always falls to the default).
 
-### M3. Live Meta WhatsApp access token sits in a local `.env`
-**File:** `.env` (untracked, but present locally)
-A real-looking `WHATSAPP_ACCESS_TOKEN` is in the working tree. It is not in git history (good), but confirm it is only stored as a Supabase function secret in production and rotate it if it has been shared. Long-lived Meta tokens are high-value.
+### M3. Moved — RESOLVED, entry removed (2026-07-22)
+Live Meta WhatsApp access token sitting in a local `.env`. User confirmed it's local-only (not shared, not in git history) — accepted as-is, no action needed. Left this pointer rather than deleting the ID outright, so the `(M3)` reference in earlier commit messages still resolves to something.
 
 ### M4. Document-received flow is in-memory mock only — FIXED (`b22f388`)
 **File:** `src/lib/taskChecklistStore.ts`
