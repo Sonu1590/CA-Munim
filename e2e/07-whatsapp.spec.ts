@@ -103,6 +103,10 @@ test.describe('WhatsApp - templates', () => {
   });
 
   test('creates, previews, edits, duplicates, and deletes a template', async ({ page }) => {
+    // Default 30s budget is tight now that the duplicate step does a real
+    // reload + persistence check plus a second delete round-trip (M16 fix
+    // verification) on top of the original create/preview/edit/delete flow.
+    test.setTimeout(45_000);
     const name = `PW Template ${unique('tmpl')}`;
     await createTemplate(page, {
       name,
@@ -139,19 +143,29 @@ test.describe('WhatsApp - templates', () => {
     await expect(templateCard(page, updatedName)).toBeVisible({ timeout: 8_000 });
     await waitForToastsClear(page);
 
-    // Duplicate — MessageTemplates.handleDuplicate is client-state only (no
-    // saveMessageTemplateToSupabase call), so the copy never reaches the DB.
-    // Deliberately NOT deleting the duplicate here: its fabricated
-    // `t-${Date.now()}` id isn't a valid uuid, and deleteMessageTemplateFromSupabase
-    // passes it straight into `.eq("id", id)` with no validation, so Postgres
-    // rejects it and the delete throws (ISSUES.md M14). It disappears on its
-    // own on next reload since it was never persisted.
+    // Duplicate — MessageTemplates.handleDuplicate now round-trips through
+    // saveMessageTemplateToSupabase (ISSUES.md M16 fix), so the copy is a
+    // real row with a real DB-generated uuid, not the old fabricated
+    // `t-${Date.now()}` client-only id. Both the original and the
+    // duplicate are now real rows and both need cleaning up.
     await templateDuplicateButton(templateCard(page, updatedName)).click();
     await expectToast(page, /template duplicated/i);
-    await expect(templateCard(page, `${updatedName} (Copy)`)).toBeVisible({ timeout: 8_000 });
+    const dupCard = templateCard(page, `${updatedName} (Copy)`);
+    await expect(dupCard).toBeVisible({ timeout: 8_000 });
     await waitForToastsClear(page);
 
-    // Clean up the one row that's actually in the DB.
+    // Reload to confirm the duplicate actually persisted (the pre-fix bug
+    // was exactly that it looked right in-session but vanished on refresh).
+    await page.reload();
+    await waitForWhatsAppPage(page);
+    await expect(templateCard(page, `${updatedName} (Copy)`)).toBeVisible({ timeout: 10_000 });
+
+    // Clean up both real rows.
+    await templateDeleteButton(templateCard(page, `${updatedName} (Copy)`)).click();
+    await expectToast(page, /template deleted/i);
+    await expect(templateCard(page, `${updatedName} (Copy)`)).not.toBeVisible({ timeout: 8_000 });
+    await waitForToastsClear(page);
+
     await templateDeleteButton(templateCard(page, updatedName)).click();
     await expectToast(page, /template deleted/i);
     await expect(templateCard(page, updatedName)).not.toBeVisible({ timeout: 8_000 });

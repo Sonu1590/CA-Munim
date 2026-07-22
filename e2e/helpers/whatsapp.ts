@@ -91,7 +91,22 @@ export function bulkSenderStepHeading(page: Page, name: string) {
  * card's action buttons): Sonner pauses its auto-dismiss timer while the
  * mouse hovers a toast, and Playwright's click-retry loop does exactly that
  * when the target sits behind one — without this, the toast can block the
- * click indefinitely instead of the usual ~4s. */
+ * click indefinitely instead of the usual ~4s.
+ *
+ * The mouse-move matters, not just the wait: :hover is positional, not
+ * event-driven, so if a *previous* click landed the cursor on/near the
+ * toast's fixed bottom-right position (common on narrow/mobile viewports
+ * where a card's action buttons sit close to it), the browser keeps
+ * reporting a hover with no further mouse movement — Sonner's dismiss timer
+ * then never resumes and the toast sits there until the *test's* timeout,
+ * not its own ~4s duration. Moving the cursor to a neutral corner first
+ * forces a real mouseleave so the toast can actually expire. Confirmed live:
+ * without this, `creates, previews, edits, duplicates, and deletes a
+ * template` in 07-whatsapp.spec.ts intermittently fails on chromium/
+ * mobile-ios (never mobile-android, whose bottom-nav layout keeps the toast
+ * further from the card buttons) with the toast's `<li data-sonner-toast>`
+ * reported as intercepting pointer events on the next click. */
 export async function waitForToastsClear(page: Page, timeout = 8_000) {
+  await page.mouse.move(0, 0);
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0, { timeout }).catch(() => {});
 }
