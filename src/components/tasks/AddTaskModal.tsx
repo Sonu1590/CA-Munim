@@ -154,8 +154,6 @@ export function AddTaskModal({
       const result = await onSave(payload);
       if (result === false) return;
 
-      toast.success("Task created successfully");
-
       handleClose(false);
     } catch (err) {
       console.error("Task creation failed:", err);
