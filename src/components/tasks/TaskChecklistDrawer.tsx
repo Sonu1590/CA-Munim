@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ChecklistItem } from "@/data/Tasks";
-import { Plus, Trash2, MessageCircle, Upload } from "lucide-react";
+import { sendQuickReminder } from "@/data/WhatsappApi";
+import { supabase } from "@/lib/supabase";
+import { Plus, Trash2, MessageCircle, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
@@ -13,14 +15,17 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   taskId: string;
   taskName: string;
+  clientId: string;
   clientName: string;
+  financialYear: string;
   items: ChecklistItem[];
   onUpdate: (items: ChecklistItem[]) => void | Promise<void>;
 }
 
-export function TaskChecklistDrawer({ open, onOpenChange, taskId, taskName, clientName, items: initialItems, onUpdate }: Props) {
+export function TaskChecklistDrawer({ open, onOpenChange, taskId, taskName, clientId, clientName, financialYear, items: initialItems, onUpdate }: Props) {
   const [items, setItems] = useState<ChecklistItem[]>(initialItems);
   const [newLabel, setNewLabel] = useState("");
+  const [requesting, setRequesting] = useState(false);
 
   // Re-sync when a fresh checklist arrives from the parent (e.g. after a
   // successful save elsewhere) or when the drawer is opened for a task.
@@ -35,6 +40,26 @@ export function TaskChecklistDrawer({ open, onOpenChange, taskId, taskName, clie
 
   const received = items.filter((i) => i.received).length;
   const pending = items.filter((i) => !i.received);
+
+  const handleRequestPending = async () => {
+    setRequesting(true);
+    try {
+      const { data: client, error } = await supabase.from("clients").select("phone").eq("id", clientId).single();
+      if (error || !client) throw new Error("Could not look up this client's phone number.");
+      await sendQuickReminder(
+        { id: clientId, name: clientName, phone: client.phone, servicesSubscribed: pending.map((i) => i.label) },
+        "Documents Pending",
+        financialYear
+      );
+      toast.success(`WhatsApp request sent to ${clientName}`, {
+        description: `Asked for ${pending.length} pending document(s).`,
+      });
+    } catch (err: any) {
+      toast.error(err?.message ?? `Failed to send request to ${clientName}`);
+    } finally {
+      setRequesting(false);
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -103,13 +128,10 @@ export function TaskChecklistDrawer({ open, onOpenChange, taskId, taskName, clie
           <Button
             variant="outline"
             className="w-full gap-2 border-[#25D366] text-[#25D366] hover:bg-[#25D366]/10"
-            onClick={() =>
-              toast.success(`WhatsApp request sent to ${clientName}`, {
-                description: `Asked for ${pending.length} pending document(s). Auto-marks checklist on upload.`,
-              })
-            }
+            disabled={requesting}
+            onClick={handleRequestPending}
           >
-            <MessageCircle className="h-4 w-4" />
+            {requesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
             Request {pending.length} pending via WhatsApp
           </Button>
         )}

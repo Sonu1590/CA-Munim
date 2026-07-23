@@ -121,7 +121,9 @@ export function TaskCard({ task, onStatusChange, onEdit, onDelete, onChecklistUp
           onOpenChange={setOpenChecklist}
           taskId={task.id}
           taskName={task.customTaskName || task.taskType}
+          clientId={task.clientId}
           clientName={task.clientName}
+          financialYear={task.financialYear}
           items={items}
           onUpdate={(next) => onChecklistUpdate(task.id, next)}
         />
