@@ -1,11 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
-// How far ahead to remind. A task stays eligible every day from now until
-// this many days before its due date (not an exact-date match) so a failed
-// send — e.g. Meta rejects the template — gets retried on the next run
-// instead of being skipped forever once it falls outside a single day's window.
-const REMINDER_WINDOW_DAYS = 3
+// How far ahead to remind, when a firm hasn't configured their own value via
+// Settings > WhatsApp > Notification Preferences (firms.whatsapp_config.reminder_days).
+// A task stays eligible every day from now until this many days before its
+// due date (not an exact-date match) so a failed send — e.g. Meta rejects
+// the template — gets retried on the next run instead of being skipped
+// forever once it falls outside a single day's window.
+const DEFAULT_REMINDER_WINDOW_DAYS = 3
+
+// The DB query below needs one fixed upper bound to stay a single indexed
+// range scan — it can't know each row's firm-specific window in advance.
+// This is deliberately generous so it comfortably covers any firm's
+// configured reminder_days; each task's actual eligibility is then
+// re-checked per-firm in the loop below against that firm's own window.
+const MAX_REMINDER_WINDOW_DAYS = 30
 
 // Deno edge functions run in UTC regardless of the business's IST
 // timezone. Shifting by the IST offset before extracting a calendar date
@@ -93,7 +102,7 @@ serve(async (req) => {
   )
 
   const now = new Date()
-  const windowEnd = new Date(now.getTime() + REMINDER_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+  const windowEnd = new Date(now.getTime() + MAX_REMINDER_WINDOW_DAYS * 24 * 60 * 60 * 1000)
   const todayStr = istDateString(now)
   const windowEndStr = istDateString(windowEnd)
 
@@ -102,7 +111,7 @@ serve(async (req) => {
   // instead reads reminder_sent_at to avoid ever double-sending.
   const { data: tasks, error: tasksError } = await supabase
     .from('tasks')
-    .select('id, firm_id, client_id, task_type, custom_name, due_date, clients(name, phone, email), firms(name)')
+    .select('id, firm_id, client_id, task_type, custom_name, due_date, clients(name, phone, email), firms(name, whatsapp_config)')
     .is('reminder_sent_at', null)
     .neq('status', 'completed')
     .gte('due_date', todayStr)
@@ -122,12 +131,33 @@ serve(async (req) => {
   let emailSent = 0
   let emailFailed = 0
   let skippedNoContact = 0
+  let skippedDisabled = 0
+  let skippedOutsideWindow = 0
 
   for (const task of tasks ?? []) {
     const client = (task as any).clients
     const firm = (task as any).firms
     const firmName = firm?.name ?? 'your CA'
     const taskLabel = task.task_type === 'Custom' ? (task.custom_name ?? 'Custom filing') : task.task_type
+
+    const whatsappConfig = firm?.whatsapp_config as { notifications?: { deadlineReminders?: boolean }; reminder_days?: number } | null | undefined
+
+    if (whatsappConfig?.notifications?.deadlineReminders === false) {
+      skippedDisabled++
+      continue
+    }
+
+    // Compare pure calendar dates (no time-of-day component) so this stays
+    // correct regardless of what time the cron actually fires — mirrors
+    // istDateString's reasoning for todayStr above.
+    const reminderWindowDays = whatsappConfig?.reminder_days ?? DEFAULT_REMINDER_WINDOW_DAYS
+    const daysUntilDue = Math.round(
+      (new Date(`${task.due_date}T00:00:00Z`).getTime() - new Date(`${todayStr}T00:00:00Z`).getTime()) / (24 * 60 * 60 * 1000)
+    )
+    if (daysUntilDue > reminderWindowDays) {
+      skippedOutsideWindow++
+      continue
+    }
 
     if (!client?.phone && !client?.email) {
       skippedNoContact++
@@ -212,7 +242,7 @@ serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ scanned: tasks?.length ?? 0, sent, failed, emailSent, emailFailed, skippedNoContact }), {
+  return new Response(JSON.stringify({ scanned: tasks?.length ?? 0, sent, failed, emailSent, emailFailed, skippedNoContact, skippedDisabled, skippedOutsideWindow }), {
     headers: { 'Content-Type': 'application/json' },
   })
 })
