@@ -127,6 +127,11 @@ export function AddTaskModal({
       return;
     }
 
+    if (!dueDate) {
+      toast.error("Please select a due date");
+      return;
+    }
+
     if (!onSave) {
       toast.error("Task save handler missing");
       return;

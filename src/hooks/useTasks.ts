@@ -158,7 +158,6 @@ if (!staffRow?.firm_id) {
       return true
     } catch (err: any) {
       console.error('addTask error:', err)
-      setError(err.message)
       return false
     }
   }
@@ -194,7 +193,6 @@ if (!staffRow?.firm_id) {
     } catch (err: any) {
       console.error('updateTaskStatus error:', err)
       setTasks(previousTasks)
-      setError(err.message)
       toast.error('Failed to update task status. Please try again.')
       return false
     }
@@ -216,7 +214,6 @@ if (!staffRow?.firm_id) {
       return true
     } catch (err: any) {
       console.error('updateTask error:', err)
-      setError(err.message)
       return false
     }
   }
@@ -236,7 +233,6 @@ if (!staffRow?.firm_id) {
     } catch (err: any) {
       console.error('deleteTask error:', err)
       setTasks(previousTasks)
-      setError(err.message)
       toast.error('Failed to delete task. Please try again.')
       return false
     }
