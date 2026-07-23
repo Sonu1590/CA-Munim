@@ -84,7 +84,7 @@ export default function Settings() {
           <div className="overflow-x-auto -mx-4 px-4">
             <TabsList className="inline-flex h-auto p-1 gap-1 bg-muted/50">
               {visibleTabs.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5 text-xs sm:text-sm px-2.5 py-2 data-[state=active]:bg-background">
+                <TabsTrigger key={tab.value} value={tab.value} aria-label={tab.label} className="gap-1.5 text-xs sm:text-sm px-2.5 py-2 data-[state=active]:bg-background">
                   <tab.icon className="h-4 w-4 shrink-0" />
                   <span className="hidden sm:inline">{tab.label}</span>
                 </TabsTrigger>
