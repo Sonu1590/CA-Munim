@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -53,6 +54,35 @@
     --sidebar-accent-foreground: 222 47% 11%;
     --sidebar-border: 214 32% 91%;
     --sidebar-ring: 211 54% 24%;
+
+    /* Mobile-only "Organic" theme — new, uniquely-named vars so nothing
+       above is touched. Used only by components under src/components/mobile
+       and the mobile-scoped bits of layout components (bottom nav, FAB) via
+       the `mobile-*` Tailwind tokens in tailwind.config.ts. Desktop never
+       references these. */
+    --mobile-color-bg: #f5ead8;
+    --mobile-color-surface: #ebddc5;
+    --mobile-color-text: #201e1d;
+    --mobile-color-divider: rgba(32, 30, 29, 0.16);
+    --mobile-color-accent: #c67139;
+    --mobile-color-accent-100: #fff2eb;
+    --mobile-color-accent-200: #ffe1d0;
+    --mobile-color-accent-600: #b2622d;
+    --mobile-color-accent-700: #8c491a;
+    --mobile-color-accent-800: #643312;
+    --mobile-color-accent-2: #7a8a5e;
+    --mobile-color-accent-2-100: #f0fae1;
+    --mobile-color-accent-2-200: #e1eecc;
+    --mobile-color-accent-2-800: #3d472b;
+    --mobile-color-accent-2-900: #272e1b;
+    --mobile-color-neutral-100: #f9f4ed;
+    --mobile-color-neutral-200: #eee7db;
+    --mobile-color-neutral-300: #dcd3c4;
+    --mobile-color-neutral-400: #c0b6a5;
+    --mobile-color-neutral-500: #a19786;
+    --mobile-color-neutral-600: #82796a;
+    --mobile-color-neutral-700: #645c50;
+    --mobile-color-neutral-900: #2e2b25;
   }
 }
 

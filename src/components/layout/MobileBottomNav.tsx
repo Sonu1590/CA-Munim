@@ -12,7 +12,7 @@ const tabs = [
 
 export function MobileBottomNav() {
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-mobile-surface border-t border-mobile-divider shadow-mobile-md z-50 font-mobile-body">
       <div className="flex items-center justify-around py-2">
         {tabs.map((tab) => (
           <NavLink
@@ -20,8 +20,8 @@ export function MobileBottomNav() {
             to={tab.path}
             className={({ isActive }) =>
               cn(
-                "flex flex-col items-center gap-0.5 px-2 py-1 text-xs font-medium transition-colors",
-                isActive ? "text-primary" : "text-muted-foreground"
+                "flex flex-col items-center gap-0.5 px-2 py-1 text-xs font-bold transition-colors",
+                isActive ? "text-mobile-accent" : "text-mobile-neutral-600"
               )
             }
           >

@@ -48,7 +48,7 @@ export function MobileFAB() {
         />
       )}
 
-      <div className="md:hidden fixed bottom-20 right-4 z-50 flex flex-col items-end gap-2">
+      <div className="md:hidden fixed bottom-20 right-4 z-50 flex flex-col items-end gap-2 font-mobile-body">
         {/* Quick action buttons */}
         {open &&
           actions.map((a, i) => (
@@ -57,12 +57,12 @@ export function MobileFAB() {
               className="flex items-center gap-2 animate-in slide-in-from-bottom-2 fade-in"
               style={{ animationDelay: `${i * 40}ms` }}
             >
-              <span className="bg-card text-foreground text-xs font-medium px-2.5 py-1 rounded-md shadow-md border border-border">
+              <span className="bg-mobile-surface text-mobile-text text-xs font-bold px-2.5 py-1 rounded-mobile-sm shadow-mobile-md border border-mobile-divider">
                 {a.label}
               </span>
               <button
                 onClick={a.onClick}
-                className="h-11 w-11 rounded-full bg-card border border-border shadow-md flex items-center justify-center text-primary hover:bg-muted transition-colors"
+                className="h-11 w-11 rounded-full bg-mobile-surface border border-mobile-divider shadow-mobile-md flex items-center justify-center text-mobile-accent-700 hover:bg-mobile-accent-100 transition-colors"
                 aria-label={a.label}
               >
                 <a.icon className="h-5 w-5" />
@@ -74,7 +74,7 @@ export function MobileFAB() {
         <button
           onClick={() => setOpen((o) => !o)}
           className={cn(
-            "h-14 w-14 rounded-full bg-accent text-accent-foreground shadow-lg flex items-center justify-center transition-transform",
+            "h-14 w-14 rounded-full bg-mobile-accent text-white shadow-mobile-lg flex items-center justify-center transition-transform",
             open && "rotate-45"
           )}
           aria-label="Quick add"

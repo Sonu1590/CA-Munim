@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import Dashboard from "@/pages/Index";
@@ -113,33 +113,45 @@ describe("Dashboard page", () => {
 
     render(<MemoryRouter><FinancialYearProvider><Dashboard /></FinancialYearProvider></MemoryRouter>);
 
+    const desktop = within(screen.getByTestId("desktop-dashboard"));
+
     expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
     expect(screen.getByText("Welcome back, CA R Sharma")).toBeInTheDocument();
 
-    expect(screen.getByText("18")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getAllByText(/1,25,000/)).toHaveLength(2);
-    expect(screen.getByText("7")).toBeInTheDocument();
+    expect(desktop.getByText("18")).toBeInTheDocument();
+    expect(desktop.getByText("3")).toBeInTheDocument();
+    expect(desktop.getAllByText(/1,25,000/)).toHaveLength(2);
+    expect(desktop.getByText("7")).toBeInTheDocument();
 
-    expect(screen.getAllByText("GSTR-3B")).toHaveLength(2); // compliance alert card + digest item
-    expect(screen.getAllByText("TDS Challan")).toHaveLength(2);
-    expect(screen.getByText("11 days overdue")).toBeInTheDocument();
-    expect(screen.getByText("4 clients affected")).toBeInTheDocument();
+    expect(desktop.getAllByText("GSTR-3B")).toHaveLength(2); // compliance alert card + digest item
+    expect(desktop.getAllByText("TDS Challan")).toHaveLength(2);
+    expect(desktop.getByText("11 days overdue")).toBeInTheDocument();
+    expect(desktop.getByText("4 clients affected")).toBeInTheDocument();
 
-    expect(screen.getByText("2 items need attention")).toBeInTheDocument();
-    expect(screen.getByText((_, el) => el?.textContent === "GSTR-3B for Mock Client")).toBeInTheDocument();
-    expect(screen.getByText((_, el) => el?.textContent === "TDS Challan for Another Client")).toBeInTheDocument();
-    expect(screen.getByText("3 days overdue")).toBeInTheDocument();
-    expect(screen.getByText("Due today")).toBeInTheDocument();
+    expect(desktop.getByText("2 items need attention")).toBeInTheDocument();
+    expect(desktop.getByText((_, el) => el?.textContent === "GSTR-3B for Mock Client")).toBeInTheDocument();
+    expect(desktop.getByText((_, el) => el?.textContent === "TDS Challan for Another Client")).toBeInTheDocument();
+    expect(desktop.getByText("3 days overdue")).toBeInTheDocument();
+    expect(desktop.getByText("Due today")).toBeInTheDocument();
 
-    expect(screen.getByText("Invoice INV-001 sent to Mock Client - Rs. 1,25,000")).toBeInTheDocument();
-    expect(screen.getByText("Document received from Mock Client: bank-statement.pdf")).toBeInTheDocument();
-    expect(screen.getByText("8/10 (80%)")).toBeInTheDocument();
+    expect(desktop.getByText("Invoice INV-001 sent to Mock Client - Rs. 1,25,000")).toBeInTheDocument();
+    expect(desktop.getByText("Document received from Mock Client: bank-statement.pdf")).toBeInTheDocument();
+    expect(desktop.getByText("8/10 (80%)")).toBeInTheDocument();
 
-    expect(screen.getByRole("button", { name: /Add New Client/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Bulk WhatsApp Reminder/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Create Task/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Generate Invoice/i })).toBeInTheDocument();
+    expect(desktop.getByRole("button", { name: /Add New Client/i })).toBeInTheDocument();
+    expect(desktop.getByRole("button", { name: /Bulk WhatsApp Reminder/i })).toBeInTheDocument();
+    expect(desktop.getByRole("button", { name: /Create Task/i })).toBeInTheDocument();
+    expect(desktop.getByRole("button", { name: /Generate Invoice/i })).toBeInTheDocument();
+
+    // Mobile Home tree renders the same real data in its own layout.
+    const mobile = within(screen.getByTestId("mobile-home"));
+    expect(mobile.getByText("CA Munim")).toBeInTheDocument();
+    expect(mobile.getByText("18")).toBeInTheDocument();
+    expect(mobile.getByText("₹1,25,000")).toBeInTheDocument();
+    expect(mobile.getByText("Mock Client")).toBeInTheDocument();
+    expect(mobile.getByText("Another Client")).toBeInTheDocument();
+    expect(mobile.getAllByRole("button", { name: /Nudge on WhatsApp/i })).toHaveLength(2);
+    expect(mobile.getAllByRole("button", { name: /Mark filed/i })).toHaveLength(2);
   });
 
   it("renders useful empty states when there is no dashboard data", () => {

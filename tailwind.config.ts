@@ -17,6 +17,8 @@ export default {
         heading: ['"Plus Jakarta Sans"', 'sans-serif'],
         body: ['"DM Sans"', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
+        "mobile-heading": ['"Caprasimo"', 'serif'],
+        "mobile-body": ['"Figtree"', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -74,11 +76,51 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Mobile-only "Organic" theme tokens — additive, see src/index.css.
+        mobile: {
+          bg: "var(--mobile-color-bg)",
+          surface: "var(--mobile-color-surface)",
+          text: "var(--mobile-color-text)",
+          divider: "var(--mobile-color-divider)",
+          accent: {
+            DEFAULT: "var(--mobile-color-accent)",
+            100: "var(--mobile-color-accent-100)",
+            200: "var(--mobile-color-accent-200)",
+            600: "var(--mobile-color-accent-600)",
+            700: "var(--mobile-color-accent-700)",
+            800: "var(--mobile-color-accent-800)",
+          },
+          "accent-2": {
+            DEFAULT: "var(--mobile-color-accent-2)",
+            100: "var(--mobile-color-accent-2-100)",
+            200: "var(--mobile-color-accent-2-200)",
+            800: "var(--mobile-color-accent-2-800)",
+            900: "var(--mobile-color-accent-2-900)",
+          },
+          neutral: {
+            100: "var(--mobile-color-neutral-100)",
+            200: "var(--mobile-color-neutral-200)",
+            300: "var(--mobile-color-neutral-300)",
+            400: "var(--mobile-color-neutral-400)",
+            500: "var(--mobile-color-neutral-500)",
+            600: "var(--mobile-color-neutral-600)",
+            700: "var(--mobile-color-neutral-700)",
+            900: "var(--mobile-color-neutral-900)",
+          },
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        "mobile-sm": "8px",
+        "mobile-md": "16px",
+        "mobile-lg": "28px",
+      },
+      boxShadow: {
+        "mobile-sm": "0 1px 2px rgba(46,43,37,0.14)",
+        "mobile-md": "0 3px 10px rgba(46,43,37,0.16)",
+        "mobile-lg": "0 12px 32px rgba(46,43,37,0.22)",
       },
       keyframes: {
         "accordion-down": {

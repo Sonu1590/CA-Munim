@@ -221,7 +221,15 @@ export async function saveMessageTemplateToSupabase(template: Omit<MessageTempla
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
+  const { data: staffRow, error: staffErr } = await supabase
+    .from("staff")
+    .select("firm_id")
+    .eq("auth_user_id", user.id)
+    .single();
+  if (staffErr || !staffRow?.firm_id) throw new Error("Unable to identify firm for current user");
+
   const payload: Record<string, any> = {
+    firm_id: staffRow.firm_id,
     name: template.name,
     category: template.category,
     body: template.body,
