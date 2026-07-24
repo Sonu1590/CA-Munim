@@ -11,13 +11,14 @@ import { useTasks } from "@/hooks/useTasks";
 import { useBilling } from "@/hooks/useBilling";
 import { useUserRole } from "@/hooks/useUserRole";
 import { ClientCredentialsPanel } from "@/components/clients/ClientCredentialsPanel";
+import { MobileClientProfileScreen } from "@/components/mobile/MobileClientProfileScreen";
 
 const formatDate = (date?: string) => date ? new Date(`${date}T00:00:00`).toLocaleDateString("en-IN") : "-";
 
 export default function ClientProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { clients, loading: clientsLoading } = useClients();
+  const { clients, loading: clientsLoading, updateClient } = useClients();
   const { tasks } = useTasks();
   const { invoices } = useBilling();
   const { isAdmin } = useUserRole();
@@ -43,7 +44,17 @@ export default function ClientProfile() {
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
+      <div className="md:hidden" data-testid="mobile-client-profile">
+        <MobileClientProfileScreen
+          client={client}
+          clientTasks={clientTasks}
+          clientInvoices={clientInvoices}
+          onUpdateClient={updateClient}
+          formatDate={formatDate}
+        />
+      </div>
+
+      <div className="hidden md:block p-4 md:p-6 max-w-6xl mx-auto space-y-5" data-testid="desktop-client-profile">
         <Button variant="ghost" className="px-0 gap-1" onClick={() => navigate("/clients")}>
           <ArrowLeft className="h-4 w-4" /> Clients
         </Button>

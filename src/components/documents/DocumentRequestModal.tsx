@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { fetchClientsFromSupabase } from "@/data/Clients";
 import { documentRequestTypes } from "@/data/Documents";
 import { supabase } from "@/lib/supabase";
+import { sendQuickReminder } from "@/data/WhatsappApi";
+import { useFinancialYear } from "@/context/financialYear";
 import { MessageCircle, Link2, Copy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,6 +19,7 @@ interface Props {
 }
 
 export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }: Props) {
+  const { selectedFY } = useFinancialYear();
   const [selectedClientId, setSelectedClientId] = useState(preselectedClientId || "");
   const [docType, setDocType] = useState("");
   const [customLabel, setCustomLabel] = useState("");
@@ -104,11 +107,24 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
       if (insertErr) throw insertErr;
 
       const link = `${window.location.origin}/upload/${token}`;
-      await navigator.clipboard.writeText(link).catch(() => {});
+      const label = isCustom ? customLabel.trim() : docType;
 
-      toast.success("Document request created!", {
-        description: `Upload link copied to clipboard. Send it to ${selectedClient?.name ?? "client"} via WhatsApp.`,
-      });
+      try {
+        await sendQuickReminder(
+          { id: selectedClientId, name: selectedClient?.name ?? "Client", phone: selectedClient?.phone ?? "", servicesSubscribed: [label] },
+          "Documents Pending",
+          selectedFY,
+          { upload_link: link, doc_name: label, due_date: new Date(dueDate).toLocaleDateString("en-IN") }
+        );
+        toast.success("Document request sent!", {
+          description: `WhatsApp message sent to ${selectedClient?.name ?? "client"} with the upload link.`,
+        });
+      } catch (sendErr: any) {
+        await navigator.clipboard.writeText(link).catch(() => {});
+        toast.error(sendErr?.message ?? "Document request created, but the WhatsApp message failed to send.", {
+          description: "Upload link copied to clipboard — you can share it manually.",
+        });
+      }
 
       onOpenChange(false);
       setSelectedClientId("");
@@ -131,7 +147,7 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[calc(100%-2rem)] rounded-2xl sm:w-full sm:max-w-md sm:rounded-lg">
         <DialogHeader>
           <DialogTitle className="font-heading">Request Document from Client</DialogTitle>
         </DialogHeader>
@@ -190,11 +206,11 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
             </div>
           )}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>Cancel</Button>
-          <Button onClick={handleSend} disabled={sending} className="bg-[#25D366] hover:bg-[#25D366]/90 text-white gap-2">
+        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending} className="w-full sm:w-auto">Cancel</Button>
+          <Button onClick={handleSend} disabled={sending} className="w-full sm:w-auto h-11 sm:h-9 bg-[#25D366] hover:bg-[#25D366]/90 text-white gap-2">
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
-            {sending ? "Creating..." : "Send Request"}
+            {sending ? "Sending..." : "Send Request"}
           </Button>
         </DialogFooter>
       </DialogContent>

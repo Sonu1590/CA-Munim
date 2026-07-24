@@ -8,6 +8,7 @@ import { MessageTemplates } from "@/components/whatsapp/MessageTemplates";
 import { BulkSender } from "@/components/whatsapp/BulkSender";
 import { DeliveryStatus } from "@/components/whatsapp/DeliveryStatus";
 import { ReceivedMessages } from "@/components/whatsapp/ReceivedMessages";
+import { MobileBulkSenderScreen } from "@/components/mobile/MobileBulkSenderScreen";
 import { fetchReceivedMessagesFromSupabase } from "@/data/WhatsappApi";
 
 export default function WhatsApp() {
@@ -73,7 +74,10 @@ export default function WhatsApp() {
           </TabsList>
 
           <TabsContent value="templates"><MessageTemplates /></TabsContent>
-          <TabsContent value="bulk"><BulkSender /></TabsContent>
+          <TabsContent value="bulk">
+            <div className="hidden md:block" data-testid="desktop-bulk-sender"><BulkSender /></div>
+            <div className="md:hidden" data-testid="mobile-bulk-sender"><MobileBulkSenderScreen /></div>
+          </TabsContent>
           <TabsContent value="status"><DeliveryStatus /></TabsContent>
           <TabsContent value="inbox"><ReceivedMessages /></TabsContent>
         </Tabs>

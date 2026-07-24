@@ -24,7 +24,8 @@ export function compileTemplateForClient(
   template: MessageTemplate,
   client: { name: string; pendingFees?: number; servicesSubscribed?: string[] },
   financialYear: string,
-  firm?: { firmName?: string; caName?: string; phone?: string }
+  firm?: { firmName?: string; caName?: string; phone?: string },
+  overrides?: Partial<Record<string, string>>
 ): { text: string; parameters: string[] } {
   const replacements: Record<string, string> = {
     client_name: client.name,
@@ -48,6 +49,7 @@ export function compileTemplateForClient(
     instalment_number: "N/A",
     percentage: "N/A",
     year: String(new Date().getFullYear()),
+    ...overrides,
   };
 
   const text = template.body.replace(/\{\{(\w+)\}\}/g, (_match, key) => replacements[key] ?? "N/A");
@@ -67,7 +69,8 @@ export function compileTemplateForClient(
 export async function sendQuickReminder(
   client: { id: string; name: string; phone: string; pendingFees?: number; servicesSubscribed?: string[] },
   templateNameContains: string,
-  financialYear: string
+  financialYear: string,
+  overrides?: Partial<Record<string, string>>
 ): Promise<void> {
   if (!client.phone) throw new Error(`${client.name} has no phone number on file.`);
 
@@ -79,7 +82,7 @@ export async function sendQuickReminder(
   const template = templates.find((t) => t.name.toLowerCase().includes(templateNameContains.toLowerCase()));
   if (!template) throw new Error(`No "${templateNameContains}" template found — create one in WhatsApp > Templates first.`);
 
-  const { text, parameters } = compileTemplateForClient(template, client, financialYear, firm ?? undefined);
+  const { text, parameters } = compileTemplateForClient(template, client, financialYear, firm ?? undefined, overrides);
 
   await sendBulkWhatsAppMessages(
     [{ id: client.id, name: client.name, phone: client.phone }],

@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/lib/supabase";
 import { Loader2, MessageCircle, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { MobileNotificationSettingsScreen } from "@/components/mobile/MobileNotificationSettingsScreen";
 
 // WhatsApp sending always goes through the platform's own Meta Cloud API
 // credentials (WHATSAPP_ACCESS_TOKEN/WHATSAPP_PHONE_NUMBER_ID function
@@ -120,6 +121,19 @@ export function WhatsAppConfig() {
 
   return (
     <div className="space-y-6">
+      <div className="md:hidden" data-testid="mobile-notification-settings">
+        <MobileNotificationSettingsScreen
+          notifications={notifications}
+          onNotificationChange={(key, value) => setNotifications((p) => ({ ...p, [key]: value }))}
+          reminderDays={reminderDays}
+          onReminderDaysChange={setReminderDays}
+          loadingPrefs={loadingPrefs}
+          saving={saving}
+          onSave={handleSave}
+        />
+      </div>
+
+      <div className="hidden md:block space-y-6" data-testid="desktop-whatsapp-config">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -195,6 +209,7 @@ export function WhatsAppConfig() {
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           Save WhatsApp Settings
         </Button>
+      </div>
       </div>
     </div>
   );

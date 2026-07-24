@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Users, Plus, Mail, Phone, ShieldCheck, Shield, Loader2 } from "lucide-react";
 import { fetchStaffFromSupabase, addStaffToSupabase, updateStaffActiveStatus, type StaffMember } from "@/data/Settings";
 import { useUserRole } from "@/hooks/useUserRole";
+import { MobileTeamScreen } from "@/components/mobile/MobileTeamScreen";
 import { toast } from "sonner";
 
 const roleIcons = { admin: ShieldCheck, staff: Shield };
@@ -92,6 +93,18 @@ export function StaffManagement() {
 
   return (
     <div className="space-y-6">
+      <div className="md:hidden" data-testid="mobile-team">
+        <MobileTeamScreen
+          staff={staffList}
+          loading={loading}
+          error={error}
+          isAdmin={isAdmin}
+          onToggleActive={toggleActive}
+          onAddStaff={() => setShowAddModal(true)}
+        />
+      </div>
+
+      <div className="hidden md:block space-y-6" data-testid="desktop-team">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2"><Users className="h-5 w-5 text-primary" />Staff Members</h3>
@@ -159,9 +172,10 @@ export function StaffManagement() {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100%-2rem)] rounded-2xl sm:w-full sm:max-w-lg sm:rounded-lg">
           <DialogHeader><DialogTitle>Add Staff Member</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div><Label>Full Name</Label><Input className="mt-1.5" value={newStaff.name} onChange={(e) => setNewStaff((p) => ({ ...p, name: e.target.value }))} /></div>
@@ -179,7 +193,10 @@ export function StaffManagement() {
             <div><Label>Email</Label><Input className="mt-1.5" type="email" value={newStaff.email} onChange={(e) => setNewStaff((p) => ({ ...p, email: e.target.value }))} /></div>
             <div><Label>Phone</Label><Input className="mt-1.5" value={newStaff.phone} onChange={(e) => setNewStaff((p) => ({ ...p, phone: e.target.value }))} /></div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button><Button onClick={handleAdd}>Add Staff</Button></DialogFooter>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+            <Button variant="outline" onClick={() => setShowAddModal(false)} className="w-full sm:w-auto">Cancel</Button>
+            <Button onClick={handleAdd} className="w-full sm:w-auto h-11 sm:h-9">Add Staff</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
