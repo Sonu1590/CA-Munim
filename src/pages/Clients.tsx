@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ClientListTable } from "@/components/clients/ClientListTable";
-import { ClientCards } from "@/components/clients/ClientCards";
 import { AddClientModal } from "@/components/clients/AddClientModal";
+import { MobileClientsScreen } from "@/components/mobile/MobileClientsScreen";
 import { ImportClientsModal } from "@/components/clients/ImportClientsModal";
 import { useClients, Client } from "@/hooks/useClients";   // ← CHANGED from mockClients
 import { Button } from "@/components/ui/button";
@@ -87,8 +87,8 @@ export default function Clients() {
   return (
     <AppLayout>
       <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        {/* Header — desktop only; mobile screen owns its own header */}
+        <div className="hidden md:flex md:items-center justify-between gap-3" data-testid="desktop-clients-header">
           <div className="flex items-center gap-2">
             <h1 className="text-xl md:text-2xl font-heading font-bold">Clients</h1>
             <Badge className="bg-primary text-primary-foreground text-xs">
@@ -158,8 +158,20 @@ export default function Clients() {
           </div>
         ) : (
           <>
-            <ClientListTable clients={filtered} onEdit={handleEdit} onView={handleView} />
-            <ClientCards clients={filtered} onEdit={handleEdit} onView={handleView} />
+            <div className="hidden md:block" data-testid="desktop-clients">
+              <ClientListTable clients={filtered} onEdit={handleEdit} onView={handleView} />
+            </div>
+            <div className="md:hidden" data-testid="mobile-clients">
+              <MobileClientsScreen
+                clients={filtered}
+                totalCount={clients.length}
+                search={search}
+                onSearchChange={setSearch}
+                typeFilter={typeFilter}
+                onTypeFilterChange={setTypeFilter}
+                filterOptions={filterOptions}
+              />
+            </div>
           </>
         )}
 

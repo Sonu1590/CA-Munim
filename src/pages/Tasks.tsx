@@ -10,7 +10,8 @@ import { TaskListView } from "@/components/tasks/TaskListView";
 import { TaskCalendarView } from "@/components/tasks/TaskCalendarView";
 import { AddTaskModal } from "@/components/tasks/AddTaskModal";
 import { BulkTaskGenerator } from "@/components/tasks/BulkTaskGenerator";
-import { useTasks } from "@/hooks/useTasks"; 
+import { MobileTasksScreen } from "@/components/mobile/MobileTasksScreen";
+import { useTasks } from "@/hooks/useTasks";
 import { toast } from "sonner";
 
 // Keep these exports here so child components (AddTaskModal etc.) 
@@ -118,8 +119,8 @@ export default function Tasks() {
   return (
     <AppLayout>
       <div className="p-4 md:p-6 space-y-4">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        {/* Header — desktop only; mobile screen owns its own header */}
+        <div className="hidden md:flex md:items-center justify-between gap-3" data-testid="desktop-tasks-header">
           <div>
             <h1 className="text-xl md:text-2xl font-heading font-bold text-foreground">
               Tasks & Deadlines
@@ -146,48 +147,7 @@ export default function Tasks() {
           </div>
         </div>
 
-        {/* Filters + View Toggle */}
-        <div className="flex flex-col md:flex-row gap-3 items-start md:items-center">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tasks or clients..."
-              className="pl-9"
-            />
-          </div>
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-            </SelectContent>
-          </Select>
-          <Tabs value={view} onValueChange={(v) => setView(v as typeof view)} className="ml-auto">
-            <TabsList>
-              <TabsTrigger value="kanban" className="gap-1.5">
-                <LayoutGrid className="h-4 w-4" />
-                <span className="hidden md:inline">Kanban</span>
-              </TabsTrigger>
-              <TabsTrigger value="list" className="gap-1.5">
-                <List className="h-4 w-4" />
-                <span className="hidden md:inline">List</span>
-              </TabsTrigger>
-              <TabsTrigger value="calendar" className="gap-1.5">
-                <CalendarDays className="h-4 w-4" />
-                <span className="hidden md:inline">Calendar</span>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-
-        {/* Empty state */}
+        {/* Empty state — shared */}
         {normalisedTasks.length === 0 && (
           <div className="text-center py-16 text-muted-foreground space-y-3">
             <p className="text-lg font-medium">No tasks yet</p>
@@ -204,9 +164,55 @@ export default function Tasks() {
           </div>
         )}
 
-        {/* Content */}
         {normalisedTasks.length > 0 && (
-          <>
+          <div className="md:hidden" data-testid="mobile-tasks">
+            <MobileTasksScreen tasks={normalisedTasks} stats={stats} onStatusChange={handleStatusChange} />
+          </div>
+        )}
+
+        {/* Desktop: filters + view toggle + content */}
+        {normalisedTasks.length > 0 && (
+          <div className="hidden md:block space-y-4" data-testid="desktop-tasks">
+            <div className="flex flex-col md:flex-row gap-3 items-start md:items-center">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search tasks or clients..."
+                  className="pl-9"
+                />
+              </div>
+              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priorities</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+              <Tabs value={view} onValueChange={(v) => setView(v as typeof view)} className="ml-auto">
+                <TabsList>
+                  <TabsTrigger value="kanban" className="gap-1.5">
+                    <LayoutGrid className="h-4 w-4" />
+                    <span className="hidden md:inline">Kanban</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="list" className="gap-1.5">
+                    <List className="h-4 w-4" />
+                    <span className="hidden md:inline">List</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="calendar" className="gap-1.5">
+                    <CalendarDays className="h-4 w-4" />
+                    <span className="hidden md:inline">Calendar</span>
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
             {view === "kanban" && (
               <TaskKanbanBoard
                 tasks={filteredTasks}
@@ -223,7 +229,7 @@ export default function Tasks() {
               <TaskListView tasks={filteredTasks} onStatusChange={handleStatusChange} onEdit={handleEditTask} onDelete={handleDeleteTask} />
             )}
             {view === "calendar" && <TaskCalendarView tasks={filteredTasks} />}
-          </>
+          </div>
         )}
 
         {/* Modals */}

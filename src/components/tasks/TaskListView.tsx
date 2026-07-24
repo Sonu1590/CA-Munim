@@ -1,6 +1,6 @@
 import { Task } from "@/data/Tasks";
 import { Badge } from "@/components/ui/badge";
-import { format, differenceInDays, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "@/components/ui/table";
@@ -10,29 +10,13 @@ import {
 import { MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TaskTypeIcon } from "./TaskTypeIcon";
+import { getDueDateTextClass, getStatusBadge } from "@/lib/taskDisplay";
 
 interface Props {
   tasks: Task[];
   onStatusChange: (taskId: string, status: Task["status"]) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (task: Task) => void;
-}
-
-function getStatusBadge(status: Task["status"]) {
-  const map: Record<string, { label: string; className: string }> = {
-    pending: { label: "Pending", className: "bg-orange-100 text-orange-700 border-orange-200" },
-    in_progress: { label: "In Progress", className: "bg-blue-100 text-blue-700 border-blue-200" },
-    completed: { label: "Completed", className: "bg-green-100 text-green-700 border-green-200" },
-  };
-  return map[status];
-}
-
-function getDueDateColor(dueDate: string, status: string) {
-  if (status === "completed") return "text-green-600";
-  const days = differenceInDays(parseISO(dueDate), new Date());
-  if (days < 0) return "text-red-600 font-semibold";
-  if (days <= 7) return "text-orange-600";
-  return "text-foreground";
 }
 
 export function TaskListView({ tasks, onStatusChange, onEdit, onDelete }: Props) {
@@ -54,7 +38,7 @@ export function TaskListView({ tasks, onStatusChange, onEdit, onDelete }: Props)
         <TableBody>
           {tasks.map((task) => {
             const statusBadge = getStatusBadge(task.status);
-            const dateColor = getDueDateColor(task.dueDate, task.status);
+            const dateColor = getDueDateTextClass(task.dueDate, task.status);
             return (
               <TableRow key={task.id}>
                 <TableCell>

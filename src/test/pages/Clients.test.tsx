@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import Clients from "@/pages/Clients";
 import { useClients } from "@/hooks/useClients";
 
@@ -25,12 +26,6 @@ vi.mock("@/components/clients/ClientListTable", () => ({
         </div>
       ))}
     </div>
-  ),
-}));
-
-vi.mock("@/components/clients/ClientCards", () => ({
-  ClientCards: ({ clients }: { clients: any[] }) => (
-    <div data-testid="client-cards">Mobile cards: {clients.length}</div>
   ),
 }));
 
@@ -127,7 +122,7 @@ describe("Clients page", () => {
   it("shows a loading state while clients are loading", () => {
     mockClientsState({ clients: [], loading: true });
 
-    render(<Clients />);
+    render(<MemoryRouter><Clients /></MemoryRouter>);
 
     expect(screen.getByText("Loading clients...")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Clients" })).not.toBeInTheDocument();
@@ -137,7 +132,7 @@ describe("Clients page", () => {
     const refetch = vi.fn();
     mockClientsState({ clients: [], error: "Unable to load clients", refetch });
 
-    render(<Clients />);
+    render(<MemoryRouter><Clients /></MemoryRouter>);
 
     expect(screen.getByText("Unable to load clients")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
@@ -147,7 +142,7 @@ describe("Clients page", () => {
   it("renders empty state and opens the add-client modal", () => {
     mockClientsState({ clients: [] });
 
-    render(<Clients />);
+    render(<MemoryRouter><Clients /></MemoryRouter>);
 
     expect(screen.getByText("No clients added yet")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Add First Client/i }));
@@ -157,26 +152,35 @@ describe("Clients page", () => {
   it("renders clients with Indian-grouped fees and filters by search text", () => {
     mockClientsState();
 
-    render(<Clients />);
+    render(<MemoryRouter><Clients /></MemoryRouter>);
 
     expect(screen.getByRole("heading", { name: "Clients" })).toBeInTheDocument();
-    expect(screen.getByText("Mock Client Pvt Ltd")).toBeInTheDocument();
-    expect(screen.getByText("Asha Sharma")).toBeInTheDocument();
-    expect(screen.getByText("1,25,000")).toBeInTheDocument();
+
+    const desktop = within(screen.getByTestId("desktop-clients"));
+    expect(desktop.getByText("Mock Client Pvt Ltd")).toBeInTheDocument();
+    expect(desktop.getByText("Asha Sharma")).toBeInTheDocument();
+    expect(desktop.getByText("1,25,000")).toBeInTheDocument();
+
+    // Mobile Clients tree renders the same real, unmocked data.
+    const mobile = within(screen.getByTestId("mobile-clients"));
+    expect(mobile.getByText("Mock Client Pvt Ltd")).toBeInTheDocument();
+    expect(mobile.getByText("Asha Sharma")).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText("Search by name, PAN, or phone..."), {
       target: { value: "PQRSX" },
     });
 
-    expect(screen.queryByText("Mock Client Pvt Ltd")).not.toBeInTheDocument();
-    expect(screen.getByText("Asha Sharma")).toBeInTheDocument();
+    expect(desktop.queryByText("Mock Client Pvt Ltd")).not.toBeInTheDocument();
+    expect(desktop.getByText("Asha Sharma")).toBeInTheDocument();
+    expect(mobile.queryByText("Mock Client Pvt Ltd")).not.toBeInTheDocument();
+    expect(mobile.getByText("Asha Sharma")).toBeInTheDocument();
   });
 
   it("passes saved client data to addClient and closes the modal on success", async () => {
     const addClient = vi.fn().mockResolvedValue({ success: true });
     mockClientsState({ addClient });
 
-    render(<Clients />);
+    render(<MemoryRouter><Clients /></MemoryRouter>);
 
     fireEvent.click(screen.getByRole("button", { name: /Add Client/i }));
     fireEvent.click(screen.getByRole("button", { name: "Save mock client" }));

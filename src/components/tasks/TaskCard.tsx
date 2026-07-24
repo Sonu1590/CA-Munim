@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Task, ChecklistItem } from "@/data/Tasks";
 import { Badge } from "@/components/ui/badge";
-import { format, differenceInDays, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,7 @@ import { MoreVertical, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TaskChecklistDrawer } from "./TaskChecklistDrawer";
 import { TaskTypeIcon } from "./TaskTypeIcon";
+import { getDueDateBadgeClasses, getPriorityBadge } from "@/lib/taskDisplay";
 
 interface Props {
   task: Task;
@@ -21,26 +22,8 @@ interface Props {
   onChecklistUpdate: (taskId: string, items: ChecklistItem[]) => void | Promise<void>;
 }
 
-function getDueDateColor(dueDate: string, status: string) {
-  if (status === "completed") return "text-green-600 bg-green-50";
-  const days = differenceInDays(parseISO(dueDate), new Date());
-  if (days < 0) return "text-red-600 bg-red-50";
-  if (days <= 7) return "text-orange-600 bg-orange-50";
-  return "text-green-600 bg-green-50";
-}
-
-function getPriorityBadge(priority: Task["priority"]) {
-  const map: Record<string, { label: string; className: string }> = {
-    urgent: { label: "Urgent", className: "bg-destructive text-destructive-foreground" },
-    high: { label: "High", className: "bg-orange-500 text-white" },
-    medium: { label: "Medium", className: "bg-yellow-500 text-white" },
-    low: { label: "Low", className: "bg-muted text-muted-foreground" },
-  };
-  return map[priority];
-}
-
 export function TaskCard({ task, onStatusChange, onEdit, onDelete, onChecklistUpdate }: Props) {
-  const dateColor = getDueDateColor(task.dueDate, task.status);
+  const dateColor = getDueDateBadgeClasses(task.dueDate, task.status);
   const priority = getPriorityBadge(task.priority);
   const [openChecklist, setOpenChecklist] = useState(false);
   const items = task.documentChecklist ?? [];

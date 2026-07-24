@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Tasks from "@/pages/Tasks";
 import { useTasks } from "@/hooks/useTasks";
@@ -260,15 +260,23 @@ describe("Tasks page", () => {
     render(<Tasks />);
 
     expect(screen.getByRole("heading", { name: "Tasks & Deadlines" })).toBeInTheDocument();
-    expect(screen.getByText(/2 total/)).toBeInTheDocument();
-    expect(screen.getByText(/1 pending/)).toBeInTheDocument();
-    expect(screen.getByText("1 overdue")).toBeInTheDocument();
-    expect(screen.getByTestId("kanban-view")).toBeInTheDocument();
-    expect(screen.getByText("GSTR-3B")).toBeInTheDocument();
-    expect(screen.getByText("Mock Client Pvt Ltd")).toBeInTheDocument();
-    expect(screen.getByText("Priya Verma")).toBeInTheDocument();
-    expect(screen.getByText("Docs 1/2")).toBeInTheDocument();
-    expect(screen.getByText("Docs 1/1")).toBeInTheDocument();
+
+    const desktopHeader = within(screen.getByTestId("desktop-tasks-header"));
+    expect(desktopHeader.getByText(/2 total/)).toBeInTheDocument();
+    expect(desktopHeader.getByText(/1 pending/)).toBeInTheDocument();
+    expect(desktopHeader.getByText("1 overdue")).toBeInTheDocument();
+
+    const desktop = within(screen.getByTestId("desktop-tasks"));
+    expect(desktop.getByTestId("kanban-view")).toBeInTheDocument();
+    expect(desktop.getByText("GSTR-3B")).toBeInTheDocument();
+    expect(desktop.getByText("Mock Client Pvt Ltd")).toBeInTheDocument();
+    expect(desktop.getByText("Priya Verma")).toBeInTheDocument();
+    expect(desktop.getByText("Docs 1/2")).toBeInTheDocument();
+    expect(desktop.getByText("Docs 1/1")).toBeInTheDocument();
+
+    // Mobile Tasks tree renders the same real data in its own layout.
+    const mobile = within(screen.getByTestId("mobile-tasks"));
+    expect(mobile.getByText(/2 total/)).toBeInTheDocument();
   });
 
   it("filters tasks by search text", () => {
@@ -280,9 +288,10 @@ describe("Tasks page", () => {
       target: { value: "asha" },
     });
 
-    expect(screen.queryByText("Mock Client Pvt Ltd")).not.toBeInTheDocument();
-    expect(screen.getByText("Asha Sharma")).toBeInTheDocument();
-    expect(screen.getByText("ITR Filing")).toBeInTheDocument();
+    const desktop = within(screen.getByTestId("desktop-tasks"));
+    expect(desktop.queryByText("Mock Client Pvt Ltd")).not.toBeInTheDocument();
+    expect(desktop.getByText("Asha Sharma")).toBeInTheDocument();
+    expect(desktop.getByText("ITR Filing")).toBeInTheDocument();
   });
 
   it("switches between list and calendar views", async () => {
