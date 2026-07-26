@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Send, Loader2, Clock, Check } from "lucide-react";
+import { Search, Send, Loader2, Clock, Check, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import {
   compileTemplateForClient,
@@ -9,6 +9,7 @@ import {
   sendBulkWhatsAppMessages,
 } from "@/data/WhatsappApi";
 import { fetchClientsFromSupabase, type Client } from "@/data/Clients";
+import { fetchInvoicesFromSupabase, type Invoice } from "@/data/Billing";
 import { fetchFirmProfileFromSupabase, type FirmProfile } from "@/data/Settings";
 import { useFinancialYear } from "@/context/financialYear";
 
@@ -31,12 +32,31 @@ export function MobileBulkSenderScreen() {
 
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [firmProfile, setFirmProfile] = useState<FirmProfile | null>(null);
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [clientsLoading, setClientsLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
   const template = templates.find((t) => t.id === selectedTemplate);
+
+  // Same invoice-gating as the desktop BulkSender: a template referencing
+  // {{invoice_number}} (e.g. "Invoice Payment Due") needs one real,
+  // specific bill — meaningless at the client level this screen otherwise
+  // operates at. compileTemplateForClient used to silently fall back to
+  // "N/A"/₹0 for these instead of ever surfacing that the data didn't exist.
+  const needsInvoice = template?.variables.includes("invoice_number") ?? false;
+
+  // Same "billed, unpaid, not cancelled/draft" filter FeesDashboard.tsx /
+  // MobileBillingScreen.tsx already use, picking the earliest-due
+  // outstanding invoice per client.
+  const invoiceByClientId = new Map<string, Invoice>();
+  invoices
+    .filter((i) => i.amountDue > 0 && i.status !== "Cancelled" && i.status !== "Draft")
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+    .forEach((i) => {
+      if (!invoiceByClientId.has(i.clientId)) invoiceByClientId.set(i.clientId, i);
+    });
 
   useEffect(() => {
     fetchMessageTemplatesFromSupabase()
@@ -50,6 +70,9 @@ export function MobileBulkSenderScreen() {
     fetchFirmProfileFromSupabase()
       .then(setFirmProfile)
       .catch(() => setFirmProfile(null));
+    fetchInvoicesFromSupabase()
+      .then(setInvoices)
+      .catch(() => setInvoices([]));
   }, []);
 
   const filteredClients = (() => {
@@ -63,12 +86,27 @@ export function MobileBulkSenderScreen() {
   const searchedClients = filteredClients.filter((c) => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
 
   const toggleClient = (id: string) => {
+    if (needsInvoice && !invoiceByClientId.has(id)) return; // no real invoice to send about
     setSelectedClients((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const selectTemplate = (id: string) => {
+    setSelectedTemplate(id);
+    const next = templates.find((t) => t.id === id);
+    if (next?.variables.includes("invoice_number")) {
+      setSelectedClients((prev) => prev.filter((cid) => invoiceByClientId.has(cid)));
+    }
+  };
+
+  const overridesFor = (client: Client): Record<string, string> | undefined => {
+    if (!needsInvoice) return undefined;
+    const inv = invoiceByClientId.get(client.id);
+    return inv ? { invoice_number: inv.invoiceNumber, amount: inv.amountDue.toLocaleString("en-IN") } : undefined;
   };
 
   const previewClient = clients.find((c) => c.id === selectedClients[0]);
   const previewText = template && previewClient
-    ? compileTemplateForClient(template, previewClient, selectedFY, firmProfile ?? undefined).text
+    ? compileTemplateForClient(template, previewClient, selectedFY, firmProfile ?? undefined, overridesFor(previewClient)).text
     : "";
 
   const handleSend = async () => {
@@ -80,7 +118,7 @@ export function MobileBulkSenderScreen() {
       const compiledTexts: Record<string, string> = {};
       const parametersByClientId: Record<string, string[]> = {};
       recipients.forEach((client) => {
-        const compiled = compileTemplateForClient(template, client, selectedFY, firmProfile ?? undefined);
+        const compiled = compileTemplateForClient(template, client, selectedFY, firmProfile ?? undefined, overridesFor(client));
         compiledTexts[client.id] = compiled.text;
         parametersByClientId[client.id] = compiled.parameters;
       });
@@ -117,7 +155,7 @@ export function MobileBulkSenderScreen() {
             <button
               type="button"
               key={t.id}
-              onClick={() => setSelectedTemplate(t.id)}
+              onClick={() => selectTemplate(t.id)}
               className={`text-left rounded-mobile-md p-3 shadow-mobile-sm ${
                 selectedTemplate === t.id ? "bg-mobile-accent text-white" : "bg-mobile-neutral-100 text-mobile-text"
               }`}
@@ -135,6 +173,12 @@ export function MobileBulkSenderScreen() {
       )}
 
       <div className="text-xs font-bold text-mobile-neutral-600 mb-2">2. Recipients</div>
+      {needsInvoice && (
+        <div className="flex items-start gap-2 rounded-mobile-sm bg-mobile-neutral-100 p-2.5 text-xs text-mobile-neutral-600 mb-2.5">
+          <ReceiptText className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>"{template?.name}" needs a real outstanding invoice — clients without one are grayed out and can't be selected.</span>
+        </div>
+      )}
       <div className="flex gap-2 overflow-x-auto mb-2.5 pb-1 -mx-4 px-4">
         {recipientFilters.map((f) => (
           <button
@@ -165,12 +209,14 @@ export function MobileBulkSenderScreen() {
           {searchedClients.length > 0 ? (
             searchedClients.map((c) => {
               const checked = selectedClients.includes(c.id);
+              const sendable = !needsInvoice || invoiceByClientId.has(c.id);
               return (
                 <button
                   type="button"
                   key={c.id}
                   onClick={() => toggleClient(c.id)}
-                  className="flex items-center gap-3 bg-mobile-neutral-100 rounded-mobile-sm p-2.5"
+                  disabled={!sendable}
+                  className={`flex items-center gap-3 bg-mobile-neutral-100 rounded-mobile-sm p-2.5 ${!sendable ? "opacity-50" : ""}`}
                 >
                   <span
                     className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
@@ -181,7 +227,9 @@ export function MobileBulkSenderScreen() {
                   </span>
                   <div className="flex-1 min-w-0 text-left">
                     <div className="text-sm font-bold truncate">{c.name}</div>
-                    <div className="text-xs text-mobile-neutral-600">{c.phone}</div>
+                    <div className="text-xs text-mobile-neutral-600">
+                      {sendable ? c.phone : "No pending invoice"}
+                    </div>
                   </div>
                 </button>
               );

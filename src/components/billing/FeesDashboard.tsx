@@ -23,7 +23,8 @@ export function FeesDashboard({ invoices }: FeesDashboardProps) {
       await sendQuickReminder(
         { id: inv.clientId, name: inv.clientName, phone: client.phone, pendingFees: inv.amountDue },
         "Invoice Payment Due",
-        inv.financialYear
+        inv.financialYear,
+        { invoice_number: inv.invoiceNumber, amount: inv.amountDue.toLocaleString("en-IN") }
       );
       toast.success(`Reminder sent to ${inv.clientName}`);
     } catch (err: any) {

@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { compileTemplateForClient, defaultTemplates, fetchMessageTemplatesFromSupabase, MessageTemplate, sendBulkWhatsAppMessages,TemplateCategory } from "@/data/WhatsappApi";
 import { fetchClientsFromSupabase, type Client } from "@/data/Clients";
+import { fetchInvoicesFromSupabase, type Invoice } from "@/data/Billing";
 import { fetchFirmProfileFromSupabase, type FirmProfile } from "@/data/Settings";
-import { Send, ChevronRight, ChevronLeft, Search, Clock, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
+import { Send, ChevronRight, ChevronLeft, Search, Clock, CheckCircle2, Loader2, AlertCircle, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useFinancialYear } from "@/context/financialYear";
@@ -37,6 +38,7 @@ export function BulkSender() {
 
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [firmProfile, setFirmProfile] = useState<FirmProfile | null>(null);
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [clientsLoading, setClientsLoading] = useState(true);
@@ -45,6 +47,28 @@ export function BulkSender() {
   const [sending, setSending] = useState(false);
 
   const template = templates.find((t) => t.id === selectedTemplate);
+
+  // Some templates (e.g. "Invoice Payment Due") reference {{invoice_number}}/
+  // {{amount}} tied to one specific bill — meaningless at the client level
+  // this bulk-send flow otherwise operates at. When such a template is
+  // selected, only clients with a real outstanding invoice are sendable,
+  // and their real invoice's number/amount are used instead of the
+  // client-level pendingFees fallback (which used to silently show
+  // "N/A"/₹0 — see ISSUES.md).
+  const needsInvoice = template?.variables.includes("invoice_number") ?? false;
+
+  // Same "billed, unpaid, not cancelled/draft" filter FeesDashboard.tsx and
+  // MobileBillingScreen.tsx already use — kept identical so this flow only
+  // ever offers to send about an invoice that's genuinely due, not a draft
+  // that hasn't even been sent to the client yet. Picks the earliest-due
+  // outstanding invoice per client, same tie-break as those two screens.
+  const invoiceByClientId = new Map<string, Invoice>();
+  invoices
+    .filter((i) => i.amountDue > 0 && i.status !== "Cancelled" && i.status !== "Draft")
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+    .forEach((i) => {
+      if (!invoiceByClientId.has(i.clientId)) invoiceByClientId.set(i.clientId, i);
+    });
 
   useEffect(() => {
     const loadTemplates = async () => {
@@ -86,9 +110,23 @@ export function BulkSender() {
       }
     };
 
+    const loadInvoices = async () => {
+      try {
+        const data = await fetchInvoicesFromSupabase();
+        setInvoices(data);
+      } catch {
+        // Non-fatal for the rest of the wizard — only invoice-tied
+        // templates need this; every other template keeps working even if
+        // this fetch fails. Those templates will just show 0 sendable
+        // recipients, same as if the firm genuinely had none due.
+        setInvoices([]);
+      }
+    };
+
     loadTemplates();
     loadClients();
     loadFirmProfile();
+    loadInvoices();
   }, []);
 
   const getFilteredClients = () => {
@@ -102,13 +140,17 @@ export function BulkSender() {
 
   const filteredClients = getFilteredClients();
   const searchedClients = filteredClients.filter((c) => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
+  const sendableSearchedClients = needsInvoice
+    ? searchedClients.filter((c) => invoiceByClientId.has(c.id))
+    : searchedClients;
 
   const toggleClient = (id: string) => {
+    if (needsInvoice && !invoiceByClientId.has(id)) return; // no real invoice to send about
     setSelectedClients((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   };
 
   const toggleAll = () => {
-    const visibleIds = searchedClients.map((c) => c.id);
+    const visibleIds = sendableSearchedClients.map((c) => c.id);
     const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedClients.includes(id));
     setSelectedClients((prev) =>
       allVisibleSelected
@@ -117,14 +159,20 @@ export function BulkSender() {
     );
   };
 
+  const overridesFor = (client: Client): Record<string, string> | undefined => {
+    if (!needsInvoice) return undefined;
+    const inv = invoiceByClientId.get(client.id);
+    return inv ? { invoice_number: inv.invoiceNumber, amount: inv.amountDue.toLocaleString("en-IN") } : undefined;
+  };
+
   const renderPreview = (client: Client) => {
     if (!template) return "";
-    return compileTemplateForClient(template, client, selectedFY, firmProfile ?? undefined).text;
+    return compileTemplateForClient(template, client, selectedFY, firmProfile ?? undefined, overridesFor(client)).text;
   };
 
   const getTemplateParameters = (client: Client): string[] => {
     if (!template) return [];
-    return compileTemplateForClient(template, client, selectedFY, firmProfile ?? undefined).parameters;
+    return compileTemplateForClient(template, client, selectedFY, firmProfile ?? undefined, overridesFor(client)).parameters;
   };
 
   const handleSend = async () => {
@@ -141,8 +189,15 @@ export function BulkSender() {
       const compiledTexts: Record<string, string> = {};
       const parametersByClientId: Record<string, string[]> = {};
       recipients.forEach(client => {
-        compiledTexts[client.id] = renderPreview(client);
-        parametersByClientId[client.id] = getTemplateParameters(client);
+        const { text, parameters } = compileTemplateForClient(
+          template,
+          client,
+          selectedFY,
+          firmProfile ?? undefined,
+          overridesFor(client),
+        );
+        compiledTexts[client.id] = text;
+        parametersByClientId[client.id] = parameters;
       });
 
       // 2. Call the live Meta API bridge
@@ -216,7 +271,16 @@ export function BulkSender() {
               templates.map((t) => (
                 <div
                   key={t.id}
-                  onClick={() => setSelectedTemplate(t.id)}
+                  onClick={() => {
+                    setSelectedTemplate(t.id);
+                    // Switching to an invoice-tied template can strand
+                    // previously-selected clients who have no real invoice —
+                    // drop them rather than silently sending them a broken
+                    // ("N/A"/₹0-parameter) message.
+                    if (t.variables.includes("invoice_number")) {
+                      setSelectedClients((prev) => prev.filter((id) => invoiceByClientId.has(id)));
+                    }
+                  }}
                   className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                     selectedTemplate === t.id ? "border-[#25D366] bg-[#25D366]/5" : "border-border hover:border-muted-foreground/30"
                   }`}
@@ -245,6 +309,15 @@ export function BulkSender() {
               </SelectContent>
             </Select>
 
+            {needsInvoice && (
+              <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+                <ReceiptText className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>
+                  "{template?.name}" needs a real outstanding invoice — clients without one are grayed out below and can't be selected.
+                </span>
+              </div>
+            )}
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder="Search clients..." className="pl-9" value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} />
@@ -262,22 +335,38 @@ export function BulkSender() {
             ) : (
               <>
                 <div className="flex items-center gap-2 pb-2 border-b border-border">
-                  <Checkbox checked={searchedClients.length > 0 && searchedClients.every((c) => selectedClients.includes(c.id))} onCheckedChange={toggleAll} />
-                  <span className="text-sm font-medium">Select All ({searchedClients.length})</span>
+                  <Checkbox checked={sendableSearchedClients.length > 0 && sendableSearchedClients.every((c) => selectedClients.includes(c.id))} onCheckedChange={toggleAll} />
+                  <span className="text-sm font-medium">
+                    Select All ({sendableSearchedClients.length}{needsInvoice && sendableSearchedClients.length !== searchedClients.length ? ` of ${searchedClients.length}` : ""})
+                  </span>
                   <Badge className="ml-auto">{selectedClients.length} selected</Badge>
                 </div>
 
                 <div className="max-h-64 overflow-y-auto space-y-1">
-                  {searchedClients.length > 0 ? searchedClients.map((c) => (
-                    <div key={c.id} className="flex items-center gap-3 py-2 px-1 hover:bg-muted/50 rounded">
-                      <Checkbox checked={selectedClients.includes(c.id)} onCheckedChange={() => toggleClient(c.id)} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{c.name}</p>
-                        <p className="text-xs text-muted-foreground">{c.phone}</p>
+                  {searchedClients.length > 0 ? searchedClients.map((c) => {
+                    const sendable = !needsInvoice || invoiceByClientId.has(c.id);
+                    return (
+                      <div
+                        key={c.id}
+                        className={`flex items-center gap-3 py-2 px-1 rounded ${sendable ? "hover:bg-muted/50" : "opacity-50"}`}
+                      >
+                        <Checkbox
+                          checked={selectedClients.includes(c.id)}
+                          onCheckedChange={() => toggleClient(c.id)}
+                          disabled={!sendable}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{c.name}</p>
+                          <p className="text-xs text-muted-foreground">{c.phone}</p>
+                        </div>
+                        {sendable ? (
+                          <Badge variant="outline" className="text-[10px] shrink-0">{c.type}</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] shrink-0 text-muted-foreground">No pending invoice</Badge>
+                        )}
                       </div>
-                      <Badge variant="outline" className="text-[10px] shrink-0">{c.type}</Badge>
-                    </div>
-                  )) : (
+                    );
+                  }) : (
                     <div className="text-center py-12 text-muted-foreground">No clients match the filter/search.</div>
                   )}
                 </div>
