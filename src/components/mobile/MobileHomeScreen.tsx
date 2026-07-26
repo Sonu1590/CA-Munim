@@ -48,6 +48,8 @@ function templateSearchTermFor(taskType: string): string {
   return "Filing Reminder";
 }
 
+const DIGEST_VISIBLE_LIMIT = 5;
+
 function formatDayMonth(dateStr: string) {
   const d = new Date(dateStr);
   return {
@@ -142,10 +144,13 @@ export function MobileHomeScreen({ metrics, complianceAlerts, digest, caName, re
         </div>
       </div>
 
-      {/* Needs your attention */}
+      {/* Needs your attention — capped so a firm with a real backlog (this
+          list can hold up to 50 items, per useDashboard's fetchDigest limit)
+          doesn't push the compliance calendar and quick actions far below
+          the fold. Same fix applied to the desktop equivalent, TodayDigest.tsx. */}
       <h2 className="font-mobile-heading font-normal text-lg mb-2.5">Needs your attention</h2>
       <div className="flex flex-col gap-2.5 mb-5">
-        {digest.map((item) => (
+        {digest.slice(0, DIGEST_VISIBLE_LIMIT).map((item) => (
           <div key={item.id} className="bg-mobile-neutral-100 rounded-mobile-md p-3.5 shadow-mobile-sm flex flex-col gap-2.5">
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -180,6 +185,15 @@ export function MobileHomeScreen({ metrics, complianceAlerts, digest, caName, re
           <div className="bg-mobile-accent-2-100 rounded-mobile-md p-4.5 text-center text-sm text-mobile-accent-2-800">
             All caught up — nothing overdue or due today 🎉
           </div>
+        )}
+        {digest.length > DIGEST_VISIBLE_LIMIT && (
+          <button
+            type="button"
+            onClick={() => navigate("/tasks")}
+            className="w-full rounded-mobile-md py-2.5 bg-mobile-neutral-100 shadow-mobile-sm text-sm font-bold text-mobile-accent-700 text-center"
+          >
+            +{digest.length - DIGEST_VISIBLE_LIMIT} more — View all in Tasks
+          </button>
         )}
       </div>
 
