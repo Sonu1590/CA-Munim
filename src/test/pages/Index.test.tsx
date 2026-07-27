@@ -1,9 +1,10 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "@/pages/Index";
 import { useDashboard } from "@/hooks/useDashboard";
 import { FinancialYearProvider } from "@/context/financialYear";
+import { buildDigestItems } from "@/test/fixtures/dashboard";
 
 vi.mock("@/hooks/useDashboard", () => ({
   useDashboard: vi.fn(),
@@ -152,6 +153,62 @@ describe("Dashboard page", () => {
     expect(mobile.getByText("Another Client")).toBeInTheDocument();
     expect(mobile.getAllByRole("button", { name: /Nudge on WhatsApp/i })).toHaveLength(2);
     expect(mobile.getAllByRole("button", { name: /Mark filed/i })).toHaveLength(2);
+  });
+
+  // Regression test for the bug where TodayDigest/MobileHomeScreen rendered
+  // every digest item unbounded (up to 50, per useDashboard's fetchDigest
+  // limit), pushing metric cards/compliance alerts/quick actions far below
+  // the fold — invisible until now because every other test here only ever
+  // used 2 mock items. See ISSUES.md and .claude/CLAUDE.md's testing
+  // conventions for the "pair a small mock with a large-dataset case" rule
+  // this test is meant to exemplify going forward.
+  it("caps the digest list at 5 items with a 'View all' link when given a real-scale (50 item) dataset", async () => {
+    const digest = buildDigestItems(50, (i) => ({
+      clientName: `Digest Client ${i}`,
+      // First 45 overdue (descending severity), last 5 due today — exercises
+      // both branches TodayDigest/MobileHomeScreen render differently.
+      daysOverdue: i < 45 ? 45 - i : 0,
+    }));
+
+    mockUseDashboard.mockReturnValue({
+      metrics: { totalClients: 50, overdueTasks: 45, pendingFees: 0, dueThisWeek: 0 },
+      complianceAlerts: [],
+      digest,
+      activity: [],
+      monthlyWork: { completed: 0, total: 0, byType: [] },
+      loading: false,
+      firmName: "Demo Firm",
+      caName: "R Sharma",
+      refetch: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <FinancialYearProvider>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/tasks" element={<div>TASKS_PAGE_SENTINEL</div>} />
+          </Routes>
+        </FinancialYearProvider>
+      </MemoryRouter>,
+    );
+
+    const desktop = within(screen.getByTestId("desktop-dashboard"));
+    // Only the first 5 (by array order) render — not all 50.
+    expect(desktop.getAllByText(/Digest Client \d+/)).toHaveLength(5);
+    for (let i = 0; i < 5; i++) {
+      expect(desktop.getByText(new RegExp(`Digest Client ${i}\\b`))).toBeInTheDocument();
+    }
+    expect(desktop.queryByText(/Digest Client 10\b/)).not.toBeInTheDocument();
+    const desktopViewAll = desktop.getByRole("button", { name: /\+45 more — View all in Tasks/ });
+    expect(desktopViewAll).toBeInTheDocument();
+
+    const mobile = within(screen.getByTestId("mobile-home"));
+    expect(mobile.getAllByText(/Digest Client \d+/)).toHaveLength(5);
+    expect(mobile.getByRole("button", { name: /\+45 more — View all in Tasks/ })).toBeInTheDocument();
+
+    fireEvent.click(desktopViewAll);
+    expect(await screen.findByText("TASKS_PAGE_SENTINEL")).toBeInTheDocument();
   });
 
   it("renders useful empty states when there is no dashboard data", () => {

@@ -288,6 +288,30 @@ User reported seeing "Invoice #N/A of ₹0 is due for payment" in the Bulk Sende
 - `BulkSender.tsx`/`MobileBulkSenderScreen.tsx` now fetch invoices alongside clients and, whenever the selected template's `variables` includes `invoice_number` (a general check, not hardcoded to this one template's name), gate the recipient list to only clients with a real outstanding invoice (`amountDue > 0`, not Cancelled/Draft — same filter as FeesDashboard) — those without one are shown grayed out with a "No pending invoice" label and can't be checked, with an explanatory banner above the list. Switching to such a template also prunes any already-selected clients who don't qualify. The real invoice's number/amount are used for compilation instead of the client-level fallback.
 **Verified:** live against the real dev server + Supabase project. Confirmed via DB query the client's invoice was genuinely in Draft status (₹0 was consistent with that, not a separate bug), moved it to Sent, then confirmed the Bulk Sender preview showed "Invoice #INV-202627-0022 of ₹1,770 is due for payment" — real data, both desktop and mobile. Confirmed non-invoice templates show no gating banner and behave unchanged (regression check). `npx tsc --noEmit` clean, full unit suite (118/118) passing.
 
+### M27. 20 more components render a variable-length, firm-scale list with no cap, pagination, or virtualization — same bug shape as the TodayDigest fix, not fixed here
+**Context:** after fixing M-numbered `TodayDigest.tsx`/`MobileHomeScreen.tsx` (dashboard digest rendering all 50 items unbounded — see the 2026-07-26 dashboard-fix commit), user asked for gatechecking against this whole bug class app-wide. An audit found 20 more components with the identical risk shape — a `.map()` over data that can plausibly grow to hundreds of rows in a real firm, with zero cap/scroll-container/pagination — all backed by unbounded Supabase fetches (`useClients.ts`, `useTasks.ts`, `useBilling.ts` fetch everything, no `.range()`/`.limit()`). **No shared pagination or virtualization utility exists anywhere in the codebase** — `src/components/ui/pagination.tsx` (shadcn's primitive) is present but imported nowhere, dead code. Test infrastructure to catch this class going forward was added separately (`src/test/fixtures/dashboard.ts`'s `buildDigestItems` factory + a new large-dataset regression test in `Index.test.tsx` — see `CLAUDE.md`'s Testing Conventions section for the new "pair every list test with a large-dataset case" rule).
+
+**Not fixed here** — logged as a prioritized backlog. The 20 findings split into two genuinely different fix shapes:
+
+**Cheap "cap + view all" fixes (same TodayDigest pattern — a widget/glance surface, not a primary browse page):**
+- `src/components/settings/AuditTrail.tsx:141` — fetch already capped at 200 (`fetchAuditLog()`, `src/data/AuditLog.ts:36`) but rendered as one flat unscrolled list — the closest exact repeat of the original bug shape.
+- `src/components/settings/ComplianceUpdatesFeed.tsx:47` — accumulating compliance-news feed, unbounded fetch.
+- `src/components/whatsapp/DeliveryStatus.tsx:117` — all sent WhatsApp messages, unbounded fetch, grows every bulk send.
+- `src/components/whatsapp/ReceivedMessages.tsx:83` — all inbound WhatsApp messages, same growth profile.
+
+**Primary browse pages needing real pagination/virtualization (capping-with-a-link is the wrong fix — users need to see all their clients/tasks/invoices; recommend introducing one shared primitive, e.g. wiring up the unused `src/components/ui/pagination.tsx` or a `useCappedList`/paged-fetch hook, before fixing these individually so the pattern doesn't fragment further — 6+ different ad hoc `.slice(0, N)` conventions already coexist: `FeesDashboard.tsx`/`GlobalSearch.tsx` both use `.slice(0, 20)`, `TaskCalendarView.tsx` uses `.slice(0, 3)` per day, etc.):**
+- `src/components/clients/ClientListTable.tsx:50` (desktop) / `ClientCards.tsx:28` (mobile) — all clients, the Clients page's primary view.
+- `src/components/tasks/TaskListView.tsx:39`, `TaskKanbanBoard.tsx:47` (desktop), `src/components/mobile/MobileTasksScreen.tsx:56` (mobile) — all tasks, the Tasks page's primary views.
+- `src/components/billing/InvoiceList.tsx:146` (desktop) / `:199` (mobile), `src/components/mobile/MobileBillingScreen.tsx:80` — all invoices, the Billing page's primary view.
+- `src/components/documents/ClientDocumentList.tsx:80` — all clients, Documents module entry point.
+- `src/components/documents/BulkDocumentStatus.tsx:106` (desktop) / `:138` (mobile) — all pending document requests across all clients.
+- `src/components/reports/ReceivablesAgingReport.tsx:142` (desktop) / `:158` (mobile) — one row per client with an outstanding balance.
+
+**Lower priority (bounded per-client in practice, revisit later):**
+- `src/components/documents/ClientDocumentFolder.tsx:202`, `src/components/reports/ClientLedgerReport.tsx:139`/`:158`, `src/components/mobile/MobileClientProfileScreen.tsx:148`/`:170` (tasks/billing tabs).
+
+**Fix (for a later pass):** two separate efforts — (1) the 4 glance-surface components get the same cap-and-link treatment `TodayDigest.tsx` already has; (2) the primary-browse-page components need a real pagination or virtualization design first (they're where a firm's day-to-day work happens, so a "view elsewhere" link isn't the right UX), applied consistently via one shared primitive rather than per-page ad hoc caps.
+
 ---
 
 ## Low / Cleanup
