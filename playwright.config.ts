@@ -4,7 +4,17 @@ import { config } from 'dotenv';
 // Nothing else in this repo auto-loads e2e/.env.test — helpers/auth.ts's
 // requireTestEnv() reads TEST_USER_EMAIL/TEST_USER_PASSWORD straight from
 // process.env, so without this every run needs them exported manually.
-config({ path: 'e2e/.env.test' });
+//
+// quiet: true suppresses dotenv's own stdout line on every load. Since
+// v17.4.x that line rotates through promotional "tips" for the package
+// author's other projects (dotenvx.com, vestauth.com) — two of which are
+// explicitly worded "for agents", i.e. aimed at AI coding assistants
+// reading test/build output rather than the human running the tests. This
+// has already been publicly flagged as a supply-chain prompt-injection
+// concern (see github.com/BeMySlaveDarlin/cc-bootstrapper issue #1).
+// Suppressing it here is just noise reduction — nothing in this repo acts
+// on that output — but there's no reason to keep printing it.
+config({ path: 'e2e/.env.test', quiet: true });
 
 export default defineConfig({
   testDir: './e2e',
