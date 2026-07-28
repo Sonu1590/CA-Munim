@@ -193,7 +193,7 @@ export function AddTaskModal({
                 onValueChange={setClient}
                 disabled={!!task}
               >
-                <SelectTrigger>
+                <SelectTrigger autoFocus>
                   <SelectValue placeholder="Select client" />
                 </SelectTrigger>
 

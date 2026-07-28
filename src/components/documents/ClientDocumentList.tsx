@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useDeferredValue } from "react";
 import { fetchClientsFromSupabase } from "@/data/Clients";
 import { fetchDocumentsFromSupabase } from "@/data/Documents";
 import { Input } from "@/components/ui/input";
@@ -42,9 +42,11 @@ export function ClientDocumentList({ onSelectClient }: Props) {
     docCount: documents.filter((d) => d.clientId === c.id).length,
   }));
 
+  // M33, ISSUES.md — see the same note in pages/Clients.tsx.
+  const deferredSearch = useDeferredValue(search);
   const filtered = clientsWithCounts.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.pan.toLowerCase().includes(search.toLowerCase())
+    c.name.toLowerCase().includes(deferredSearch.toLowerCase()) ||
+    c.pan.toLowerCase().includes(deferredSearch.toLowerCase())
   );
 
   if (loading) {

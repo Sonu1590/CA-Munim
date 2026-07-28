@@ -55,7 +55,9 @@ export function MobileFAB() {
         />
       )}
 
-      <div className="md:hidden fixed bottom-20 right-4 z-50 flex flex-col items-end gap-2 font-mobile-body">
+      {/* bottom-24 (H15, ISSUES.md) — was bottom-20, sitting flush against
+          the bottom nav with no visual clearance. */}
+      <div className="md:hidden fixed bottom-24 right-4 z-50 flex flex-col items-end gap-2 font-mobile-body">
         {/* Quick action buttons */}
         {open &&
           actions.map((a, i) => (

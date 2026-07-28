@@ -6,6 +6,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -218,12 +228,25 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
     setIsDirty(false);
   }, [open, client]);
 
+  // M32, ISSUES.md — was a raw window.confirm(); now the AlertDialog
+  // rendered alongside the main Dialog below. The main Dialog stays open
+  // while this confirmation is pending — it only actually closes on
+  // confirmDiscardClose.
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen && isDirty) {
-      if (!window.confirm("You have unsaved changes. Close anyway?")) return;
+      setConfirmCloseOpen(true);
+      return;
     }
     if (!newOpen) resetForm();
     onOpenChange(newOpen);
+  };
+
+  const confirmDiscardClose = () => {
+    setConfirmCloseOpen(false);
+    resetForm();
+    onOpenChange(false);
   };
 
   const handleSave = async () => {
@@ -300,17 +323,39 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
           <DialogTitle className="text-lg font-heading">{client ? "Edit Client" : "Add New Client"}</DialogTitle>
           <DialogDescription className="sr-only">Enter the client's KYC, tax, and billing details.</DialogDescription>
         </DialogHeader>
+
+        {/* Section jump nav (L9, ISSUES.md) — the form has 5 sections (A-E,
+            C conditional) with heavy scrolling and no sense of position or
+            how much remains. Plain anchor links + scrollIntoView rather than
+            a scroll-spy "current section" indicator — simpler and lower-risk
+            for a polish-tier fix, and still gives real navigational value. */}
+        <div className="flex items-center gap-1 px-6 pb-2 text-xs font-medium text-muted-foreground">
+          {(["a", "b", ...(isCompanyType ? ["c"] : []), "d", "e"] as const).map((letter) => (
+            <a
+              key={letter}
+              href={`#section-${letter}`}
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById(`section-${letter}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="h-6 w-6 flex items-center justify-center rounded-full border border-border hover:border-primary hover:text-primary transition-colors uppercase"
+            >
+              {letter}
+            </a>
+          ))}
+        </div>
+
         <ScrollArea className="max-h-[75vh] px-6 pb-6">
           <div className="space-y-6 pt-4">
             {/* Section A: Basic Details */}
-            <section>
+            <section id="section-a">
               <h3 className="text-sm font-heading font-semibold text-primary mb-3">
                 A. Basic Details
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="fullName">Full Name *</Label>
-                  <Input id="fullName" placeholder="Client name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                  <Input id="fullName" autoFocus placeholder="Client name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Client Type *</Label>
@@ -421,7 +466,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
             <Separator />
 
             {/* Section B: Tax & Compliance */}
-            <section>
+            <section id="section-b">
               <h3 className="text-sm font-heading font-semibold text-primary mb-3">
                 B. Tax & Compliance Details
               </h3>
@@ -490,7 +535,15 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="tan">TAN Number</Label>
-                  <Input id="tan" className="font-mono uppercase" placeholder="Optional" value={tanValue} onChange={(e) => setTanValue(e.target.value.toUpperCase())} />
+                  {/* No `uppercase` class (L7, ISSUES.md) — it applied
+                      text-transform to the whole input including the
+                      placeholder, rendering "Optional" as "OPTIONAL" and
+                      breaking casing consistency with every other optional
+                      field's placeholder. The typed value is already forced
+                      uppercase via .toUpperCase() below, so the class was
+                      redundant for real input and only affected the
+                      placeholder. */}
+                  <Input id="tan" className="font-mono" placeholder="Optional" value={tanValue} onChange={(e) => setTanValue(e.target.value.toUpperCase())} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="ward">IT Ward / AO Code</Label>
@@ -514,7 +567,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
             {isCompanyType && (
               <>
                 <Separator />
-                <section>
+                <section id="section-c">
                   <h3 className="text-sm font-heading font-semibold text-primary mb-3">
                     C. Company / ROC Details
                   </h3>
@@ -581,7 +634,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
             <Separator />
 
             {/* Section D: Services Subscribed */}
-            <section>
+            <section id="section-d">
               <h3 className="text-sm font-heading font-semibold text-primary mb-3">
                 D. Services Subscribed
               </h3>
@@ -601,7 +654,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
             <Separator />
 
             {/* Section E: Fees & Billing */}
-            <section>
+            <section id="section-e">
               <h3 className="text-sm font-heading font-semibold text-primary mb-3">
                 E. Fees & Billing
               </h3>
@@ -666,6 +719,21 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
           </div>
         </ScrollArea>
       </DialogContent>
+
+      <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+            <AlertDialogDescription>You have unsaved changes. Close anyway?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDiscardClose} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

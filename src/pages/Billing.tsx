@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useDeferredValue } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -43,15 +43,17 @@ export default function Billing() {
     loadInvoices();
   }, [loadInvoices]);
 
+  // M33, ISSUES.md — see the same note in pages/Clients.tsx.
+  const deferredSearch = useDeferredValue(search);
   const filtered = useMemo(() => {
     return invoices.filter((inv) => {
       const matchesSearch =
-        inv.clientName.toLowerCase().includes(search.toLowerCase()) ||
-        inv.invoiceNumber.toLowerCase().includes(search.toLowerCase());
+        inv.clientName.toLowerCase().includes(deferredSearch.toLowerCase()) ||
+        inv.invoiceNumber.toLowerCase().includes(deferredSearch.toLowerCase());
       const matchesStatus = statusFilter === "All" || inv.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [invoices, search, statusFilter]);
+  }, [invoices, deferredSearch, statusFilter]);
 
   if (roleLoading || loading) {
     return (
@@ -84,7 +86,7 @@ export default function Billing() {
         <div className="flex flex-col items-center justify-center h-64 gap-3">
           <AlertCircle className="h-10 w-10 text-destructive" />
           <p className="text-muted-foreground">{error}</p>
-          <Button variant="outline" onClick={() => window.location.reload()}>Try Again</Button>
+          <Button variant="outline" onClick={loadInvoices}>Try Again</Button>
         </div>
       </AppLayout>
     );

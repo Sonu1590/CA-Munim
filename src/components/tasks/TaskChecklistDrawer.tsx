@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +66,7 @@ export function TaskChecklistDrawer({ open, onOpenChange, taskId, taskName, clie
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="font-heading">Document Checklist</SheetTitle>
+          <SheetDescription className="sr-only">Track and request the documents needed for this task.</SheetDescription>
           <div className="text-xs text-muted-foreground">{taskName} · {clientName}</div>
         </SheetHeader>
 

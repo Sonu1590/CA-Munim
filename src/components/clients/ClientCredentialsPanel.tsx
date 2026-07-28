@@ -5,6 +5,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Eye, EyeOff, Loader2, Plus, Trash2, Pencil, KeyRound, ShieldAlert, AlertTriangle, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
@@ -316,25 +326,30 @@ export function ClientCredentialsPanel({ clientId }: { clientId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, roleLoading, isAdmin]);
 
-  const handleDeleteCredential = async (id: string) => {
-    if (!window.confirm("Delete this credential? This cannot be undone.")) return;
-    try {
-      await deleteClientPortalCredential(id);
-      toast.success("Credential deleted");
-      load();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Unable to delete credential");
-    }
-  };
+  // M32, ISSUES.md — was two raw window.confirm() calls; now the styled
+  // AlertDialog rendered near the end of this component, matching the
+  // destructive-action pattern used for delete-task in pages/Tasks.tsx.
+  const [deleteConfirm, setDeleteConfirm] = useState<{ kind: "credential" | "dsc"; id: string } | null>(null);
 
-  const handleDeleteDsc = async (id: string) => {
-    if (!window.confirm("Delete this DSC record? This cannot be undone.")) return;
+  const handleDeleteCredential = (id: string) => setDeleteConfirm({ kind: "credential", id });
+  const handleDeleteDsc = (id: string) => setDeleteConfirm({ kind: "dsc", id });
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    const { kind, id } = deleteConfirm;
     try {
-      await deleteClientDscRecord(id);
-      toast.success("DSC record deleted");
+      if (kind === "credential") {
+        await deleteClientPortalCredential(id);
+        toast.success("Credential deleted");
+      } else {
+        await deleteClientDscRecord(id);
+        toast.success("DSC record deleted");
+      }
       load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Unable to delete DSC record");
+      toast.error(err instanceof Error ? err.message : `Unable to delete ${kind === "credential" ? "credential" : "DSC record"}`);
+    } finally {
+      setDeleteConfirm(null);
     }
   };
 
@@ -447,6 +462,23 @@ export function ClientCredentialsPanel({ clientId }: { clientId: string }) {
       </Dialog>
 
       <ReAuthDialog open={reAuthOpen} onConfirm={handleReAuthConfirm} onCancel={handleReAuthCancel} />
+
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{deleteConfirm?.kind === "dsc" ? "Delete DSC record?" : "Delete credential?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirm?.kind === "dsc" ? "Delete this DSC record? This cannot be undone." : "Delete this credential? This cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

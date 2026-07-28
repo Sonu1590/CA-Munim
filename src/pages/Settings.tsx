@@ -74,7 +74,13 @@ export default function Settings() {
             <h1 className="text-2xl font-heading font-bold">Settings</h1>
             <p className="text-muted-foreground text-sm mt-1">Manage your firm profile, staff, integrations, and preferences</p>
           </div>
-          <Button onClick={handleSignOut} variant="outline" className="gap-2" disabled={signingOut}>
+          {/* md:hidden (L8, ISSUES.md) — DesktopSidebar (hidden md:flex,
+              i.e. desktop-only) already has its own Sign out button, so
+              this one was a duplicate on desktop. Can't remove it outright
+              though: the sidebar doesn't render at all on mobile, and
+              MobileBottomNav/MobileFAB have no sign-out affordance of their
+              own — this button is mobile's *only* way to sign out. */}
+          <Button onClick={handleSignOut} variant="outline" className="gap-2 md:hidden" disabled={signingOut}>
             <LogOut className="h-4 w-4" />
             {signingOut ? "Signing out..." : "Sign out"}
           </Button>

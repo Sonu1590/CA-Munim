@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useDeferredValue } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ClientListTable } from "@/components/clients/ClientListTable";
 import { AddClientModal } from "@/components/clients/AddClientModal";
@@ -33,16 +33,20 @@ export default function Clients() {
   // ── Real data from Supabase ──────────────────────────────────────────────
   const { clients, loading, error, addClient, updateClient, refetch } = useClients();
 
+  // M33, ISSUES.md — deferring the expensive filter/render (not the input
+  // itself, which stays bound to the immediate `search` state so typing
+  // never lags) avoids re-filtering the full client list on every keystroke.
+  const deferredSearch = useDeferredValue(search);
   const filtered = useMemo(() => {
     return clients.filter((c) => {
       const matchesSearch =
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.pan.toLowerCase().includes(search.toLowerCase()) ||
-        c.phone.includes(search);
+        c.name.toLowerCase().includes(deferredSearch.toLowerCase()) ||
+        c.pan.toLowerCase().includes(deferredSearch.toLowerCase()) ||
+        c.phone.includes(deferredSearch);
       const matchesType = typeFilter === "All" || c.type === typeFilter;
       return matchesSearch && matchesType;
     });
-  }, [clients, search, typeFilter]);
+  }, [clients, deferredSearch, typeFilter]);
 
   const openAddClient = () => {
     setEditingClient(null);

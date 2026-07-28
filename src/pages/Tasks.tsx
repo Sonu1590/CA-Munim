@@ -1,9 +1,19 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useDeferredValue } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, LayoutGrid, List, CalendarDays, Zap, Search, Loader2, AlertCircle } from "lucide-react";
 import { TaskKanbanBoard } from "@/components/tasks/TaskKanbanBoard";
 import { TaskListView } from "@/components/tasks/TaskListView";
@@ -55,16 +65,31 @@ export default function Tasks() {
     }));
   }, [tasks]);
 
+  // Sorted by urgency (H13, ISSUES.md): the List view was showing whatever
+  // order the data arrived in from Supabase, which put Completed tasks
+  // first while genuinely overdue work sat below the fold — the opposite
+  // of what a CA opening this page needs to see. Completed sorts last;
+  // everything else sorts by due date ascending, so the most-overdue item
+  // (earliest due date) leads.
+  // M33, ISSUES.md — see the same note in pages/Clients.tsx.
+  const deferredSearch = useDeferredValue(search);
   const filteredTasks = useMemo(() => {
-    return normalisedTasks.filter((t) => {
-      const matchSearch =
-        !search ||
-        t.clientName.toLowerCase().includes(search.toLowerCase()) ||
-        t.taskType.toLowerCase().includes(search.toLowerCase());
-      const matchPriority = priorityFilter === "all" || t.priority === priorityFilter;
-      return matchSearch && matchPriority;
-    });
-  }, [normalisedTasks, search, priorityFilter]);
+    return normalisedTasks
+      .filter((t) => {
+        const matchSearch =
+          !deferredSearch ||
+          t.clientName.toLowerCase().includes(deferredSearch.toLowerCase()) ||
+          t.taskType.toLowerCase().includes(deferredSearch.toLowerCase());
+        const matchPriority = priorityFilter === "all" || t.priority === priorityFilter;
+        return matchSearch && matchPriority;
+      })
+      .sort((a, b) => {
+        const aCompleted = a.status === "completed" ? 1 : 0;
+        const bCompleted = b.status === "completed" ? 1 : 0;
+        if (aCompleted !== bCompleted) return aCompleted - bCompleted;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      });
+  }, [normalisedTasks, deferredSearch, priorityFilter]);
 
   // Status change — writes to Supabase, then optimistically updates UI
   const handleStatusChange = async (taskId: string, status: "pending" | "in_progress" | "completed") => {
@@ -76,10 +101,19 @@ export default function Tasks() {
     setAddOpen(true);
   };
 
-  const handleDeleteTask = async (task: any) => {
-    if (!window.confirm(`Delete task "${task.customTaskName || task.taskType}" for ${task.clientName}?`)) return;
-    const success = await deleteTask(task.id);
+  // M32, ISSUES.md — was a raw window.confirm(); now the styled AlertDialog
+  // below, matching every other destructive-action pattern in the app.
+  const [deleteConfirmTask, setDeleteConfirmTask] = useState<any | null>(null);
+
+  const handleDeleteTask = (task: any) => {
+    setDeleteConfirmTask(task);
+  };
+
+  const confirmDeleteTask = async () => {
+    if (!deleteConfirmTask) return;
+    const success = await deleteTask(deleteConfirmTask.id);
     if (success) toast.success("Task deleted");
+    setDeleteConfirmTask(null);
   };
 
   const stats = {
@@ -264,6 +298,24 @@ export default function Tasks() {
           onOpenChange={setBulkOpen}
           onGenerated={refetch} // refresh after bulk create
         />
+
+        <AlertDialog open={!!deleteConfirmTask} onOpenChange={(open) => !open && setDeleteConfirmTask(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete task?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {deleteConfirmTask &&
+                  `Delete task "${deleteConfirmTask.customTaskName || deleteConfirmTask.taskType}" for ${deleteConfirmTask.clientName}? This cannot be undone.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeleteTask} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );

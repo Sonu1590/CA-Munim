@@ -43,7 +43,10 @@ export function GlobalSearch() {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="Search clients, tasks, invoices… (⌘K)" />
+      {/* autoFocus (M34, ISSUES.md) — cmdk's own default focus behavior
+          wasn't reliably winning the race against Radix's dialog-open
+          focus trap; explicit autoFocus fixes it. */}
+      <CommandInput autoFocus placeholder="Search clients, tasks, invoices… (⌘K)" />
       <CommandList>
         {loading ? (
           <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground text-sm">

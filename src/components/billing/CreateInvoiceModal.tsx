@@ -162,7 +162,7 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
             <div>
               <Label className="text-xs">Client *</Label>
               <Select value={clientId} onValueChange={setClientId}>
-                <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+                <SelectTrigger autoFocus><SelectValue placeholder="Select client" /></SelectTrigger>
                 <SelectContent>
                   {clients.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
