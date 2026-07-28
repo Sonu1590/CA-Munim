@@ -43,7 +43,11 @@ export function ComplianceUpdatesFeed() {
       ) : error ? (
         <div className="p-8 text-center text-destructive">{error}</div>
       ) : (
-        <div className="space-y-4">
+        // Unbounded accumulating feed (fetchComplianceUpdatesFromSupabase has
+        // no limit) rendered on its own dedicated Settings tab — bounded
+        // scroll container rather than a cap-and-link, same reasoning as
+        // AuditTrail.tsx just above it in ISSUES.md's M27.
+        <div className="space-y-4 max-h-[36rem] overflow-y-auto pr-1">
           {updates.map((update) => {
           const config = severityConfig[update.severity];
           const Icon = config.icon;

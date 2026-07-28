@@ -137,7 +137,14 @@ export function AuditTrail() {
           {entries.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No changes recorded yet.</p>
           ) : (
-            <div>
+            // fetchAuditLog() returns up to 200 rows (src/data/AuditLog.ts) —
+            // this is already the app's own dedicated Audit Trail tab (no
+            // "view all elsewhere" to link to, unlike a dashboard widget), so
+            // the fix is a bounded scroll container, not a cap-and-link —
+            // every row stays reachable, it just doesn't push the rest of
+            // the Settings page off-screen. Same convention already used by
+            // ImportClientsModal/ClientCredentialsPanel's scroll containers.
+            <div className="max-h-[28rem] overflow-y-auto">
               {entries.map((entry) => (
                 <AuditRow key={entry.id} entry={entry} />
               ))}

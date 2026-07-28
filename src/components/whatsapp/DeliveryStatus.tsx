@@ -112,8 +112,11 @@ export function DeliveryStatus() {
             })}
           </div>
 
-          {/* Messages Table (mobile cards) */}
-      <div className="space-y-2">
+          {/* Messages Table (mobile cards) — unbounded fetch (grows every
+              bulk send, no limit in fetchSentMessagesFromSupabase), own
+              dedicated WhatsApp Center tab (no "view all elsewhere"), so
+              bounded scroll container rather than a cap-and-link. */}
+      <div className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
         {filtered.map((msg) => {
           const cfg = statusConfig[msg.status];
           return (

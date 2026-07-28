@@ -79,7 +79,11 @@ export function ReceivedMessages() {
       ) : (
         <>
 
-      <div className="space-y-2">
+      {/* Unbounded fetch (grows with every inbound message), own dedicated
+          WhatsApp Center "Inbox" tab (no "view all elsewhere") — bounded
+          scroll container rather than a cap-and-link, same reasoning as
+          DeliveryStatus.tsx just above it in ISSUES.md's M27. */}
+      <div className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
         {filtered.map((msg) => (
           <Card key={msg.id} className={`transition-colors ${!msg.isRead ? "border-l-2 border-l-[#25D366] bg-[#25D366]/5" : ""}`}>
             <CardContent className="p-3">
