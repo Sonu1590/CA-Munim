@@ -324,6 +324,118 @@ The 20 findings split into two genuinely different fix shapes:
 
 ---
 
+## From the Fable UX review (2026-07-28)
+
+Two-pass review (`CA-Munim-UX-Review.md` code-only, then `CA-Munim-UX-Review-v2.md` visually verified against 22 screenshots at desktop ~1440px and mobile 400px — v2 supersedes v1 for any item both cover). The review's own "STILL OPEN — CRITICAL, SECURITY: cron secret committed" note is **stale** — already fixed and tracked as C4 (2026-07-14); the reviewer was working from an older commit. Not re-logged. Everything below is newly logged from the review; severities re-mapped from the review's own 0–3 scale onto this doc's Critical/High/Medium/Low to match how those tiers are actually used elsewhere in this file (this repo's High tier is reserved for broken-workflow/accessibility-blocking bugs, not general polish).
+
+### H8. Mobile Clients page renders two of everything — duplicate search bar, filter, and heading
+**Where:** `src/pages/Clients.tsx` — the desktop page header + Search & Filter block (~lines 117–137) are not wrapped in `hidden md:block`, so they render alongside `<MobileClientsScreen>` (`md:hidden`) instead of being hidden by it.
+**Problem:** On mobile: search input, "All" dropdown, then a second "Clients N" heading, a second search input, then filter chips — both trees visible and stacked.
+**Fix:** Wrap the desktop header and Search & Filter block in `hidden md:block`. Check Tasks/Documents/Billing pages for the identical pattern (a desktop header block sitting next to a `Mobile*Screen` without its own visibility guard) — the review flagged Clients as confirmed and asked that the others be checked.
+
+### H9. Phone numbers are truncated in the Clients table with no ellipsis or tooltip
+**Where:** `src/components/clients/ClientListTable.tsx` — Phone column.
+**Problem:** A 10-digit Indian mobile number renders cut off mid-digit (e.g. `75073277`) with no `whitespace-nowrap`, ellipsis, or tooltip — worse than showing nothing, since it looks complete. Reading/copying a client's phone number is a core daily action for a CA.
+**Fix:** Give the Phone column a fixed min-width sized for the full number, `whitespace-nowrap`, and reduce width on lower-priority columns (Last Activity, Active Tasks) or hide them at intermediate breakpoints to make room.
+
+### H10. Touch targets well below the ~44px minimum across action-icon buttons and checkboxes
+**Where:** `ClientListTable.tsx` action buttons (`h-8 w-8`, 32px), `InvoiceList.tsx` (`h-7 w-7`, 28px), `components/ui/checkbox.tsx` (`h-4 w-4`, 16px) — the checkbox size is used for all ~10 Services Subscribed / MCA Filings checkboxes in `AddClientModal.tsx` Section D, which is the field that (should) drive automatic recurring task generation, i.e. the most valuable field in the form is the hardest to tap accurately.
+**Problem:** WCAG 2.5.5 / platform HIG both call for ~44px touch targets. These sizes are 30–65% of that, clustered 2–4-to-a-row, on a product whose stated core users are phone-first CAs.
+**Fix:** Icon buttons: bump to `h-11 w-11` on touch via responsive classes, or keep the icon small and expand the hit area with padding — don't rely on the mobile screens alone, since the desktop table is also reachable on tablets. Checkboxes: increase visual size to 20–24px and extend the wrapping `<label>`'s padding (`py-2.5 px-1 -mx-1`) so the whole row is a ≥44px tap target — the label already wraps the input, so this is the cheap correct fix.
+
+### H11. Icon-only action buttons have no accessible name
+**Where:** `ClientListTable.tsx` (~lines 95–120), `InvoiceList.tsx` (~lines 163–172), task row menus, and any other icon-only `<Button size="icon">`. Across the app: 171 buttons, only 4 use `title`.
+**Problem:** A screen reader announces "button" with no purpose — can't distinguish edit from delete from send-WhatsApp. Existing tooltips don't fix this; tooltips aren't reliably read by assistive tech.
+**Fix:** Add `aria-label` to every icon-only button, including the entity name where the button repeats per row (e.g. `aria-label="Send WhatsApp message to ${client.name}"`) so screen-reader users can distinguish rows, not just actions.
+
+### H12. Every modal is missing `DialogDescription` — Radix/WCAG accessibility requirement
+**Where:** `AddClientModal.tsx`, `AddTaskModal.tsx`, `CreateInvoiceModal.tsx` — zero uses of `DialogDescription` (`components/ui/dialog.tsx` exports it but nothing consumes it). Confirmed live via a console warning on every modal open: `Warning: Missing 'Description' or 'aria-describedby={undefined}' for {DialogContent}`.
+**Fix:** Add a `<DialogDescription>` to every `DialogContent` (visible or `sr-only` if a visible description isn't wanted). Sweep all dialogs in the app, not just the three named.
+
+### H13. Task List view defaults to showing Completed tasks first, burying overdue work below the fold
+**Where:** `src/components/tasks/TaskListView.tsx` / `src/pages/Tasks.tsx` sort order.
+**Problem:** Confirmed live: header reads "107 total · 75 pending · 74 overdue" but the List view's visible rows are all "Completed", sorted to the top. The default view surfaces the least actionable work while the app's core promise (surfacing overdue compliance work) sits scrolled out of view.
+**Fix:** Default sort by urgency — most-overdue first, then due-soon, then pending, completed last. Keep sort user-changeable. Consider hiding completed behind a filter toggle by default.
+
+### H14. Mobile bottom nav has no path to 4 of 8 modules
+**Where:** `src/components/layout/MobileBottomNav.tsx` — 5 items (Home, Clients, Tasks, WhatsApp, More), where "More" routes directly to `/settings`.
+**Problem:** Documents, Billing, Reports, and Penalty Calculator have no mobile navigation path at all except a deep link or the FAB (which only covers Add Client / Add Task / New Invoice). A phone-first CA can't reach Billing or Reports from the nav.
+**Fix:** Make "More" open a sheet/menu listing every remaining module instead of hard-redirecting to Settings. Confirm all 8 modules are reachable in ≤2 taps on mobile.
+
+### H15. FAB overlaps and obscures content on mobile
+**Where:** `src/components/layout/MobileFAB.tsx` + `AppLayout.tsx`.
+**Problem:** Confirmed live: on mobile Dashboard the FAB sits on top of a task card, covering the overdue-days badge and part of the card body; on mobile Clients it covers the third client card's action buttons.
+**Fix:** Raise the FAB above the bottom nav with more offset (e.g. `bottom-24`), and add matching bottom padding to scrollable content so the last list item clears both FAB and nav. Verify at short viewport heights (~400px), not just narrow widths.
+
+### M29. Loading states are blank-screen spinners, not skeletons, across every data view
+**Where:** `pages/Clients.tsx:63-68` and the same pattern in Tasks, Billing, dashboard widgets. `components/ui/skeleton.tsx` exists but is only consumed by `ui/sidebar.tsx`.
+**Problem:** Every data view shows an empty page with a spinner, then pops the full table in — layout shift, reads as slow with a few hundred real rows (the review's live data had 362 clients / 107 tasks).
+**Fix:** Replace full-page spinners with skeletons matching the real layout (table-row skeletons for Clients/Billing, card skeletons for the Kanban, metric-card skeletons for the dashboard), reusing the existing `skeleton.tsx`. Reserve spinners for sub-second inline actions.
+
+### M30. Single-error, submit-only form validation in the three main create modals
+**Where:** `components/clients/AddClientModal.tsx` — one `error` string state, validated only in `handleSave`, one message reported at a time (DOB then PAN etc). Same pattern applies to `AddTaskModal` and `CreateInvoiceModal`.
+**Problem:** AddClientModal spans 5 sections (A–E); a user with 3 invalid fields discovers them one submit at a time, scrolling to find each one, with nothing visually marking the invalid field.
+**Fix:** Validate per-field on blur with inline errors; on submit collect all errors at once, mark every invalid field (red border + message), scroll to the first; clear each field's error as it becomes valid. Apply identically across all three modals.
+
+### M31. Billing's error-retry reloads the whole app instead of refetching
+**Where:** `pages/Billing.tsx:87` — `onClick={() => window.location.reload()}`, inconsistent with `Clients.tsx:81` and `Tasks.tsx:113`, which correctly call `refetch`.
+**Fix:** Wire Billing's "Try Again" to the hook's `refetch`, matching the other two pages.
+
+### M32. Four native `window.confirm()` dialogs break visual consistency with the rest of the app
+**Where:** `AddClientModal.tsx:222` (unsaved changes), `ClientCredentialsPanel.tsx:314` and `:325` (delete credential / DSC), `pages/Tasks.tsx:80` (delete task) — the app uses styled `AlertDialog` everywhere else (52 instances).
+**Fix:** Replace each with the app's `AlertDialog`, matching the existing destructive-action pattern (title, description, Cancel + destructive confirm).
+
+### M33. No search debouncing anywhere in the app
+**Where:** Search inputs in Clients, Tasks, Documents, Billing — no `debounce`/`useDeferredValue` found anywhere in the codebase.
+**Problem:** Every keystroke re-filters the full list (362 clients / 107 tasks in the review's live data) — noticeable stutter on a mid-range Android phone, the stated core user device.
+**Fix:** Debounce ~250ms, or wrap the filtered list in `useDeferredValue`, keeping the input itself immediately responsive.
+
+### M34. Autofocus missing on desktop modal/search open
+**Where:** Only `ClientCredentialsPanel.tsx` uses `autoFocus`. Mobile Add Client does appear to focus its first field; desktop AddClient/AddTask/CreateInvoice modals and the global search (Ctrl/Cmd-K) don't.
+**Fix:** Autofocus the first input on modal open and when GlobalSearch opens. Confirm focus is trapped in the modal and returns to the trigger on close (Radix Dialog handles most of this — confirm it isn't disabled).
+
+### M35. Modal shows a dark band artifact above the title on mobile — needs DevTools verification
+**Where:** `components/ui/dialog.tsx` overlay/content positioning at mobile widths.
+**Problem:** `[verify in DevTools]` All three mobile modal screenshots in the review show a solid dark strip across the top of the modal card, above the title — reads as a rendering artifact, not an intentional header.
+**Fix:** Inspect at 400px width; likely the overlay or a `DialogHeader` background showing through where content doesn't fill the rounded corners. Test iOS Safari and Chrome Android both.
+
+### M36. Mobile and desktop read as two different products — needs a product decision, not a blind fix
+**Where:** `src/components/mobile/*` vs. the desktop pages.
+**Problem:** Desktop: white background, navy sidebar, orange accent, sans-serif. Mobile: cream/beige background, orange serif wordmark, warm peach cards — different typography and spacing entirely. Largest brand-consistency gap in the app; also doubles design-maintenance surface going forward.
+**Not fixed here — this is a real design decision, not a mechanical bug.** The review's own recommendation: keep the desktop palette (white/navy/orange) as canonical since it reads more credible for a compliance product, restyle mobile to match while keeping mobile's *layout* patterns (cards, bottom nav, larger touch targets), and consolidate colors into shared design tokens so it can't drift again. Flagging for explicit sign-off before a redesign pass this size gets scoped.
+
+### M37. Dashboard Quick Actions: four buttons, four different colors, no visual hierarchy
+**Where:** Dashboard Quick Actions grid — Add New Client (navy), Bulk WhatsApp Reminder (green), Create Task (orange), Generate Invoice (navy).
+**Problem:** Nothing reads as primary; color is used decoratively rather than semantically, which also weakens orange as the app's action color elsewhere.
+**Fix:** One primary (orange) for the most common action, the rest secondary/outline. Reserve green for WhatsApp-specific actions only, so it consistently signals "this sends a WhatsApp message."
+
+### M38. Pricing cards compare ₹/year against ₹/month under the same toggle
+**Where:** Settings → Plans (`SubscriptionBilling.tsx`) — Founding Member shows ₹2,999/year, Professional shows ₹417/month, side by side under a Monthly/Annual toggle that doesn't apply to both.
+**Problem:** User has to do mental math to compare; Founding Member's actual value (₹2,999 vs ₹5,004/yr equivalent) is obscured by the mismatched units.
+**Fix:** Respect the toggle for all cards — annual mode shows every plan as ₹/year, monthly mode shows ₹/month with the annual equivalent as subtext. Add an explicit savings callout on Founding Member.
+
+### M39. "50 of 50 left" scarcity badge reads as "nobody has bought this"
+**Where:** Settings → Plans, Founding Member badge.
+**Fix:** Either omit the counter until there's meaningful traction, or reframe as "Limited to first 50 firms" — showing the full remaining inventory undercuts the urgency it's meant to create.
+
+### M40. Settings has 9 tabs in a single row — will overflow on tablet/mobile
+**Where:** Settings — Firm Profile, Staff, WhatsApp, Compliance, Invoice, Updates, Plans, Export, Audit Trail.
+**Fix:** Group into 3–4 sections (Firm, Team & Access, Integrations, Billing & Data) with a vertical sub-nav on desktop and an accordion/list on mobile.
+
+### M41. Dashboard bar chart renders near-zero values as invisible flat lines
+**Where:** Dashboard "This Month's Work" chart — GST bar is tall; ITR, Other, TDS render as thin lines indistinguishable from the axis or each other.
+**Fix:** Set a minimum visible bar height and print the value above each bar. Consider a horizontal bar chart with labels for readability with only 4 categories.
+
+### M42. Tasks Calendar view is low-density with hard-to-read overflow dots
+**Where:** Tasks → Calendar — large mostly-empty cells, tiny colored dots, one observed cell showing "+74" with 3 dots for what should be a highly visible overdue signal.
+**Fix:** Show a count badge per day (e.g. a small pill "74" tinted by worst severity that day) instead of dots-plus-overflow. Strengthen today's highlight beyond a light gray box. Confirm legend colors match badge colors used elsewhere.
+
+### M43. Long client names wrap awkwardly and break table/list layout
+**Where:** Clients table, Tasks list Client column — a company name with a "Private Ltd" suffix wraps to two lines with the type badge wrapping mid-word; raw seed-data IDs (`PW client-1785234752399-djrz`) demonstrate the same gap when a name is unexpectedly long.
+**Fix:** Truncate with ellipsis at a sensible max-width plus a tooltip showing the full name; keep type badges on one line via `whitespace-nowrap`.
+
+---
+
 ## Low / Cleanup
 
 ### L1. Simulated payment checkout presented as real — FIXED (2026-07-06)
@@ -341,6 +453,34 @@ The 20 findings split into two genuinely different fix shapes:
 
 ### L5. Compliance content hardcoded/stale — FIXED (`a752464`)
 `src/data/Settings.ts` ships hardcoded `mockComplianceUpdates` and `mockFirmProfile` (Sharma & Associates) dated 2025. Confirm these mocks aren't surfacing anywhere in production UI.
+
+### L6. Deprecated `apple-mobile-web-app-capable` meta tag — console warning
+**Where:** `index.html`. Console: `<meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">`.
+**Fix:** Add the modern `mobile-web-app-capable` meta tag alongside the existing Apple one (keep the Apple tag for older iOS).
+
+### L7. Inconsistent placeholder casing in Add Client form
+**Where:** Add Client Section B — `OPTIONAL` (uppercase) on TAN Number vs `Optional` (title case) on IT Ward / AO Code.
+**Fix:** Standardize to sentence case. Likely an `uppercase` CSS class on the TAN field's wrapper bleeding into its placeholder — check the class isn't applied above the input level.
+
+### L8. Duplicate "Sign out" affordance
+**Where:** Settings page header has its own Sign out button; the sidebar also has one at the bottom.
+**Fix:** `guessing on intent` — keep the sidebar one (persistent, expected location), remove it from the Settings header or move it into a clearly labeled Account section.
+
+### L9. No progress indicator in the long Add Client form
+**Where:** Add Client modal, 5 sections (A–E), heavy scrolling, no indication of position or remaining sections.
+**Fix:** Add a sticky section indicator or step markers (A → E) at the top of the modal; consider collapsing optional sections by default.
+
+### L10. "BETA" badge on WhatsApp Center is unexplained
+**Where:** Sidebar nav — WhatsApp Center carries a BETA tag with no explanation of what's in beta or what's safe to use, for a feature that sends real client messages.
+**Fix:** Add a one-line note on the WhatsApp page explaining the beta scope, or remove the badge once the flow is production-ready.
+
+### L11. `text-muted-foreground` contrast risk — 363 uses, not yet measured
+**Where:** Across the app — Reports "N/A" cells, timestamp captions, client sub-labels all use the low-contrast token.
+**Fix:** Measure `--muted-foreground` against `--background` and card backgrounds; ensure ≥4.5:1 for body text (3:1 for large text). Darken the token if short.
+
+### L12. Dashboard compliance-alert carousel has a thin, hard-to-discover horizontal scrollbar
+**Where:** Dashboard compliance-alert cards scroll horizontally with small arrows and a slim scrollbar; content is cut mid-card at the right edge.
+**Fix:** Make the partial card at the edge clearly peek so the scroll affordance is obvious, enlarge the arrow controls, confirm keyboard and swipe both work. Consider a wrapping grid on wide screens instead of forced horizontal scroll.
 
 ---
 
