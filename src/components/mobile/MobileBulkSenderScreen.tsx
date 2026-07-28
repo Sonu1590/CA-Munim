@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Send, Loader2, Clock, Check, ReceiptText } from "lucide-react";
+import { Search, Send, Loader2, Check, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import {
   compileTemplateForClient,
@@ -26,9 +26,6 @@ export function MobileBulkSenderScreen() {
   const [recipientFilter, setRecipientFilter] = useState("all");
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [clientSearch, setClientSearch] = useState("");
-  const [scheduleType, setScheduleType] = useState<"now" | "later">("now");
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("10:00");
 
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -125,14 +122,11 @@ export function MobileBulkSenderScreen() {
 
       await sendBulkWhatsAppMessages(recipients, template, compiledTexts, parametersByClientId);
 
-      toast.success(`${scheduleType === "now" ? "Sent" : "Scheduled"} ${selectedClients.length} messages!`, {
-        description: scheduleType === "later" ? `Scheduled for ${scheduleDate} at ${scheduleTime}` : undefined,
-      });
+      toast.success(`Sent ${selectedClients.length} messages!`);
 
       setSelectedTemplate("");
       setSelectedClients([]);
       setRecipientFilter("all");
-      setScheduleType("now");
     } catch (err: any) {
       toast.error(err?.message ?? "Unable to send WhatsApp messages");
     } finally {
@@ -140,7 +134,7 @@ export function MobileBulkSenderScreen() {
     }
   };
 
-  const canSend = !!template && selectedClients.length > 0 && (scheduleType === "now" || (!!scheduleDate && !!scheduleTime)) && !sending;
+  const canSend = !!template && selectedClients.length > 0 && !sending;
 
   return (
     <div className="bg-mobile-bg font-mobile-body text-mobile-text -mx-4 -mt-4 px-4 pt-6 pb-28 min-h-[calc(100vh-8rem)]">
@@ -256,44 +250,10 @@ export function MobileBulkSenderScreen() {
         </>
       )}
 
-      <div className="text-xs font-bold text-mobile-neutral-600 mb-2">4. Delivery</div>
-      <div className="flex gap-2 mb-2.5">
-        <button
-          type="button"
-          onClick={() => setScheduleType("now")}
-          className={`flex-1 rounded-mobile-md py-2.5 text-xs font-bold flex flex-col items-center gap-1 ${
-            scheduleType === "now" ? "bg-mobile-accent text-white" : "bg-mobile-neutral-100 text-mobile-text"
-          }`}
-        >
-          <Send className="h-4 w-4" /> Send Now
-        </button>
-        <button
-          type="button"
-          onClick={() => setScheduleType("later")}
-          className={`flex-1 rounded-mobile-md py-2.5 text-xs font-bold flex flex-col items-center gap-1 ${
-            scheduleType === "later" ? "bg-mobile-accent text-white" : "bg-mobile-neutral-100 text-mobile-text"
-          }`}
-        >
-          <Clock className="h-4 w-4" /> Schedule
-        </button>
-      </div>
-      {scheduleType === "later" && (
-        <div className="flex gap-2 mb-4">
-          <input
-            type="date"
-            value={scheduleDate}
-            onChange={(e) => setScheduleDate(e.target.value)}
-            className="flex-1 border border-mobile-neutral-300 rounded-mobile-sm bg-mobile-surface py-2 px-2.5 text-sm outline-none"
-          />
-          <input
-            type="time"
-            value={scheduleTime}
-            onChange={(e) => setScheduleTime(e.target.value)}
-            className="flex-1 border border-mobile-neutral-300 rounded-mobile-sm bg-mobile-surface py-2 px-2.5 text-sm outline-none"
-          />
-        </div>
-      )}
-
+      {/* No "Schedule for later" option (M25, ISSUES.md) — it let a user
+          pick a date/time but always sent immediately regardless, just with
+          a toast claiming otherwise. Removed rather than faked further;
+          real scheduled sending needs a distinct table + cron dispatch. */}
       <div className="fixed bottom-16 left-0 right-0 px-4 pb-3 md:hidden">
         <button
           type="button"
@@ -304,9 +264,7 @@ export function MobileBulkSenderScreen() {
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           {sending
             ? "Sending..."
-            : scheduleType === "now"
-              ? `Send to ${selectedClients.length || 0} Client${selectedClients.length === 1 ? "" : "s"}`
-              : `Schedule for ${selectedClients.length || 0} Client${selectedClients.length === 1 ? "" : "s"}`}
+            : `Send to ${selectedClients.length || 0} Client${selectedClients.length === 1 ? "" : "s"}`}
         </button>
       </div>
     </div>

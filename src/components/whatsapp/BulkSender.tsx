@@ -4,18 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { compileTemplateForClient, defaultTemplates, fetchMessageTemplatesFromSupabase, MessageTemplate, sendBulkWhatsAppMessages,TemplateCategory } from "@/data/WhatsappApi";
 import { fetchClientsFromSupabase, type Client } from "@/data/Clients";
 import { fetchInvoicesFromSupabase, type Invoice } from "@/data/Billing";
 import { fetchFirmProfileFromSupabase, type FirmProfile } from "@/data/Settings";
-import { Send, ChevronRight, ChevronLeft, Search, Clock, CheckCircle2, Loader2, AlertCircle, ReceiptText } from "lucide-react";
+import { Send, ChevronRight, ChevronLeft, Search, CheckCircle2, Loader2, AlertCircle, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useFinancialYear } from "@/context/financialYear";
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4;
 
 const recipientFilters = [
   { id: "all", label: "All Clients" },
@@ -32,9 +31,6 @@ export function BulkSender() {
   const [recipientFilter, setRecipientFilter] = useState("all");
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [clientSearch, setClientSearch] = useState("");
-  const [scheduleType, setScheduleType] = useState<"now" | "later">("now");
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("10:00");
 
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -208,17 +204,14 @@ export function BulkSender() {
         parametersByClientId
       );
 
-      toast.success(`${scheduleType === "now" ? "Sent" : "Scheduled"} ${selectedClients.length} messages!`, {
-        description: scheduleType === "later" ? `Scheduled for ${scheduleDate} at ${scheduleTime}` : undefined,
-      });
-      
+      toast.success(`Sent ${selectedClients.length} messages!`);
+
       // Reset state on success
       setStep(1);
       setSelectedTemplate("");
       setSelectedClients([]);
       setRecipientFilter("all");
-      setScheduleType("now");
-      
+
     } catch (err: any) {
       toast.error(err?.message ?? "Unable to send WhatsApp messages");
     } finally {
@@ -229,8 +222,6 @@ export function BulkSender() {
   const canNext = () => {
     if (step === 1) return !!selectedTemplate;
     if (step === 2) return selectedClients.length > 0;
-    if (step === 3) return true;
-    if (step === 4) return scheduleType === "now" || (!!scheduleDate && !!scheduleTime);
     return true;
   };
 
@@ -238,7 +229,7 @@ export function BulkSender() {
     <div className="min-w-0 space-y-4">
       {/* Step Indicator */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-        {["Template", "Recipients", "Preview", "Schedule", "Confirm"].map((label, i) => (
+        {["Template", "Recipients", "Preview", "Confirm"].map((label, i) => (
           <div key={label} className="flex items-center gap-1.5">
             <div className={`h-7 w-7 shrink-0 rounded-full flex items-center justify-center text-xs font-semibold ${
               step > i + 1 ? "bg-[#25D366] text-white" : step === i + 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
@@ -246,7 +237,7 @@ export function BulkSender() {
               {step > i + 1 ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
             </div>
             <span className={`text-xs font-medium whitespace-nowrap ${step === i + 1 ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
-            {i < 4 && <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground max-sm:hidden" aria-hidden />}
+            {i < 3 && <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground max-sm:hidden" aria-hidden />}
           </div>
         ))}
       </div>
@@ -399,49 +390,16 @@ export function BulkSender() {
         </Card>
       )}
 
-      {/* Step 4: Schedule */}
+      {/* Step 4: Confirm — was Step 5; the old Step 4 ("Schedule or Send
+          Now") is removed (M25, ISSUES.md): it let a user pick "Schedule"
+          plus a date/time, but handleSend always sent immediately regardless
+          — the toast just said "Scheduled" instead of "Sent". No deferred-
+          send mechanism exists anywhere (no scheduled_at column, no cron
+          dispatch), so keeping the option meant promising something the app
+          doesn't do. Removed rather than faked further; real scheduled
+          sending is a distinct, larger feature (a scheduled_whatsapp_sends
+          table + cron dispatch, like send-task-reminders) for a later pass. */}
       {step === 4 && (
-        <Card>
-          <CardHeader><CardTitle className="text-base font-heading">Schedule or Send Now</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div
-                onClick={() => setScheduleType("now")}
-                className={`p-4 rounded-lg border cursor-pointer text-center transition-colors ${
-                  scheduleType === "now" ? "border-[#25D366] bg-[#25D366]/5" : "border-border"
-                }`}
-              >
-                <Send className="h-6 w-6 mx-auto mb-2 text-[#25D366]" />
-                <p className="text-sm font-medium">Send Now</p>
-              </div>
-              <div
-                onClick={() => setScheduleType("later")}
-                className={`p-4 rounded-lg border cursor-pointer text-center transition-colors ${
-                  scheduleType === "later" ? "border-[#25D366] bg-[#25D366]/5" : "border-border"
-                }`}
-              >
-                <Clock className="h-6 w-6 mx-auto mb-2 text-accent" />
-                <p className="text-sm font-medium">Schedule</p>
-              </div>
-            </div>
-            {scheduleType === "later" && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Date</Label>
-                  <Input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Time</Label>
-                  <Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} />
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Step 5: Confirm */}
-      {step === 5 && (
         <Card>
           <CardHeader><CardTitle className="text-base font-heading">Confirm & Send</CardTitle></CardHeader>
           <CardContent className="space-y-3">
@@ -450,12 +408,12 @@ export function BulkSender() {
               <div className="flex justify-between text-sm"><span className="text-muted-foreground">Recipients:</span><span className="font-medium">{selectedClients.length} clients</span></div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Delivery:</span>
-                <span className="font-medium">{scheduleType === "now" ? "Immediately" : `${scheduleDate} at ${scheduleTime}`}</span>
+                <span className="font-medium">Immediately</span>
               </div>
             </div>
             <Button onClick={handleSend} disabled={sending} className="w-full bg-[#25D366] hover:bg-[#25D366]/90 text-white gap-2 h-11">
               <Send className="h-4 w-4" />
-              {sending ? "Recording..." : scheduleType === "now" ? `Send to ${selectedClients.length} Clients` : `Schedule for ${selectedClients.length} Clients`}
+              {sending ? "Sending..." : `Send to ${selectedClients.length} Clients`}
             </Button>
           </CardContent>
         </Card>
@@ -466,7 +424,7 @@ export function BulkSender() {
         <Button variant="outline" onClick={() => setStep((s) => (s - 1) as Step)} disabled={step === 1}>
           <ChevronLeft className="h-4 w-4 mr-1" /> Back
         </Button>
-        {step < 5 && (
+        {step < 4 && (
           <Button onClick={() => setStep((s) => (s + 1) as Step)} disabled={!canNext()} className="bg-primary shrink-0">
             Next <ChevronRight className="h-4 w-4 ml-1" />
           </Button>

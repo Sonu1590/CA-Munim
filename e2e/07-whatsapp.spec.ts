@@ -219,14 +219,18 @@ test.describe('WhatsApp - bulk sender', () => {
     await goToWhatsApp(page, 'bulk');
   });
 
-  test('shows the 5-step wizard with Next disabled until a template is chosen', async ({ page }) => {
+  test('shows the 4-step wizard with Next disabled until a template is chosen', async ({ page }) => {
     await expect(page.getByText('Select Message Template')).toBeVisible();
     await expect(page.getByText('Template', { exact: true })).toBeVisible();
     await expect(page.getByText('Recipients', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /^next$/i })).toBeDisabled();
   });
 
-  test('steps through Template -> Recipients -> Preview -> Schedule without sending', async ({ page }) => {
+  // No more "Schedule" step (M25, ISSUES.md): it let a user pick a date/time
+  // but handleSend always sent immediately regardless — a real UI element
+  // promising something the app didn't do. Removed rather than faked
+  // further; the wizard is Template -> Recipients -> Preview -> Confirm now.
+  test('steps through Template -> Recipients -> Preview -> Confirm without sending', async ({ page }) => {
     await expect(page.getByText('Loading templates...')).not.toBeVisible({ timeout: 10_000 });
 
     // Step 1: pick the first available template
@@ -254,25 +258,10 @@ test.describe('WhatsApp - bulk sender', () => {
     await expect(page.getByText(/Message looks correct/)).toBeVisible();
     await page.getByRole('button', { name: /^next$/i }).click();
 
-    // Step 4: schedule — defaults to Send Now, Next enabled
-    await expect(page.getByText('Schedule or Send Now')).toBeVisible();
-    await expect(page.getByRole('button', { name: /^next$/i })).toBeEnabled();
-
-    // Switching to "Schedule" requires date/time before Next re-enables.
-    // Scoped to the clickable toggle card — "Schedule" is also the label of
-    // step 4 in the step indicator above, which a plain text locator would
-    // also match.
-    await page.locator('div.cursor-pointer', { hasText: 'Schedule' }).click();
-    // The Date/Time <Label>s aren't connected via htmlFor/id, so getByLabel
-    // can't find them — target the input types directly.
-    await expect(page.locator('input[type="date"]')).toBeVisible();
-
-    // Back to Send Now and proceed to the Confirm screen — but never click Send.
-    await page.locator('div.cursor-pointer', { hasText: 'Send Now' }).click();
-    await page.getByRole('button', { name: /^next$/i }).click();
-
+    // Step 4: confirm — delivery is always "Immediately", no schedule choice.
     await expect(page.getByText('Confirm & Send')).toBeVisible();
-    await expect(page.getByRole('button', { name: /send to \d+ client|schedule for \d+ client/i })).toBeVisible();
+    await expect(page.getByText('Immediately')).toBeVisible();
+    await expect(page.getByRole('button', { name: /send to \d+ client/i })).toBeVisible();
     // Deliberately not clicking Send — it calls the live Meta WhatsApp API.
   });
 
