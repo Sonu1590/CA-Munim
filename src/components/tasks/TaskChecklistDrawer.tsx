@@ -100,7 +100,13 @@ export function TaskChecklistDrawer({ open, onOpenChange, taskId, taskName, clie
                   </p>
                 )}
               </div>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => commit(items.filter((i) => i.id !== item.id))}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-11 w-11 text-muted-foreground hover:text-destructive"
+                aria-label={`Remove checklist item ${item.label}`}
+                onClick={() => commit(items.filter((i) => i.id !== item.id))}
+              >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -114,6 +120,8 @@ export function TaskChecklistDrawer({ open, onOpenChange, taskId, taskName, clie
           <Input placeholder="Add document item…" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
           <Button
             size="icon"
+            className="h-11 w-11"
+            aria-label="Add document item"
             onClick={() => {
               if (!newLabel.trim()) return;
               commit([...items, { id: crypto.randomUUID(), label: newLabel.trim(), received: false }]);

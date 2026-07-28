@@ -170,7 +170,7 @@ export function SubscriptionBilling() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-medium">{b.amount === 0 ? "Free" : `₹${b.amount.toLocaleString("en-IN")}`}</span>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadReceipt(b)}>
+                  <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Download receipt" onClick={() => downloadReceipt(b)}>
                     <Download className="h-4 w-4" />
                   </Button>
                 </div>

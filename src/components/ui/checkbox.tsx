@@ -11,7 +11,11 @@ const Checkbox = React.forwardRef<
   <CheckboxPrimitive.Root
     ref={ref}
     className={cn(
-      "peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+      // h-5 w-5 (20px), up from h-4 w-4 (16px, H10 ISSUES.md) — still below
+      // the ~44px touch-target minimum on its own, so callers wrapping this
+      // in a <label> should extend the label's own padding to make the
+      // whole row tappable (see AddClientModal's Services Subscribed grid).
+      "peer h-5 w-5 shrink-0 rounded-sm border border-primary ring-offset-background data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
       className,
     )}
     {...props}

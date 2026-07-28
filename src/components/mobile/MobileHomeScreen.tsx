@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Bell, MessageCircle, CheckCircle2, UserPlus, ClipboardList, Receipt, Send } from "lucide-react";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AddClientModal } from "@/components/clients/AddClientModal";
 import { AddTaskModal } from "@/components/tasks/AddTaskModal";
 import { CreateInvoiceModal } from "@/components/billing/CreateInvoiceModal";
@@ -280,6 +280,7 @@ export function MobileHomeScreen({ metrics, complianceAlerts, digest, caName, re
         <DialogContent className="max-w-6xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="font-heading">Bulk WhatsApp Reminder</DialogTitle>
+            <DialogDescription className="sr-only">Send a reminder message to multiple clients at once via WhatsApp.</DialogDescription>
           </DialogHeader>
           <div className="min-w-0 p-4">
             <BulkSender />

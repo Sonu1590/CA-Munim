@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Eye, EyeOff, Loader2, Plus, Trash2, Pencil, KeyRound, ShieldAlert, AlertTriangle, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
@@ -112,9 +112,9 @@ function ReAuthDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Lock className="h-4 w-4" />Confirm your password</DialogTitle>
+          <DialogDescription>Re-enter your password to reveal this credential. You won't be asked again for 5 minutes.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">Re-enter your password to reveal this credential. You won't be asked again for 5 minutes.</p>
           <Input
             type="password"
             autoFocus
@@ -165,7 +165,10 @@ function PortalCredentialForm({
 
   return (
     <DialogContent>
-      <DialogHeader><DialogTitle>{editing ? "Edit Portal Credential" : "Add Portal Credential"}</DialogTitle></DialogHeader>
+      <DialogHeader>
+        <DialogTitle>{editing ? "Edit Portal Credential" : "Add Portal Credential"}</DialogTitle>
+        <DialogDescription className="sr-only">Store this client's government portal login details.</DialogDescription>
+      </DialogHeader>
       <div className="space-y-4">
         <div><Label>Portal *</Label><Input className="mt-1.5" placeholder="e.g. GST Portal, Income Tax e-filing, MCA" value={portalName} onChange={(e) => setPortalName(e.target.value)} /></div>
         <div><Label>Username</Label><Input className="mt-1.5" value={username} onChange={(e) => setUsername(e.target.value)} /></div>
@@ -223,7 +226,10 @@ function DscRecordForm({
 
   return (
     <DialogContent>
-      <DialogHeader><DialogTitle>{editing ? "Edit DSC Record" : "Add DSC Record"}</DialogTitle></DialogHeader>
+      <DialogHeader>
+        <DialogTitle>{editing ? "Edit DSC Record" : "Add DSC Record"}</DialogTitle>
+        <DialogDescription className="sr-only">Store this client's Digital Signature Certificate details.</DialogDescription>
+      </DialogHeader>
       <div className="space-y-4 max-h-[60vh] overflow-y-auto">
         <div><Label>Holder Name *</Label><Input className="mt-1.5" value={holderName} onChange={(e) => setHolderName(e.target.value)} /></div>
         <div><Label>Serial Number</Label><Input className="mt-1.5 font-mono" value={serial} onChange={(e) => setSerial(e.target.value)} /></div>
@@ -367,8 +373,8 @@ export function ClientCredentialsPanel({ clientId }: { clientId: string }) {
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     {c.hasPassword ? <RevealField reveal={() => revealClientPortalCredential(c.id)} ensureReAuth={ensureReAuth} /> : <span className="text-xs text-muted-foreground">(not set)</span>}
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCredentialModal(c)}><Pencil className="h-3.5 w-3.5" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteCredential(c.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Edit ${c.portalName} credential`} onClick={() => setCredentialModal(c)}><Pencil className="h-3.5 w-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive" aria-label={`Delete ${c.portalName} credential`} onClick={() => handleDeleteCredential(c.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div>
                 </div>
               ))}
@@ -405,8 +411,8 @@ export function ClientCredentialsPanel({ clientId }: { clientId: string }) {
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       {d.hasPin ? <RevealField reveal={() => revealClientDscPin(d.id)} ensureReAuth={ensureReAuth} /> : null}
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDscModal(d)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteDsc(d.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Edit DSC record for ${d.holderName}`} onClick={() => setDscModal(d)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive" aria-label={`Delete DSC record for ${d.holderName}`} onClick={() => handleDeleteDsc(d.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </div>
                 );

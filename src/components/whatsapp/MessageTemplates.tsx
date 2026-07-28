@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -161,11 +161,11 @@ export function MessageTemplates() {
                     {t.variables.length > 4 && <span className="text-[10px] text-muted-foreground">+{t.variables.length - 4} more</span>}
                   </div>
                   <div className="flex items-center gap-1 pt-1 border-t border-border">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPreviewTemplate(t)}><Eye className="h-3.5 w-3.5" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditTemplate(t); setEditOpen(true); }}><Edit className="h-3.5 w-3.5" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDuplicate(t)}><Copy className="h-3.5 w-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Preview ${t.name} template`} onClick={() => setPreviewTemplate(t)}><Eye className="h-3.5 w-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Edit ${t.name} template`} onClick={() => { setEditTemplate(t); setEditOpen(true); }}><Edit className="h-3.5 w-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Duplicate ${t.name} template`} onClick={() => handleDuplicate(t)}><Copy className="h-3.5 w-3.5" /></Button>
                     {!t.isDefault && (
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(t.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive hover:text-destructive" aria-label={`Delete ${t.name} template`} onClick={() => handleDelete(t.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     )}
                   </div>
                 </CardContent>
@@ -186,6 +186,7 @@ export function MessageTemplates() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="font-heading">{previewTemplate?.name}</DialogTitle>
+            <DialogDescription className="sr-only">Preview of how this WhatsApp template message will appear to the client.</DialogDescription>
           </DialogHeader>
           <div className="rounded-xl bg-[#dcf8c6] p-4 text-sm whitespace-pre-wrap border border-[#25D366]/20">
             <p className="font-medium text-xs text-[#25D366] mb-2">WhatsApp Preview</p>
@@ -204,6 +205,7 @@ export function MessageTemplates() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-heading">{editTemplate.id ? "Edit Template" : "Create Template"}</DialogTitle>
+            <DialogDescription className="sr-only">Compose the WhatsApp message text and variables for this template.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,6 +60,7 @@ export function RecordPaymentModal({ open, onOpenChange, invoice, onRecorded }: 
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="font-heading">Record Payment</DialogTitle>
+          <DialogDescription className="sr-only">Log a payment received against this invoice.</DialogDescription>
         </DialogHeader>
 
         <div className="bg-muted/50 rounded-lg p-3 mb-2">

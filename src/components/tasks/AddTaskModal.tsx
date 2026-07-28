@@ -9,6 +9,7 @@ import { useStaff } from "@/hooks/useStaff";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -177,6 +178,7 @@ export function AddTaskModal({
           <DialogTitle className="font-heading">
             {task ? "Edit Task" : "Create New Task"}
           </DialogTitle>
+          <DialogDescription className="sr-only">Assign a compliance task to a client with a due date and priority.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-2">

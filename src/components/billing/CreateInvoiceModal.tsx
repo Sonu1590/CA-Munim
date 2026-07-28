@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -153,6 +153,7 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-heading">Create Invoice</DialogTitle>
+          <DialogDescription className="sr-only">Enter line items and client details to generate a new invoice.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -223,7 +224,8 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-8 w-8 mt-0.5 text-muted-foreground hover:text-destructive"
+                    className="h-11 w-11 mt-0.5 text-muted-foreground hover:text-destructive"
+                    aria-label="Remove line item"
                     onClick={() => removeLineItem(li.id)}
                     disabled={lineItems.length <= 1}
                   >

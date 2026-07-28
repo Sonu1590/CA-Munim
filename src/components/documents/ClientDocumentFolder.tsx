@@ -161,7 +161,7 @@ export function ClientDocumentFolder({ clientId, onBack }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack}>
+        <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Back to clients" onClick={onBack}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
@@ -220,16 +220,16 @@ export function ClientDocumentFolder({ clientId, onBack }: Props) {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handlePreview(doc)}>
+                    <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Preview ${doc.fileName}`} onClick={() => handlePreview(doc)}>
                       <Eye className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownload(doc)}>
+                    <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Download ${doc.fileName}`} onClick={() => handleDownload(doc)}>
                       <Download className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleShare(doc)}>
+                    <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Share ${doc.fileName}`} onClick={() => handleShare(doc)}>
                       <Share2 className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(doc)}>
+                    <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive hover:text-destructive" aria-label={`Delete ${doc.fileName}`} onClick={() => handleDelete(doc)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>

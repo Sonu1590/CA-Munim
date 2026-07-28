@@ -73,7 +73,7 @@ export function TaskListView({ tasks, onStatusChange, onEdit, onDelete }: Props)
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                      <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`More actions for ${task.clientName}`}>
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>

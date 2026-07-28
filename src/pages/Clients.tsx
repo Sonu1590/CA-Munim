@@ -114,8 +114,12 @@ export default function Clients() {
           </div>
         </div>
 
-        {/* Search & Filter */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        {/* Search & Filter — desktop only; MobileClientsScreen renders its own
+            search/filter UI below, bound to the same search/typeFilter state.
+            This block was missing its visibility guard (H8, ISSUES.md),
+            so it rendered a second search bar + filter dropdown on mobile,
+            stacked above MobileClientsScreen's own. */}
+        <div className="hidden md:flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input

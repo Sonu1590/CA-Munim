@@ -143,7 +143,7 @@ describe("TaskChecklistDrawer", () => {
     fireEvent.change(screen.getByPlaceholderText("Add document item…"), {
       target: { value: "Form 26AS" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "" })); // icon-only Plus button
+    fireEvent.click(screen.getByRole("button", { name: "Add document item" }));
 
     expect(onUpdate).toHaveBeenCalledTimes(1);
     const [updatedItems] = onUpdate.mock.calls[0];

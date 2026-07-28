@@ -3,7 +3,7 @@ import { UserPlus, Send, FileText, Receipt } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { AddClientModal } from "@/components/clients/AddClientModal";
 import { AddTaskModal } from "@/components/tasks/AddTaskModal";
@@ -124,6 +124,7 @@ export function QuickActions() {
             <DialogTitle className="font-heading">
               Bulk WhatsApp Reminder
             </DialogTitle>
+            <DialogDescription className="sr-only">Send a reminder message to multiple clients at once via WhatsApp.</DialogDescription>
           </DialogHeader>
 
           <div className="min-w-0 p-4">

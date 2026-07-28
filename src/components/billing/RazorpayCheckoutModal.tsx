@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, Info, IndianRupee } from "lucide-react";
 import { SubscriptionPlan } from "@/data/Settings";
@@ -112,6 +112,7 @@ export function RazorpayCheckoutModal({ open, onOpenChange, plan, cycle, onSucce
             <div className="h-7 px-2 rounded bg-[#072654] text-white text-xs font-bold flex items-center">Razorpay</div>
             Checkout
           </DialogTitle>
+          <DialogDescription className="sr-only">Complete payment for your plan via Razorpay's secure checkout.</DialogDescription>
         </DialogHeader>
 
         {step === "summary" && (

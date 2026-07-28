@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -297,6 +298,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
       <DialogContent className="max-w-2xl max-h-[90vh] p-0">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="text-lg font-heading">{client ? "Edit Client" : "Add New Client"}</DialogTitle>
+          <DialogDescription className="sr-only">Enter the client's KYC, tax, and billing details.</DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[75vh] px-6 pb-6">
           <div className="space-y-6 pt-4">
@@ -561,7 +563,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                       <Label>MCA Filings Applicable</Label>
                       <div className="flex flex-wrap gap-3 mt-1">
                         {mcaFilings.map((f) => (
-                          <label key={f} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                          <label key={f} className="flex items-center gap-1.5 text-sm cursor-pointer py-2.5 px-1 -mx-1">
                             <Checkbox
                               checked={selectedMcaFilings.includes(f)}
                               onCheckedChange={() => toggleMcaFiling(f)}
@@ -585,7 +587,7 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {services.map((s) => (
-                  <label key={s} className="flex items-center gap-2 text-sm cursor-pointer py-1">
+                  <label key={s} className="flex items-center gap-2 text-sm cursor-pointer py-2.5 px-1 -mx-1">
                     <Checkbox
                       checked={selectedServices.includes(s)}
                       onCheckedChange={() => toggleService(s)}

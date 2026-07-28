@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -234,6 +234,7 @@ export function BulkTaskGenerator({ open, onOpenChange, onGenerated }: Props) {
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-heading">Generate Recurring Tasks</DialogTitle>
+          <DialogDescription className="sr-only">Bulk-generate recurring compliance tasks for eligible clients.</DialogDescription>
         </DialogHeader>
 
         {/* Step indicator */}

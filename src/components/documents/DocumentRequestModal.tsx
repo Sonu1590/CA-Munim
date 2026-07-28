@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -150,6 +150,7 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
       <DialogContent className="w-[calc(100%-2rem)] rounded-2xl sm:w-full sm:max-w-md sm:rounded-lg">
         <DialogHeader>
           <DialogTitle className="font-heading">Request Document from Client</DialogTitle>
+          <DialogDescription className="sr-only">Send a document upload request link to this client via WhatsApp.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">

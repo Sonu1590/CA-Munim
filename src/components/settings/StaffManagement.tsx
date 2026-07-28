@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Users, Plus, Mail, Phone, ShieldCheck, Shield, Loader2 } from "lucide-react";
 import { fetchStaffFromSupabase, addStaffToSupabase, updateStaffActiveStatus, type StaffMember } from "@/data/Settings";
@@ -176,7 +176,10 @@ export function StaffManagement() {
 
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent className="w-[calc(100%-2rem)] rounded-2xl sm:w-full sm:max-w-lg sm:rounded-lg">
-          <DialogHeader><DialogTitle>Add Staff Member</DialogTitle></DialogHeader>
+          <DialogHeader>
+        <DialogTitle>Add Staff Member</DialogTitle>
+        <DialogDescription className="sr-only">Invite a new staff member and set their role.</DialogDescription>
+      </DialogHeader>
           <div className="space-y-4">
             <div><Label>Full Name</Label><Input className="mt-1.5" value={newStaff.name} onChange={(e) => setNewStaff((p) => ({ ...p, name: e.target.value }))} /></div>
             <div>

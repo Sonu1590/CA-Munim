@@ -1,6 +1,6 @@
 import { useState } from "react";
 import * as XLSX from "xlsx";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -143,6 +143,7 @@ export function ImportClientsModal({ open, onOpenChange, onImported }: Props) {
             <FileSpreadsheet className="h-5 w-5 text-primary" />
             Import Clients from Excel
           </DialogTitle>
+          <DialogDescription className="sr-only">Bulk-upload clients from an Excel spreadsheet.</DialogDescription>
         </DialogHeader>
 
         {step === "upload" && (

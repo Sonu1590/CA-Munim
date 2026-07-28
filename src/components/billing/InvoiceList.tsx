@@ -160,16 +160,29 @@ export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
                     </td>
                     <td className="p-3">
                       <div className="flex items-center justify-center gap-1">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => previewInvoice(inv)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-11 w-11"
+                          aria-label={`Preview invoice ${inv.invoiceNumber}`}
+                          onClick={() => previewInvoice(inv)}
+                        >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => downloadInvoice(inv)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-11 w-11"
+                          aria-label={`Download invoice ${inv.invoiceNumber}`}
+                          onClick={() => downloadInvoice(inv)}
+                        >
                           <Download className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-7 w-7 text-[#25D366]"
+                          className="h-11 w-11 text-[#25D366]"
+                          aria-label={`Share invoice ${inv.invoiceNumber} on WhatsApp`}
                           onClick={() => shareInvoiceOnWhatsApp(inv)}
                         >
                           <MessageCircle className="h-3.5 w-3.5" />
@@ -178,7 +191,8 @@ export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-7 w-7 text-primary"
+                            className="h-11 w-11 text-primary"
+                            aria-label={`Record payment for invoice ${inv.invoiceNumber}`}
                             onClick={() => onRecordPayment(inv)}
                           >
                             <CreditCard className="h-3.5 w-3.5" />
@@ -216,7 +230,8 @@ export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-8 w-8"
+                    className="h-11 w-11"
+                    aria-label={`Download invoice ${inv.invoiceNumber}`}
                     onClick={() => downloadInvoice(inv)}
                   >
                     <Download className="h-4 w-4" />
@@ -224,7 +239,8 @@ export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-8 w-8 text-[#25D366]"
+                    className="h-11 w-11 text-[#25D366]"
+                    aria-label={`Share invoice ${inv.invoiceNumber} on WhatsApp`}
                     onClick={() => shareInvoiceOnWhatsApp(inv)}
                   >
                     <MessageCircle className="h-4 w-4" />
@@ -233,7 +249,7 @@ export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 text-xs"
+                      className="h-11 text-xs"
                       onClick={() => onRecordPayment(inv)}
                     >
                       <CreditCard className="h-3.5 w-3.5 mr-1" />

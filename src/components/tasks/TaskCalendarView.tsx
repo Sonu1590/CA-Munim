@@ -34,11 +34,11 @@ export function TaskCalendarView({ tasks }: Props) {
   return (
     <div className="bg-card border border-border rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
-        <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+        <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Previous month" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <h3 className="text-base font-heading font-semibold">{format(currentMonth, "MMMM yyyy")}</h3>
-        <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+        <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Next month" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
           <ChevronRight className="h-5 w-5" />
         </Button>
       </div>

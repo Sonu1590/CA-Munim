@@ -31,6 +31,14 @@ const typeBadgeColor: Record<string, string> = {
   BOI: "bg-rose-100 text-rose-700",
 };
 
+// Same wa.me convention as MobileClientsScreen.tsx's waLink() — assumes a
+// 10-digit number is a domestic Indian mobile and prefixes the country code.
+function waLink(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  const withCountryCode = digits.length === 10 ? `91${digits}` : digits;
+  return `https://wa.me/${withCountryCode}`;
+}
+
 export function ClientListTable({ clients, onEdit, onView }: ClientListTableProps) {
   return (
     <div className="hidden md:block overflow-x-auto rounded-md border">
@@ -39,7 +47,7 @@ export function ClientListTable({ clients, onEdit, onView }: ClientListTableProp
           <TableRow>
             <TableHead>Client Name</TableHead>
             <TableHead>PAN</TableHead>
-            <TableHead>Phone</TableHead>
+            <TableHead className="min-w-[9rem]">Phone</TableHead>
             <TableHead className="text-center">Active Tasks</TableHead>
             <TableHead className="text-right">Pending Fees</TableHead>
             <TableHead>Last Activity</TableHead>
@@ -66,7 +74,7 @@ export function ClientListTable({ clients, onEdit, onView }: ClientListTableProp
                   {client.pan}
                 </span>
               </TableCell>
-              <TableCell className="text-sm">{client.phone}</TableCell>
+              <TableCell className="text-sm whitespace-nowrap">{client.phone}</TableCell>
               <TableCell className="text-center">
                 <Badge variant="secondary" className="text-xs">
                   {client.activeTasks}
@@ -93,19 +101,24 @@ export function ClientListTable({ clients, onEdit, onView }: ClientListTableProp
               <TableCell className="sticky right-0 z-10 bg-background text-right shadow-[-8px_0_12px_-12px_rgba(0,0,0,0.45)] group-hover:bg-muted/50">
                 <div className="flex items-center justify-end gap-1">
                   <Button
+                    asChild
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-[hsl(var(--whatsapp))] hover:text-[hsl(var(--whatsapp))] hover:bg-[hsl(var(--whatsapp))]/10"
+                    className="h-11 w-11 text-[hsl(var(--whatsapp))] hover:text-[hsl(var(--whatsapp))] hover:bg-[hsl(var(--whatsapp))]/10"
                     title="WhatsApp"
+                    aria-label={`Send WhatsApp message to ${client.name}`}
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <MessageCircle className="h-4 w-4" />
+                    <a href={waLink(client.phone)} target="_blank" rel="noopener noreferrer">
+                      <MessageCircle className="h-4 w-4" />
+                    </a>
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8"
+                    className="h-11 w-11"
                     title="Edit"
+                    aria-label={`Edit ${client.name}`}
                     onClick={(event) => {
                       event.stopPropagation();
                       onEdit(client);
@@ -116,8 +129,9 @@ export function ClientListTable({ clients, onEdit, onView }: ClientListTableProp
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8"
+                    className="h-11 w-11"
                     title="View"
+                    aria-label={`View ${client.name}`}
                     onClick={(event) => {
                       event.stopPropagation();
                       onView(client);
