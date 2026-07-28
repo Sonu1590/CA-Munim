@@ -65,11 +65,37 @@ export async function selectTaskFieldOption(page: Page, label: string, optionNam
   await page.getByRole('option', { name: optionName, exact }).click();
 }
 
-export async function pickTaskDueDate(page: Page, day = '20') {
-  await taskField(page, 'Due Date').getByRole('button').click();
+/** `monthsAgo` clicks the Calendar's "Go to previous month" nav (react-day-picker's
+ * default label, unmodified by src/components/ui/calendar.tsx) that many times
+ * before picking `day` — used to seed a task guaranteed to outrank whatever
+ * overdue test data has already accumulated in the shared live test project. */
+export async function pickTaskDueDate(page: Page, day = '20', monthsAgo = 0) {
+  // force:true throughout this function, not just the previous-month loop —
+  // on a slow/loaded mobile-ios (WebKit) run, the very first trigger click
+  // below has also been observed to fail Playwright's pre-click "stable"
+  // check the same way (see M28-adjacent investigation notes on the loop
+  // below); this is calendar-navigation plumbing, not the thing under test.
+  await taskField(page, 'Due Date').getByRole('button').click({ force: true });
+  const prevMonthBtn = page.getByRole('button', { name: 'Go to previous month' });
+  for (let i = 0; i < monthsAgo; i++) {
+    // react-day-picker re-renders its whole Nav on every month change, which
+    // on the mobile-ios (WebKit) project was observed to make Playwright's
+    // pre-click "stable" bounding-box check never settle within the click's
+    // own timeout when fired in a tight loop — reproduced consistently on
+    // mobile-ios, never on mobile-android/chromium doing the identical
+    // clicks, and the failure screenshot showed a perfectly normal,
+    // unobstructed calendar — so this is WebKit-specific repaint/actionability
+    // timing in the test harness, not a real app bug. force:true is
+    // appropriate here because the click's role is pure test navigation
+    // (getting the calendar to the right month), not verifying the button
+    // itself is clickable — that's not what this test is about.
+    await expect(prevMonthBtn).toBeEnabled({ timeout: 5_000 });
+    await prevMonthBtn.click({ force: true });
+    await page.waitForTimeout(150);
+  }
   const dayCell = page.getByRole('gridcell', { name: day, exact: true });
   await expect(dayCell).toBeVisible({ timeout: 5_000 });
-  await dayCell.click();
+  await dayCell.click({ force: true });
 }
 
 export interface TaskFormOptions {
@@ -80,6 +106,7 @@ export interface TaskFormOptions {
   priority?: string;
   notes?: string;
   dueDateDay?: string;
+  dueDateMonthsAgo?: number;
 }
 
 /** Fills the Add/Edit Task modal. Does not submit. */
@@ -94,7 +121,7 @@ export async function fillTaskForm(page: Page, options: TaskFormOptions) {
     await selectTaskFieldOption(page, 'Period', options.period, false);
   }
 
-  await pickTaskDueDate(page, options.dueDateDay ?? '20');
+  await pickTaskDueDate(page, options.dueDateDay ?? '20', options.dueDateMonthsAgo ?? 0);
 
   if (options.priority) {
     await selectTaskFieldOption(page, 'Priority', options.priority, false);

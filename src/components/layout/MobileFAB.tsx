@@ -110,7 +110,7 @@ export function MobileFAB() {
         onSave={async (taskData) => {
           const success = await addTask(taskData);
           if (success) {
-            toast.success("Task added");
+            toast.success("Task created successfully");
             setTaskOpen(false);
           } else {
             toast.error("Failed to add task. Please try again.");
