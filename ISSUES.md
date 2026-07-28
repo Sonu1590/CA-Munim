@@ -328,44 +328,52 @@ The 20 findings split into two genuinely different fix shapes:
 
 Two-pass review (`CA-Munim-UX-Review.md` code-only, then `CA-Munim-UX-Review-v2.md` visually verified against 22 screenshots at desktop ~1440px and mobile 400px — v2 supersedes v1 for any item both cover). The review's own "STILL OPEN — CRITICAL, SECURITY: cron secret committed" note is **stale** — already fixed and tracked as C4 (2026-07-14); the reviewer was working from an older commit. Not re-logged. Everything below is newly logged from the review; severities re-mapped from the review's own 0–3 scale onto this doc's Critical/High/Medium/Low to match how those tiers are actually used elsewhere in this file (this repo's High tier is reserved for broken-workflow/accessibility-blocking bugs, not general polish).
 
-### H8. Mobile Clients page renders two of everything — duplicate search bar, filter, and heading
+### H8. Mobile Clients page renders two of everything — duplicate search bar, filter, and heading — FIXED (2026-07-29)
 **Where:** `src/pages/Clients.tsx` — the desktop page header + Search & Filter block (~lines 117–137) are not wrapped in `hidden md:block`, so they render alongside `<MobileClientsScreen>` (`md:hidden`) instead of being hidden by it.
 **Problem:** On mobile: search input, "All" dropdown, then a second "Clients N" heading, a second search input, then filter chips — both trees visible and stacked.
-**Fix:** Wrap the desktop header and Search & Filter block in `hidden md:block`. Check Tasks/Documents/Billing pages for the identical pattern (a desktop header block sitting next to a `Mobile*Screen` without its own visibility guard) — the review flagged Clients as confirmed and asked that the others be checked.
+**Fix:** Wrapped the Search & Filter block in `hidden md:flex` — the page header block above it already had the correct guard (`hidden md:flex`), so only the search/filter block needed it. Checked Tasks/Documents/Billing for the same pattern: Tasks and Billing already correctly nest their search inside their own `hidden md:block` desktop wrapper; Documents has no separate mobile screen at all, so neither was affected.
+**Verified:** live on the real dev server at mobile viewport (375px) — exactly one "Clients 362" heading, one filter dropdown, one search UI.
 
-### H9. Phone numbers are truncated in the Clients table with no ellipsis or tooltip
+### H9. Phone numbers are truncated in the Clients table with no ellipsis or tooltip — FIXED (2026-07-29)
 **Where:** `src/components/clients/ClientListTable.tsx` — Phone column.
 **Problem:** A 10-digit Indian mobile number renders cut off mid-digit (e.g. `75073277`) with no `whitespace-nowrap`, ellipsis, or tooltip — worse than showing nothing, since it looks complete. Reading/copying a client's phone number is a core daily action for a CA.
 **Fix:** Give the Phone column a fixed min-width sized for the full number, `whitespace-nowrap`, and reduce width on lower-priority columns (Last Activity, Active Tasks) or hide them at intermediate breakpoints to make room.
+**Fixed:** added `min-w-[9rem]` to the Phone column header and `whitespace-nowrap` to its cells. Left the other columns' widths alone — the table already has `overflow-x-auto` on its wrapper, so a wider Phone column just scrolls rather than squeezing anything else.
 
-### H10. Touch targets well below the ~44px minimum across action-icon buttons and checkboxes
+### H10. Touch targets well below the ~44px minimum across action-icon buttons and checkboxes — FIXED (2026-07-29)
 **Where:** `ClientListTable.tsx` action buttons (`h-8 w-8`, 32px), `InvoiceList.tsx` (`h-7 w-7`, 28px), `components/ui/checkbox.tsx` (`h-4 w-4`, 16px) — the checkbox size is used for all ~10 Services Subscribed / MCA Filings checkboxes in `AddClientModal.tsx` Section D, which is the field that (should) drive automatic recurring task generation, i.e. the most valuable field in the form is the hardest to tap accurately.
 **Problem:** WCAG 2.5.5 / platform HIG both call for ~44px touch targets. These sizes are 30–65% of that, clustered 2–4-to-a-row, on a product whose stated core users are phone-first CAs.
 **Fix:** Icon buttons: bump to `h-11 w-11` on touch via responsive classes, or keep the icon small and expand the hit area with padding — don't rely on the mobile screens alone, since the desktop table is also reachable on tablets. Checkboxes: increase visual size to 20–24px and extend the wrapping `<label>`'s padding (`py-2.5 px-1 -mx-1`) so the whole row is a ≥44px tap target — the label already wraps the input, so this is the cheap correct fix.
+**Fixed:** bumped every icon-only action button flagged by the review (`ClientListTable.tsx`, `InvoiceList.tsx`, `CreateInvoiceModal.tsx`, `ClientCredentialsPanel.tsx`, `ClientDocumentFolder.tsx`, `SubscriptionBilling.tsx`, `TaskListView.tsx`, `TaskCard.tsx`, `TaskCalendarView.tsx`, `TaskChecklistDrawer.tsx`, `MessageTemplates.tsx`) to `h-11 w-11` unconditionally (not just on touch — a slightly larger target doesn't hurt desktop mouse users, and it avoids a two-tier compromise for tablets that are touch but match the `md:` breakpoint). `ui/checkbox.tsx` bumped `h-4 w-4` → `h-5 w-5`; `AddClientModal.tsx`'s two checkbox grids (Services Subscribed, MCA Filings) got `py-2.5 px-1 -mx-1` on their wrapping `<label>`.
 
-### H11. Icon-only action buttons have no accessible name
+### H11. Icon-only action buttons have no accessible name — FIXED (2026-07-29)
 **Where:** `ClientListTable.tsx` (~lines 95–120), `InvoiceList.tsx` (~lines 163–172), task row menus, and any other icon-only `<Button size="icon">`. Across the app: 171 buttons, only 4 use `title`.
 **Problem:** A screen reader announces "button" with no purpose — can't distinguish edit from delete from send-WhatsApp. Existing tooltips don't fix this; tooltips aren't reliably read by assistive tech.
 **Fix:** Add `aria-label` to every icon-only button, including the entity name where the button repeats per row (e.g. `aria-label="Send WhatsApp message to ${client.name}"`) so screen-reader users can distinguish rows, not just actions.
+**Fixed:** added entity-scoped `aria-label`s to every icon-only button across the same files touched for H10, e.g. `` `Edit ${client.name}` ``, `` `Delete DSC record for ${d.holderName}` ``, `` `Preview invoice ${inv.invoiceNumber}` ``, `` `More actions for ${task.clientName}` ``. **Also found and fixed a related M24 leftover while in `ClientListTable.tsx` for this:** the desktop WhatsApp icon button's only handler was `event.stopPropagation()` — no real `wa.me` link, explicitly documented in M24 as "still unfixed, for a later pass." Wiring an accurate `aria-label="Send WhatsApp message to X"` onto a button that does nothing would just be a more convincing lie, so it now uses the same `waLink()` pattern `MobileClientsScreen.tsx` already established.
 
-### H12. Every modal is missing `DialogDescription` — Radix/WCAG accessibility requirement
+### H12. Every modal is missing `DialogDescription` — Radix/WCAG accessibility requirement — FIXED (2026-07-29)
 **Where:** `AddClientModal.tsx`, `AddTaskModal.tsx`, `CreateInvoiceModal.tsx` — zero uses of `DialogDescription` (`components/ui/dialog.tsx` exports it but nothing consumes it). Confirmed live via a console warning on every modal open: `Warning: Missing 'Description' or 'aria-describedby={undefined}' for {DialogContent}`.
 **Fix:** Add a `<DialogDescription>` to every `DialogContent` (visible or `sr-only` if a visible description isn't wanted). Sweep all dialogs in the app, not just the three named.
+**Fixed:** swept all 13 files using `DialogContent` (some with multiple dialogs — `ClientCredentialsPanel.tsx` has 3, `MessageTemplates.tsx` has 2), adding a `DialogDescription` to each — `sr-only` where a visible one wasn't warranted, real visible text (replacing a near-duplicate plain `<p>`) where one already existed. Also fixed `ui/command.tsx`'s `CommandDialog` wrapper (used by `GlobalSearch`), which had neither a `DialogTitle` nor a `Description` at all. **Found one more instance the initial sweep missed:** `ui/sheet.tsx`'s `Sheet` is built on the same underlying `@radix-ui/react-dialog` primitive, so it throws the identical warning under the generic name "DialogContent" — a repo-wide re-run of the vitest suite still showed the warning coming from `TaskChecklistDrawer.tsx`'s `Sheet`, fixed the same way. (`ui/sidebar.tsx`'s own `SheetContent` usage was also missing one, but that component is dead code — genuinely unused anywhere in the app, confirmed via search — so left alone.) Re-ran the full suite afterward and confirmed zero remaining "Missing 'Description'" warnings anywhere.
 
-### H13. Task List view defaults to showing Completed tasks first, burying overdue work below the fold
+### H13. Task List view defaults to showing Completed tasks first, burying overdue work below the fold — FIXED (2026-07-29)
 **Where:** `src/components/tasks/TaskListView.tsx` / `src/pages/Tasks.tsx` sort order.
 **Problem:** Confirmed live: header reads "107 total · 75 pending · 74 overdue" but the List view's visible rows are all "Completed", sorted to the top. The default view surfaces the least actionable work while the app's core promise (surfacing overdue compliance work) sits scrolled out of view.
 **Fix:** Default sort by urgency — most-overdue first, then due-soon, then pending, completed last. Keep sort user-changeable. Consider hiding completed behind a filter toggle by default.
+**Fixed:** added a `.sort()` to `pages/Tasks.tsx`'s `filteredTasks` — completed tasks sort last (via a `0`/`1` completed flag), everything else sorts by due date ascending, so the most-overdue item leads. Applied once, centrally, so it benefits all three views (List directly; Kanban's within-column order too, since its columns are also fed from `filteredTasks`; Calendar is unaffected since it groups by day). Sort isn't user-changeable in this pass — logged as a possible follow-up, not required by the review's own fix text.
 
-### H14. Mobile bottom nav has no path to 4 of 8 modules
+### H14. Mobile bottom nav has no path to 4 of 8 modules — FIXED (2026-07-29)
 **Where:** `src/components/layout/MobileBottomNav.tsx` — 5 items (Home, Clients, Tasks, WhatsApp, More), where "More" routes directly to `/settings`.
 **Problem:** Documents, Billing, Reports, and Penalty Calculator have no mobile navigation path at all except a deep link or the FAB (which only covers Add Client / Add Task / New Invoice). A phone-first CA can't reach Billing or Reports from the nav.
 **Fix:** Make "More" open a sheet/menu listing every remaining module instead of hard-redirecting to Settings. Confirm all 8 modules are reachable in ≤2 taps on mobile.
+**Fixed:** "More" is now a button that opens a bottom `Sheet` listing Documents/Billing & Fees/Reports/Penalty Calculator/Settings — same labels/icons/paths as `DesktopSidebar.tsx`'s own nav list. All 8 modules now reachable in ≤2 taps (1 tap for the 4 fixed tabs, 2 for anything in More). Not live-verified in-browser (port 8080 was occupied by a concurrent background agent's dev server for the rest of this session) — verified via `tsc` and code review; the component reuses the same `Sheet`/`NavLink` primitives already proven working elsewhere in the app.
 
-### H15. FAB overlaps and obscures content on mobile
+### H15. FAB overlaps and obscures content on mobile — FIXED (2026-07-29)
 **Where:** `src/components/layout/MobileFAB.tsx` + `AppLayout.tsx`.
 **Problem:** Confirmed live: on mobile Dashboard the FAB sits on top of a task card, covering the overdue-days badge and part of the card body; on mobile Clients it covers the third client card's action buttons.
 **Fix:** Raise the FAB above the bottom nav with more offset (e.g. `bottom-24`), and add matching bottom padding to scrollable content so the last list item clears both FAB and nav. Verify at short viewport heights (~400px), not just narrow widths.
+**Fixed:** `MobileFAB.tsx`'s position bumped `bottom-20` → `bottom-24`; `AppLayout.tsx`'s `<main>` bottom padding bumped `pb-20` → `pb-28`. Since the FAB is `position: fixed`, it covers whatever content happens to render at its screen coordinates whenever scrolled into that range, not just the very end of a list — the extra padding gives trailing content genuine clearance from both the nav and the floating FAB. Not live-verified in-browser this pass (see H14's note on port 8080); verified via `tsc` and code review.
 
 ### M29. Loading states are blank-screen spinners, not skeletons, across every data view
 **Where:** `pages/Clients.tsx:63-68` and the same pattern in Tasks, Billing, dashboard widgets. `components/ui/skeleton.tsx` exists but is only consumed by `ui/sidebar.tsx`.
@@ -377,22 +385,28 @@ Two-pass review (`CA-Munim-UX-Review.md` code-only, then `CA-Munim-UX-Review-v2.
 **Problem:** AddClientModal spans 5 sections (A–E); a user with 3 invalid fields discovers them one submit at a time, scrolling to find each one, with nothing visually marking the invalid field.
 **Fix:** Validate per-field on blur with inline errors; on submit collect all errors at once, mark every invalid field (red border + message), scroll to the first; clear each field's error as it becomes valid. Apply identically across all three modals.
 
-### M31. Billing's error-retry reloads the whole app instead of refetching
+### M31. Billing's error-retry reloads the whole app instead of refetching — FIXED (2026-07-29)
 **Where:** `pages/Billing.tsx:87` — `onClick={() => window.location.reload()}`, inconsistent with `Clients.tsx:81` and `Tasks.tsx:113`, which correctly call `refetch`.
 **Fix:** Wire Billing's "Try Again" to the hook's `refetch`, matching the other two pages.
+**Fixed:** `Billing.tsx` doesn't use a `useBilling`-style hook for its invoice list — it manages `loadInvoices`/`loading`/`error` state directly. Wired the button to call `loadInvoices` (the same function the page's own `useEffect` already calls on mount) instead of `window.location.reload()`.
 
-### M32. Four native `window.confirm()` dialogs break visual consistency with the rest of the app
+### M32. Four native `window.confirm()` dialogs break visual consistency with the rest of the app — FIXED (2026-07-29)
 **Where:** `AddClientModal.tsx:222` (unsaved changes), `ClientCredentialsPanel.tsx:314` and `:325` (delete credential / DSC), `pages/Tasks.tsx:80` (delete task) — the app uses styled `AlertDialog` everywhere else (52 instances).
 **Fix:** Replace each with the app's `AlertDialog`, matching the existing destructive-action pattern (title, description, Cancel + destructive confirm).
+**Correction:** the "52 instances" claim doesn't hold up — a repo-wide search found zero existing uses of `AlertDialog` anywhere outside `components/ui/alert-dialog.tsx` itself. The review most likely miscounted plain `Dialog` (which genuinely has 50+ uses, confirmed while doing H12) as `AlertDialog`. This wasn't an established pattern to match; it's the first real usage of the component.
+**Fixed:** all 4 replaced with the standard shadcn `AlertDialog` (Title/Description/Cancel/destructive Action). `Tasks.tsx` and `ClientCredentialsPanel.tsx`'s two delete-confirms use a small pending-target state (`deleteConfirmTask`, `deleteConfirm: {kind, id}`) set by the trigger and read by the dialog. `AddClientModal.tsx`'s unsaved-changes confirm is a different shape (confirm-before-close, not confirm-before-delete): the underlying `Dialog` stays open while the `AlertDialog` is shown on top, and only actually closes on confirm.
+**Verified:** `npx tsc --noEmit` clean, full unit suite (119/119) passing.
 
-### M33. No search debouncing anywhere in the app
+### M33. No search debouncing anywhere in the app — FIXED (2026-07-29)
 **Where:** Search inputs in Clients, Tasks, Documents, Billing — no `debounce`/`useDeferredValue` found anywhere in the codebase.
 **Problem:** Every keystroke re-filters the full list (362 clients / 107 tasks in the review's live data) — noticeable stutter on a mid-range Android phone, the stated core user device.
 **Fix:** Debounce ~250ms, or wrap the filtered list in `useDeferredValue`, keeping the input itself immediately responsive.
+**Fixed:** used `useDeferredValue` (zero new dependencies) in `Clients.tsx`, `Tasks.tsx`, `Billing.tsx`, and `ClientDocumentList.tsx` (the actual home of Documents' search — the review named `Documents.tsx`, but that page has no search of its own; it lives in `ClientDocumentList.tsx`). Each `<Input>` stays bound to the immediate `search` state so typing never lags; only the expensive `.filter()`/`useMemo` consumes the deferred value.
 
-### M34. Autofocus missing on desktop modal/search open
+### M34. Autofocus missing on desktop modal/search open — FIXED (2026-07-29)
 **Where:** Only `ClientCredentialsPanel.tsx` uses `autoFocus`. Mobile Add Client does appear to focus its first field; desktop AddClient/AddTask/CreateInvoice modals and the global search (Ctrl/Cmd-K) don't.
 **Fix:** Autofocus the first input on modal open and when GlobalSearch opens. Confirm focus is trapped in the modal and returns to the trigger on close (Radix Dialog handles most of this — confirm it isn't disabled).
+**Fixed:** `autoFocus` added to `AddClientModal.tsx`'s first field (Full Name `Input`), `AddTaskModal.tsx` and `CreateInvoiceModal.tsx`'s first field (Client `SelectTrigger` — both start with a Select, not an Input), and `GlobalSearch.tsx`'s `CommandInput`. Radix's own focus-trap/return-to-trigger behavior is unmodified (never disabled in this codebase), so that half was already correct.
 
 ### M35. Modal shows a dark band artifact above the title on mobile — needs DevTools verification
 **Where:** `components/ui/dialog.tsx` overlay/content positioning at mobile widths.
@@ -454,21 +468,26 @@ Two-pass review (`CA-Munim-UX-Review.md` code-only, then `CA-Munim-UX-Review-v2.
 ### L5. Compliance content hardcoded/stale — FIXED (`a752464`)
 `src/data/Settings.ts` ships hardcoded `mockComplianceUpdates` and `mockFirmProfile` (Sharma & Associates) dated 2025. Confirm these mocks aren't surfacing anywhere in production UI.
 
-### L6. Deprecated `apple-mobile-web-app-capable` meta tag — console warning
+### L6. Deprecated `apple-mobile-web-app-capable` meta tag — console warning — FIXED (2026-07-29)
 **Where:** `index.html`. Console: `<meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">`.
 **Fix:** Add the modern `mobile-web-app-capable` meta tag alongside the existing Apple one (keep the Apple tag for older iOS).
+**Fixed:** added, kept the Apple tag alongside it.
 
-### L7. Inconsistent placeholder casing in Add Client form
+### L7. Inconsistent placeholder casing in Add Client form — FIXED (2026-07-29)
 **Where:** Add Client Section B — `OPTIONAL` (uppercase) on TAN Number vs `Optional` (title case) on IT Ward / AO Code.
 **Fix:** Standardize to sentence case. Likely an `uppercase` CSS class on the TAN field's wrapper bleeding into its placeholder — check the class isn't applied above the input level.
+**Fixed:** confirmed exactly this — the TAN `Input`'s `className="font-mono uppercase"` applied `text-transform: uppercase` to the whole element including its `placeholder="Optional"`. The PAN/GSTIN fields also carry `uppercase` but their placeholders (`ABCDE1234F`, `22AAAAA0000A1Z5`) are already all-caps example values, so the same bug is invisible there. Removed `uppercase` from the TAN field specifically — its typed value is already forced uppercase via `.toUpperCase()` in the `onChange` handler, so the class was redundant for real input and only affected the placeholder.
 
-### L8. Duplicate "Sign out" affordance
+### L8. Duplicate "Sign out" affordance — FIXED (2026-07-29)
 **Where:** Settings page header has its own Sign out button; the sidebar also has one at the bottom.
 **Fix:** `guessing on intent` — keep the sidebar one (persistent, expected location), remove it from the Settings header or move it into a clearly labeled Account section.
+**Correction:** removing it outright would have been a regression, not a fix — `DesktopSidebar.tsx` is `hidden md:flex`, i.e. entirely absent on mobile, and neither `MobileBottomNav` nor `MobileFAB` has a sign-out affordance of their own. The Settings header button is mobile's *only* way to sign out.
+**Fixed:** made the Settings header's Sign out button `md:hidden` instead of removing it — gone on desktop (where the sidebar already covers it), still present on mobile (where it's load-bearing).
 
-### L9. No progress indicator in the long Add Client form
+### L9. No progress indicator in the long Add Client form — FIXED (2026-07-29)
 **Where:** Add Client modal, 5 sections (A–E), heavy scrolling, no indication of position or remaining sections.
 **Fix:** Add a sticky section indicator or step markers (A → E) at the top of the modal; consider collapsing optional sections by default.
+**Fixed:** added a row of section-letter anchor links (A/B/C/D/E, C only shown when `isCompanyType`) below the modal title, each scrolling its section into view on click via `id="section-x"` + `scrollIntoView`. Deliberately a plain jump-nav, not a scroll-spy "current section" indicator with active-state tracking — simpler and lower-risk for an L-tier polish fix, while still giving real navigational value. Optional-section collapsing not done — a bigger change than this pass's scope.
 
 ### L10. "BETA" badge on WhatsApp Center is unexplained
 **Where:** Sidebar nav — WhatsApp Center carries a BETA tag with no explanation of what's in beta or what's safe to use, for a feature that sends real client messages.
