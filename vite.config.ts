@@ -51,6 +51,16 @@ export default defineConfig(({ mode }) => ({
         // App shell only — never precache/serve Supabase API responses, so
         // clients always see live, RLS-scoped data rather than a stale cache.
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+        // Default is 2 MiB; the main bundle is already ~2.1 MB and grows
+        // over time, which made `vite build` fail outright (workbox
+        // treats an oversized precache asset as a hard error, not a
+        // warning). Raised with headroom rather than tuned to the exact
+        // current size, so normal bundle growth doesn't re-break the
+        // build. Rollup's own "chunks larger than 500 kB" warning at
+        // build time is the real signal to eventually code-split
+        // (dynamic import / manualChunks) — orthogonal to this fix and
+        // not something to do blind under a broken-build deadline.
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),
   ].filter(Boolean),
