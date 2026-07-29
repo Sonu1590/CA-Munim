@@ -35,6 +35,7 @@ import { validatePAN, validateGSTIN } from "@/lib/indianTaxUtils";
 import { FYHint } from "@/components/common/FYHint";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { CheckCircle2, XCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface AddClientModalProps {
   open: boolean;
@@ -86,6 +87,12 @@ const months = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+// M30, ISSUES.md — the only fields actually marked "*" (required) in the
+// form below. Order matches their top-to-bottom DOM position in Section A
+// so "scroll to first invalid field" lands on whichever one the user
+// would hit first while reading the form.
+const requiredFieldOrder = ["fullName", "clientType", "dob", "pan", "phone"] as const;
+
 export function AddClientModal({ open, onOpenChange, onSave, client }: AddClientModalProps) {
   const [clientType, setClientType] = useState<string>("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -120,10 +127,78 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const isCompanyType = ["Private Ltd", "LLP", "Public Ltd"].includes(clientType);
   const panCheck = validatePAN(panValue, clientType || undefined);
   const gstinCheck = validateGSTIN(gstinValue);
+
+  // M30, ISSUES.md — single source of truth for what makes each required
+  // field valid right now. Reads current state directly (not a passed-in
+  // value) so it's safe to call from onBlur, from the touched-field
+  // re-validation effect below, and from validateAll on submit alike.
+  const validateField = (field: string): string | null => {
+    switch (field) {
+      case "fullName":
+        return fullName.trim() ? null : "Full Name is required.";
+      case "clientType":
+        return clientType ? null : "Client Type is required.";
+      case "dob":
+        return dob ? null : "Date of Birth / Incorporation is required.";
+      case "pan":
+        if (!panValue.trim()) return "PAN Number is required.";
+        return panCheck.isValid ? null : "Enter a valid PAN (format: AAAAA9999A — 5 letters, 4 digits, 1 letter).";
+      case "phone":
+        return phone.trim() ? null : "Phone is required.";
+      default:
+        return null;
+    }
+  };
+
+  const touchField = (field: string) => setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+
+  // Re-validates only fields already touched (blurred at least once), so an
+  // error clears live as the user fixes it without flashing errors on
+  // fields they haven't reached yet.
+  useEffect(() => {
+    if (!open) return;
+    setFieldErrors((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const field of requiredFieldOrder) {
+        if (!touched[field]) continue;
+        const err = validateField(field);
+        if ((err ?? null) !== (next[field] ?? null)) {
+          changed = true;
+          if (err) next[field] = err; else delete next[field];
+        }
+      }
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, fullName, clientType, dob, panValue, panCheck.isValid, phone, touched]);
+
+  const validateAll = () => {
+    const next: Record<string, string> = {};
+    for (const field of requiredFieldOrder) {
+      const err = validateField(field);
+      if (err) next[field] = err;
+    }
+    setTouched((prev) => {
+      const nextTouched = { ...prev };
+      for (const field of requiredFieldOrder) nextTouched[field] = true;
+      return nextTouched;
+    });
+    setFieldErrors(next);
+    return next;
+  };
+
+  const scrollToField = (field: string) => {
+    const el = document.getElementById(field);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    (el as HTMLElement | null)?.focus?.();
+  };
 
   const toggleService = (service: string) => {
     setIsDirty(true);
@@ -189,6 +264,8 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
     setPreferredPaymentMode("");
     setIsDirty(false);
     setError(null);
+    setFieldErrors({});
+    setTouched({});
   };
 
   useEffect(() => {
@@ -226,6 +303,8 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
     setPreferredPaymentMode(client?.preferred_payment_mode ?? "");
     setError(null);
     setIsDirty(false);
+    setFieldErrors({});
+    setTouched({});
   }, [open, client]);
 
   // M32, ISSUES.md — was a raw window.confirm(); now the AlertDialog
@@ -251,13 +330,10 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
 
   const handleSave = async () => {
     setError(null);
-    if (!dob) {
-      setError("Date of Birth / Incorporation is required.");
-      return;
-    }
-
-    if (panValue.trim() && !panCheck.isValid) {
-      setError("Enter a valid PAN (format: AAAAA9999A — 5 letters, 4 digits, 1 letter).");
+    const errs = validateAll();
+    const firstInvalid = requiredFieldOrder.find((field) => errs[field]);
+    if (firstInvalid) {
+      scrollToField(firstInvalid);
       return;
     }
 
@@ -355,18 +431,34 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="fullName">Full Name *</Label>
-                  <Input id="fullName" autoFocus placeholder="Client name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                  <Input
+                    id="fullName"
+                    autoFocus
+                    placeholder="Client name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    onBlur={() => touchField("fullName")}
+                    className={cn(fieldErrors.fullName && "border-destructive focus-visible:ring-destructive")}
+                  />
+                  {fieldErrors.fullName && <p className="text-[11px] text-destructive mt-1">{fieldErrors.fullName}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Client Type *</Label>
-                  <Select value={clientType} onValueChange={setClientType}>
-                    <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <Label htmlFor="clientType">Client Type *</Label>
+                  <Select value={clientType} onValueChange={(v) => { setClientType(v); touchField("clientType"); }}>
+                    <SelectTrigger
+                      id="clientType"
+                      onBlur={() => touchField("clientType")}
+                      className={cn(fieldErrors.clientType && "border-destructive focus-visible:ring-destructive")}
+                    >
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
                     <SelectContent>
                       {clientTypes.map((t) => (
                         <SelectItem key={t} value={t}>{t}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {fieldErrors.clientType && <p className="text-[11px] text-destructive mt-1">{fieldErrors.clientType}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="fatherName">Father's / Director's Name</Label>
@@ -381,20 +473,24 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                       setIsDirty(true);
                       setDob(value);
                     }}
+                    onBlur={() => touchField("dob")}
                     placeholder="dd/mm/yyyy"
+                    className={cn(fieldErrors.dob && "border-destructive focus-visible:ring-destructive")}
                   />
                   <FYHint date={dob} />
+                  {fieldErrors.dob && <p className="text-[11px] text-destructive mt-1">{fieldErrors.dob}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="pan">PAN Number *</Label>
                   <div className="relative">
                     <Input
                       id="pan"
-                      className="font-mono uppercase tracking-wider pr-9"
+                      className={cn("font-mono uppercase tracking-wider pr-9", fieldErrors.pan && "border-destructive focus-visible:ring-destructive")}
                       placeholder="ABCDE1234F"
                       maxLength={10}
                       value={panValue}
                       onChange={(e) => setPanValue(e.target.value.toUpperCase())}
+                      onBlur={() => touchField("pan")}
                     />
                     {panValue.length > 0 && (
                       panCheck.isValid ? (
@@ -420,6 +516,9 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                       Invalid PAN format (expected AAAAA9999A — 5 letters, 4 digits, 1 letter)
                     </p>
                   )}
+                  {fieldErrors.pan && !panValue.trim() && (
+                    <p className="text-[11px] text-destructive mt-1">{fieldErrors.pan}</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="aadhaar">Aadhaar Number</Label>
@@ -427,7 +526,17 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="phone">Phone *</Label>
-                  <Input id="phone" type="tel" placeholder="10-digit mobile" maxLength={10} value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="10-digit mobile"
+                    maxLength={10}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    onBlur={() => touchField("phone")}
+                    className={cn(fieldErrors.phone && "border-destructive focus-visible:ring-destructive")}
+                  />
+                  {fieldErrors.phone && <p className="text-[11px] text-destructive mt-1">{fieldErrors.phone}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="altPhone">Alternate Phone</Label>

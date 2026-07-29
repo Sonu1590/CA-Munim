@@ -13,6 +13,7 @@ interface DatePickerFieldProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  onBlur?: () => void;
 }
 
 /** Date field storing `yyyy-MM-dd`, displaying `dd/MM/yyyy`. */
@@ -23,6 +24,7 @@ export function DatePickerField({
   placeholder = "dd/mm/yyyy",
   className,
   disabled,
+  onBlur,
 }: DatePickerFieldProps) {
   const [open, setOpen] = useState(false);
   const parsed = value ? parseISO(value) : undefined;
@@ -36,6 +38,7 @@ export function DatePickerField({
           type="button"
           variant="outline"
           disabled={disabled}
+          onBlur={onBlur}
           className={cn(
             "w-full justify-start text-left font-normal",
             !selected && "text-muted-foreground",

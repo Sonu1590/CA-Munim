@@ -15,6 +15,7 @@ import { useFinancialYear } from "@/context/financialYear";
 import { financialYears as availableFinancialYears } from "@/data/Tasks";
 import { roundMoney } from "@/lib/indianTaxUtils";
 import { formatDateIN } from "@/lib/downloads";
+import { cn } from "@/lib/utils";
 
 interface CreateInvoiceModalProps {
   open: boolean;
@@ -28,6 +29,11 @@ interface LineItem {
   sacCode: string;
   amount: string;
 }
+
+// M30, ISSUES.md — line items are a dynamic array, so each row's
+// description/amount errors are keyed by the row's own id rather than a
+// fixed field name (see fieldErrors/touched below).
+const lineItemFieldKey = (id: string, field: "description" | "amount") => `li-${id}-${field}`;
 
 export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvoiceModalProps) {
   const { selectedFY } = useFinancialYear();
@@ -45,11 +51,97 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
   const [submitting, setSubmitting] = useState(false);
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: "1", description: "", sacCode: "998231", amount: "" },
-    
+
   ]);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const selectedClient = clients.find((c) => c.id === clientId);
   const isSameState = selectedClient && firmState ? selectedClient.state === firmState : true;
+
+  // M30, ISSUES.md — same per-field pattern as AddClientModal/AddTaskModal.
+  const validateClientId = (): string | null => (clientId ? null : "Client is required.");
+
+  const validateLineItem = (li: LineItem): { description?: string; amount?: string } => {
+    const errs: { description?: string; amount?: string } = {};
+    if (!li.description.trim()) errs.description = "Description is required.";
+    if (!li.amount.trim()) errs.amount = "Amount is required.";
+    else if (!(Number(li.amount) > 0)) errs.amount = "Amount must be greater than ₹0.";
+    return errs;
+  };
+
+  const touchField = (field: string) => setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+
+  useEffect(() => {
+    if (!open) return;
+    setFieldErrors((prev) => {
+      let changed = false;
+      const next = { ...prev };
+
+      if (touched.clientId) {
+        const err = validateClientId();
+        if ((err ?? null) !== (next.clientId ?? null)) {
+          changed = true;
+          if (err) next.clientId = err; else delete next.clientId;
+        }
+      }
+
+      for (const li of lineItems) {
+        const errs = validateLineItem(li);
+        (["description", "amount"] as const).forEach((f) => {
+          const key = lineItemFieldKey(li.id, f);
+          if (!touched[key]) return;
+          const err = errs[f] ?? null;
+          if (err !== (next[key] ?? null)) {
+            changed = true;
+            if (err) next[key] = err; else delete next[key];
+          }
+        });
+      }
+
+      // Drop stale errors for rows the user removed.
+      const liveIds = new Set(lineItems.map((li) => li.id));
+      for (const key of Object.keys(next)) {
+        if (!key.startsWith("li-")) continue;
+        const id = key.slice(3, key.lastIndexOf("-"));
+        if (!liveIds.has(id)) {
+          changed = true;
+          delete next[key];
+        }
+      }
+
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, clientId, lineItems, touched]);
+
+  const validateAll = () => {
+    const next: Record<string, string> = {};
+    const nextTouched: Record<string, boolean> = { ...touched, clientId: true };
+
+    const clientErr = validateClientId();
+    if (clientErr) next.clientId = clientErr;
+
+    for (const li of lineItems) {
+      const errs = validateLineItem(li);
+      const descKey = lineItemFieldKey(li.id, "description");
+      const amountKey = lineItemFieldKey(li.id, "amount");
+      nextTouched[descKey] = true;
+      nextTouched[amountKey] = true;
+      if (errs.description) next[descKey] = errs.description;
+      if (errs.amount) next[amountKey] = errs.amount;
+    }
+
+    setTouched(nextTouched);
+    setFieldErrors(next);
+    return next;
+  };
+
+  const scrollToField = (field: string) => {
+    const el = document.getElementById(`invoice-${field}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    (el as HTMLElement | null)?.focus?.();
+  };
 
   useEffect(() => {
     setFy(selectedFY);
@@ -108,12 +200,18 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
     setSendEmail(false);
     setNotes("");
     setLineItems([{ id: "1", description: "", sacCode: "998231", amount: "" }]);
+    setFieldErrors({});
+    setTouched({});
   };
 
   const handleSubmit = async () => {
-    if (!clientId) return toast.error("Please select a client");
-    if (lineItems.some((li) => !li.description || !li.amount)) return toast.error("Please fill all line items");
-    if (lineItems.some((li) => !(Number(li.amount) > 0))) return toast.error("Each line item amount must be greater than ₹0");
+    const errs = validateAll();
+    const order = ["clientId", ...lineItems.flatMap((li) => [lineItemFieldKey(li.id, "description"), lineItemFieldKey(li.id, "amount")])];
+    const firstInvalid = order.find((field) => errs[field]);
+    if (firstInvalid) {
+      scrollToField(firstInvalid);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -160,15 +258,23 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
           {/* Client & basic info */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Client *</Label>
-              <Select value={clientId} onValueChange={setClientId}>
-                <SelectTrigger autoFocus><SelectValue placeholder="Select client" /></SelectTrigger>
+              <Label htmlFor="invoice-clientId" className="text-xs">Client *</Label>
+              <Select value={clientId} onValueChange={(v) => { setClientId(v); touchField("clientId"); }}>
+                <SelectTrigger
+                  id="invoice-clientId"
+                  autoFocus
+                  onBlur={() => touchField("clientId")}
+                  className={cn(fieldErrors.clientId && "border-destructive focus-visible:ring-destructive")}
+                >
+                  <SelectValue placeholder="Select client" />
+                </SelectTrigger>
                 <SelectContent>
                   {clients.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {fieldErrors.clientId && <p className="text-[11px] text-destructive mt-1">{fieldErrors.clientId}</p>}
             </div>
             <div>
               <Label className="text-xs">Invoice Number</Label>
@@ -197,42 +303,56 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated }: CreateInvo
           <div>
             <Label className="text-xs font-semibold">Line Items</Label>
             <div className="space-y-2 mt-2">
-              {lineItems.map((li, idx) => (
-                <div key={li.id} className="flex gap-2 items-start">
-                  <span className="text-xs text-muted-foreground mt-3 w-4">{idx + 1}.</span>
-                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-[1fr_100px_100px] gap-2">
-                    <Input
-                      placeholder="Description (e.g., ITR Filing — FY 2024-25)"
-                      value={li.description}
-                      onChange={(e) => updateLineItem(li.id, "description", e.target.value)}
-                      className="text-sm"
-                    />
-                    <Input
-                      placeholder="SAC Code"
-                      value={li.sacCode}
-                      onChange={(e) => updateLineItem(li.id, "sacCode", e.target.value)}
-                      className="text-sm font-mono"
-                    />
-                    <Input
-                      placeholder="₹ Amount"
-                      type="number"
-                      value={li.amount}
-                      onChange={(e) => updateLineItem(li.id, "amount", e.target.value)}
-                      className="text-sm"
-                    />
+              {lineItems.map((li, idx) => {
+                const descKey = lineItemFieldKey(li.id, "description");
+                const amountKey = lineItemFieldKey(li.id, "amount");
+                return (
+                  <div key={li.id} className="flex gap-2 items-start">
+                    <span className="text-xs text-muted-foreground mt-3 w-4">{idx + 1}.</span>
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-[1fr_100px_100px] gap-2">
+                      <div>
+                        <Input
+                          id={`invoice-${descKey}`}
+                          placeholder="Description (e.g., ITR Filing — FY 2024-25)"
+                          value={li.description}
+                          onChange={(e) => updateLineItem(li.id, "description", e.target.value)}
+                          onBlur={() => touchField(descKey)}
+                          className={cn("text-sm", fieldErrors[descKey] && "border-destructive focus-visible:ring-destructive")}
+                        />
+                        {fieldErrors[descKey] && <p className="text-[11px] text-destructive mt-1">{fieldErrors[descKey]}</p>}
+                      </div>
+                      <Input
+                        placeholder="SAC Code"
+                        value={li.sacCode}
+                        onChange={(e) => updateLineItem(li.id, "sacCode", e.target.value)}
+                        className="text-sm font-mono"
+                      />
+                      <div>
+                        <Input
+                          id={`invoice-${amountKey}`}
+                          placeholder="₹ Amount"
+                          type="number"
+                          value={li.amount}
+                          onChange={(e) => updateLineItem(li.id, "amount", e.target.value)}
+                          onBlur={() => touchField(amountKey)}
+                          className={cn("text-sm", fieldErrors[amountKey] && "border-destructive focus-visible:ring-destructive")}
+                        />
+                        {fieldErrors[amountKey] && <p className="text-[11px] text-destructive mt-1">{fieldErrors[amountKey]}</p>}
+                      </div>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-11 w-11 mt-0.5 text-muted-foreground hover:text-destructive"
+                      aria-label="Remove line item"
+                      onClick={() => removeLineItem(li.id)}
+                      disabled={lineItems.length <= 1}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-11 w-11 mt-0.5 text-muted-foreground hover:text-destructive"
-                    aria-label="Remove line item"
-                    onClick={() => removeLineItem(li.id)}
-                    disabled={lineItems.length <= 1}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <Button variant="outline" size="sm" className="mt-2 text-xs" onClick={addLineItem}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Add Row

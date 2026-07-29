@@ -48,6 +48,11 @@ interface Props {
   task?: Task | null;
 }
 
+// M30, ISSUES.md — same "*" required fields as AddClientModal/
+// CreateInvoiceModal, in DOM order, plus customName which is only
+// required when taskType is "Other".
+const requiredFieldOrder = ["client", "taskType", "customName", "dueDate"] as const;
+
 export function AddTaskModal({
   open,
   onOpenChange,
@@ -73,6 +78,8 @@ export function AddTaskModal({
   const [notes, setNotes] = useState("");
 
   const [assignedTo, setAssignedTo] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const resetForm = () => {
     setClient("");
@@ -84,12 +91,75 @@ export function AddTaskModal({
     setPriority("medium");
     setNotes("");
     setAssignedTo("");
+    setFieldErrors({});
+    setTouched({});
+  };
+
+  // M30, ISSUES.md — see the identical pattern (and rationale) in
+  // AddClientModal.tsx.
+  const validateField = (field: string): string | null => {
+    switch (field) {
+      case "client":
+        return client ? null : "Client is required.";
+      case "taskType":
+        return taskType ? null : "Task Type is required.";
+      case "customName":
+        if (taskType !== "Other") return null;
+        return customName.trim() ? null : "Custom Task Name is required when Task Type is Other.";
+      case "dueDate":
+        return dueDate ? null : "Due Date is required.";
+      default:
+        return null;
+    }
+  };
+
+  const touchField = (field: string) => setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+
+  useEffect(() => {
+    if (!open) return;
+    setFieldErrors((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const field of requiredFieldOrder) {
+        if (!touched[field]) continue;
+        const err = validateField(field);
+        if ((err ?? null) !== (next[field] ?? null)) {
+          changed = true;
+          if (err) next[field] = err; else delete next[field];
+        }
+      }
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, client, taskType, customName, dueDate, touched]);
+
+  const validateAll = () => {
+    const next: Record<string, string> = {};
+    for (const field of requiredFieldOrder) {
+      const err = validateField(field);
+      if (err) next[field] = err;
+    }
+    setTouched((prev) => {
+      const nextTouched = { ...prev };
+      for (const field of requiredFieldOrder) nextTouched[field] = true;
+      return nextTouched;
+    });
+    setFieldErrors(next);
+    return next;
+  };
+
+  const scrollToField = (field: string) => {
+    const el = document.getElementById(`task-${field}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    (el as HTMLElement | null)?.focus?.();
   };
 
   const availableFYs = [selectedFY, ...financialYears.filter((year) => year !== selectedFY)];
 
   useEffect(() => {
     if (!open) return;
+    setFieldErrors({});
+    setTouched({});
     if (!task) {
       setClient("");
       setTaskType("");
@@ -123,13 +193,10 @@ export function AddTaskModal({
   };
 
   const handleSave = async () => {
-    if (!client || !taskType) {
-      toast.error("Please select client and task type");
-      return;
-    }
-
-    if (!dueDate) {
-      toast.error("Please select a due date");
+    const errs = validateAll();
+    const firstInvalid = requiredFieldOrder.find((field) => errs[field]);
+    if (firstInvalid) {
+      scrollToField(firstInvalid);
       return;
     }
 
@@ -184,16 +251,21 @@ export function AddTaskModal({
         <div className="space-y-6 py-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Client
+              <label htmlFor="task-client" className="text-sm font-medium">
+                Client *
               </label>
 
               <Select
                 value={client}
-                onValueChange={setClient}
+                onValueChange={(v) => { setClient(v); touchField("client"); }}
                 disabled={!!task}
               >
-                <SelectTrigger autoFocus>
+                <SelectTrigger
+                  id="task-client"
+                  autoFocus
+                  onBlur={() => touchField("client")}
+                  className={cn(fieldErrors.client && "border-destructive focus-visible:ring-destructive")}
+                >
                   <SelectValue placeholder="Select client" />
                 </SelectTrigger>
 
@@ -214,18 +286,23 @@ export function AddTaskModal({
                   )}
                 </SelectContent>
               </Select>
+              {fieldErrors.client && <p className="text-[11px] text-destructive mt-1">{fieldErrors.client}</p>}
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Task Type
+              <label htmlFor="task-taskType" className="text-sm font-medium">
+                Task Type *
               </label>
 
               <Select
                 value={taskType}
-                onValueChange={setTaskType}
+                onValueChange={(v) => { setTaskType(v); touchField("taskType"); }}
               >
-                <SelectTrigger>
+                <SelectTrigger
+                  id="task-taskType"
+                  onBlur={() => touchField("taskType")}
+                  className={cn(fieldErrors.taskType && "border-destructive focus-visible:ring-destructive")}
+                >
                   <SelectValue placeholder="Select task type" />
                 </SelectTrigger>
 
@@ -255,22 +332,27 @@ export function AddTaskModal({
                   </SelectItem>
                 </SelectContent>
               </Select>
+              {fieldErrors.taskType && <p className="text-[11px] text-destructive mt-1">{fieldErrors.taskType}</p>}
             </div>
           </div>
 
           {taskType === "Other" && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Custom Task Name
+              <label htmlFor="task-customName" className="text-sm font-medium">
+                Custom Task Name *
               </label>
 
               <Input
+                id="task-customName"
                 value={customName}
                 onChange={(e) =>
                   setCustomName(e.target.value)
                 }
+                onBlur={() => touchField("customName")}
                 placeholder="Enter custom task name"
+                className={cn(fieldErrors.customName && "border-destructive focus-visible:ring-destructive")}
               />
+              {fieldErrors.customName && <p className="text-[11px] text-destructive mt-1">{fieldErrors.customName}</p>}
             </div>
           )}
 
@@ -337,18 +419,21 @@ export function AddTaskModal({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Due Date
+            <label htmlFor="task-dueDate" className="text-sm font-medium">
+              Due Date *
             </label>
 
-            <Popover open={dueDateOpen} onOpenChange={setDueDateOpen} modal>
+            <Popover open={dueDateOpen} onOpenChange={(o) => { setDueDateOpen(o); if (!o) touchField("dueDate"); }} modal>
               <PopoverTrigger asChild>
                 <Button
+                  id="task-dueDate"
                   variant="outline"
+                  onBlur={() => touchField("dueDate")}
                   className={cn(
                     "w-full justify-start text-left font-normal",
                     !dueDate &&
-                      "text-muted-foreground"
+                      "text-muted-foreground",
+                    fieldErrors.dueDate && "border-destructive focus-visible:ring-destructive"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -371,11 +456,13 @@ export function AddTaskModal({
                   onSelect={(date) => {
                     setDueDate(date);
                     setDueDateOpen(false);
+                    touchField("dueDate");
                   }}
                   initialFocus
                 />
               </PopoverContent>
             </Popover>
+            {fieldErrors.dueDate && <p className="text-[11px] text-destructive mt-1">{fieldErrors.dueDate}</p>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
