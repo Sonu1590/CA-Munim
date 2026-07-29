@@ -46,8 +46,19 @@ export default function WhatsApp() {
             <MessageCircle className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl md:text-2xl font-heading font-bold">WhatsApp Center</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl md:text-2xl font-heading font-bold">WhatsApp Center</h1>
+              <Badge variant="secondary" className="text-[10px]">Beta</Badge>
+            </div>
             <p className="text-sm text-muted-foreground">Manage templates, send bulk messages & track delivery</p>
+            {/* L10, ISSUES.md — the sidebar's Beta tag had no explanation for
+                a feature that sends real client messages. Messages here are
+                real (via the WhatsApp Business API, not simulated) — "beta"
+                means the template/delivery-tracking workflow around them is
+                still being refined, not that sends are fake or unsafe. */}
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Beta: messages send for real via the WhatsApp Business API — template management and delivery tracking are still being refined.
+            </p>
           </div>
         </div>
 

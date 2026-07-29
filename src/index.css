@@ -23,7 +23,13 @@
     --secondary-foreground: 222 47% 11%;
 
     --muted: 210 20% 95%;
-    --muted-foreground: 215 16% 47%;
+    /* L11, ISSUES.md — was 215 16% 47%, measured at ~4.49:1 against
+       --background (210 40% 98%) — under the WCAG AA 4.5:1 threshold for
+       normal text (marginally more, ~4.70:1, against white --card, but
+       still too close to the line). Darkened to 42% lightness for
+       ~5.4-5.7:1 against both, with real margin instead of sitting on
+       the boundary. */
+    --muted-foreground: 215 16% 42%;
 
     --accent: 24 95% 53%;
     --accent-foreground: 0 0% 100%;
