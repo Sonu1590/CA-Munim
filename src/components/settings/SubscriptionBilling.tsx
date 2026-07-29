@@ -128,6 +128,34 @@ export function SubscriptionBilling() {
                         <span className="text-2xl font-bold">₹{displayPrice.toLocaleString("en-IN")}</span>
                         <span className="text-sm text-muted-foreground">/{planCycle === "annual" ? "year" : "month"}</span>
                         {isFounding && <span className="text-xs text-muted-foreground ml-1">· locked for life</span>}
+                        {/* M38, ISSUES.md — every card already respects the
+                            page-level toggle except Founding Member, which
+                            is intentionally a fixed annual-only offer (see
+                            the planCycle comment above) — that's real, not
+                            a bug, but it meant a user comparing cards side
+                            by side under "Monthly" saw one card silently
+                            switch units with no explanation, and any card's
+                            single price required mental math to compare
+                            against the other billing cycle. Two additions:
+                            an equivalent-unit subtext on every priced card
+                            (computed from the plan's own real price/
+                            priceAnnual — annual pricing is independently
+                            discounted, not price*12, so this doesn't
+                            fabricate a number), and an explicit "Billed
+                            annually" note on Founding Member specifically
+                            when the toggle is on Monthly, so it's visually
+                            obvious why that one card doesn't match its
+                            siblings' unit right there. */}
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          {planCycle === "annual"
+                            ? `≈ ₹${Math.round(displayPrice / 12).toLocaleString("en-IN")}/mo equivalent`
+                            : plan.priceAnnual > 0
+                              ? `₹${plan.priceAnnual.toLocaleString("en-IN")}/yr if billed annually`
+                              : null}
+                          {isFounding && cycle === "monthly" && (
+                            <span className="ml-1 font-medium text-amber-700">· Billed annually</span>
+                          )}
+                        </div>
                       </>
                     )}
                   </div>

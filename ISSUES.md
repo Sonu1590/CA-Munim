@@ -428,10 +428,14 @@ Two-pass review (`CA-Munim-UX-Review.md` code-only, then `CA-Munim-UX-Review-v2.
 **Problem:** Nothing reads as primary; color is used decoratively rather than semantically, which also weakens orange as the app's action color elsewhere.
 **Fix:** One primary (orange) for the most common action, the rest secondary/outline. Reserve green for WhatsApp-specific actions only, so it consistently signals "this sends a WhatsApp message."
 
-### M38. Pricing cards compare ₹/year against ₹/month under the same toggle
+### M38. Pricing cards compare ₹/year against ₹/month under the same toggle — FIXED (2026-07-29)
 **Where:** Settings → Plans (`SubscriptionBilling.tsx`) — Founding Member shows ₹2,999/year, Professional shows ₹417/month, side by side under a Monthly/Annual toggle that doesn't apply to both.
 **Problem:** User has to do mental math to compare; Founding Member's actual value (₹2,999 vs ₹5,004/yr equivalent) is obscured by the mismatched units.
 **Fix:** Respect the toggle for all cards — annual mode shows every plan as ₹/year, monthly mode shows ₹/month with the annual equivalent as subtext. Add an explicit savings callout on Founding Member.
+**Correction:** the code already respected the toggle for every plan *except* Founding Member — which is deliberately hardcoded to always show its annual price (`planCycle = isFounding ? "annual" : cycle`, with its own explanatory comment: "a fixed annual-only offer"). That's a real product fact, not a bug — Founding Member has no monthly billing option to switch to. So "make it follow the toggle" would misrepresent the actual offer; the real fix is reducing the resulting visual confusion instead.
+**Fixed:** every priced card now shows a small equivalent-unit subtext under its price — annual prices show `≈ ₹X/mo equivalent`, monthly prices show `₹X/yr if billed annually` — computed from the plan's own real `price`/`priceAnnual` fields (annual pricing is independently discounted, not `price × 12`, per `SubscriptionPlan`'s own type comment, so this doesn't fabricate a number). Founding Member additionally shows a `· Billed annually` note specifically when the page toggle is on Monthly, so it's visually obvious right on the card why its price doesn't match its siblings' unit in that view.
+**Not fixed — scoped out:** an explicit "Save ₹X vs [tier]" callout on Founding Member, since that requires a product decision about which tier it's meant to be compared against (the review's own worked example implicitly compares it to Professional's monthly rate × 12, but that's an assumption about intent, not something in the data) — a wrong number on a real pricing page is worse than no number, so left for whoever owns that call.
+**Verified:** `npx tsc --noEmit` clean, full unit suite (125/125) passing (no existing test coverage for this component to extend). Not live-verified in-browser this pass — port 8080 was still occupied by a concurrent background agent's dev server; relied on `tsc` + code review, same as H14/H15/M39 onward.
 
 ### M39. "50 of 50 left" scarcity badge reads as "nobody has bought this"
 **Where:** Settings → Plans, Founding Member badge.
