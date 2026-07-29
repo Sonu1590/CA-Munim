@@ -99,6 +99,26 @@ const clients = [
   },
 ];
 
+// M27, ISSUES.md — same "fixed object + overrides, generalized to also
+// take a count" convention as fixtures/dashboard.ts's buildDigestItems.
+function buildClients(n: number) {
+  return Array.from({ length: n }, (_, i) => ({
+    id: `bulk-client-${i}`,
+    name: `Bulk Client ${String(i).padStart(3, "0")}`,
+    type: "Individual",
+    pan: `BULKP${i}234F`,
+    phone: `90000${String(i).padStart(5, "0")}`,
+    email: `bulk${i}@example.com`,
+    activeTasks: 0,
+    pendingFees: 0,
+    feesOverdue: false,
+    lastActivity: "2026-05-09",
+    city: "Mumbai",
+    state: "Maharashtra",
+    servicesSubscribed: [],
+  }));
+}
+
 function mockClientsState(overrides: Partial<ReturnType<typeof useClients>> = {}) {
   const state = {
     clients,
@@ -174,6 +194,25 @@ describe("Clients page", () => {
     expect(desktop.getByText("Asha Sharma")).toBeInTheDocument();
     expect(mobile.queryByText("Mock Client Pvt Ltd")).not.toBeInTheDocument();
     expect(mobile.getByText("Asha Sharma")).toBeInTheDocument();
+  });
+
+  it("bounds a firm-scale (60 client) list to one page of 25 with working pagination", () => {
+    mockClientsState({ clients: buildClients(60) });
+
+    render(<MemoryRouter><Clients /></MemoryRouter>);
+
+    const desktop = within(screen.getByTestId("desktop-clients"));
+    expect(desktop.getByText("Bulk Client 000")).toBeInTheDocument();
+    expect(desktop.getByText("Bulk Client 024")).toBeInTheDocument();
+    expect(desktop.queryByText("Bulk Client 025")).not.toBeInTheDocument();
+    expect(screen.getByText("Showing 1–25 of 60")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("link", { name: "Go to next page" }));
+
+    expect(desktop.queryByText("Bulk Client 000")).not.toBeInTheDocument();
+    expect(desktop.getByText("Bulk Client 025")).toBeInTheDocument();
+    expect(desktop.getByText("Bulk Client 049")).toBeInTheDocument();
+    expect(screen.getByText("Showing 26–50 of 60")).toBeInTheDocument();
   });
 
   it("passes saved client data to addClient and closes the modal on success", async () => {

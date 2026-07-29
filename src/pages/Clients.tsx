@@ -5,6 +5,8 @@ import { AddClientModal } from "@/components/clients/AddClientModal";
 import { MobileClientsScreen } from "@/components/mobile/MobileClientsScreen";
 import { ImportClientsModal } from "@/components/clients/ImportClientsModal";
 import { useClients, Client } from "@/hooks/useClients";   // ← CHANGED from mockClients
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/common/PaginationControls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +49,11 @@ export default function Clients() {
       return matchesSearch && matchesType;
     });
   }, [clients, deferredSearch, typeFilter]);
+
+  // M27, ISSUES.md — the desktop table and mobile card list share one
+  // page of results rather than each paginating independently, since
+  // both trees are mounted simultaneously (CSS-hidden, not unmounted).
+  const { paginated, page, setPage, totalPages, totalItems, pageSize } = usePagination(filtered, 25);
 
   const openAddClient = () => {
     setEditingClient(null);
@@ -167,11 +174,11 @@ export default function Clients() {
         ) : (
           <>
             <div className="hidden md:block" data-testid="desktop-clients">
-              <ClientListTable clients={filtered} onEdit={handleEdit} onView={handleView} />
+              <ClientListTable clients={paginated} onEdit={handleEdit} onView={handleView} />
             </div>
             <div className="md:hidden" data-testid="mobile-clients">
               <MobileClientsScreen
-                clients={filtered}
+                clients={paginated}
                 totalCount={clients.length}
                 search={search}
                 onSearchChange={setSearch}
@@ -180,6 +187,7 @@ export default function Clients() {
                 filterOptions={filterOptions}
               />
             </div>
+            <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} pageSize={pageSize} />
           </>
         )}
 
