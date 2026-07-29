@@ -14,7 +14,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, LayoutGrid, List, CalendarDays, Zap, Search, Loader2, AlertCircle } from "lucide-react";
+import { Plus, LayoutGrid, List, CalendarDays, Zap, Search, AlertCircle } from "lucide-react";
+import { CardListSkeleton } from "@/components/common/CardListSkeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TaskKanbanBoard } from "@/components/tasks/TaskKanbanBoard";
 import { TaskListView } from "@/components/tasks/TaskListView";
 import { TaskCalendarView } from "@/components/tasks/TaskCalendarView";
@@ -126,12 +128,32 @@ export default function Tasks() {
   };
 
   // ── Loading state ────────────────────────────────────────────────────────
+  // M29, ISSUES.md — was a blank-page spinner; card skeletons matching the
+  // default Kanban view's 3 columns avoid the layout-shift "pop-in" once
+  // real tasks land.
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-3 text-muted-foreground">Loading tasks...</span>
+        <div className="p-4 md:p-6 space-y-4">
+          <span className="sr-only" role="status">Loading tasks...</span>
+          <div className="hidden md:flex md:items-center justify-between gap-3">
+            <div className="space-y-2">
+              <Skeleton className="h-7 w-48" />
+              <Skeleton className="h-4 w-40" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-9 w-32" />
+              <Skeleton className="h-9 w-28" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {["Pending", "In Progress", "Completed"].map((label) => (
+              <div key={label} className="space-y-3">
+                <Skeleton className="h-5 w-24" />
+                <CardListSkeleton count={3} />
+              </div>
+            ))}
+          </div>
         </div>
       </AppLayout>
     );

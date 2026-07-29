@@ -7,7 +7,9 @@ import { MonthlyWork } from "@/components/dashboard/MonthlyWork";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { MobileHomeScreen } from "@/components/mobile/MobileHomeScreen";
 import { useDashboard } from "@/hooks/useDashboard";  // ← NEW
-import { Loader2 } from "lucide-react";
+import { MetricCardsSkeleton } from "@/components/common/MetricCardsSkeleton";
+import { CardListSkeleton } from "@/components/common/CardListSkeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Dashboard = () => {
   // ── Real data from Supabase ────────────────────────────────────────────────
@@ -36,9 +38,22 @@ const Dashboard = () => {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center h-48">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-3 text-muted-foreground">Loading dashboard...</span>
+          // M29, ISSUES.md — was a blank-page spinner; skeletons matching
+          // the metric-card grid + list widgets avoid the layout-shift
+          // "pop-in" once real dashboard data lands.
+          <div className="space-y-6">
+            <span className="sr-only" role="status">Loading dashboard...</span>
+            <MetricCardsSkeleton count={4} />
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Skeleton className="h-5 w-32" />
+                <CardListSkeleton count={4} />
+              </div>
+              <div className="space-y-3">
+                <Skeleton className="h-5 w-32" />
+                <CardListSkeleton count={4} />
+              </div>
+            </div>
           </div>
         ) : (
           <>
