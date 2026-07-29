@@ -4,6 +4,8 @@ import { Invoice } from "@/data/Billing";
 import { sendQuickReminder } from "@/data/WhatsappApi";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/sonner";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/common/PaginationControls";
 
 interface MobileBillingScreenProps {
   invoices: Invoice[];
@@ -48,6 +50,8 @@ export function MobileBillingScreen({ invoices, onRecordPayment, onCreateInvoice
   const billedUnpaidInvoices = invoices.filter((i) => i.amountDue > 0 && i.status !== "Cancelled" && i.status !== "Draft");
   const totalOutstanding = billedUnpaidInvoices.reduce((s, i) => s + i.amountDue, 0);
   const unpaidInvoices = billedUnpaidInvoices.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  // M27, ISSUES.md
+  const { paginated, page, setPage, totalPages, totalItems, pageSize } = usePagination(unpaidInvoices, 25);
 
   return (
     <div className="bg-mobile-bg font-mobile-body text-mobile-text -mx-4 -mt-4 px-4 pt-6 pb-8 min-h-[calc(100vh-8rem)]">
@@ -77,7 +81,7 @@ export function MobileBillingScreen({ invoices, onRecordPayment, onCreateInvoice
       </div>
 
       <div className="flex flex-col gap-2.5">
-        {unpaidInvoices.map((inv) => {
+        {paginated.map((inv) => {
           const isOverdue = new Date(inv.dueDate) < now;
           return (
             <div key={inv.id} className="bg-mobile-neutral-100 rounded-mobile-md p-3.5 shadow-mobile-sm">
@@ -123,6 +127,7 @@ export function MobileBillingScreen({ invoices, onRecordPayment, onCreateInvoice
           </div>
         )}
       </div>
+      <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} pageSize={pageSize} />
     </div>
   );
 }

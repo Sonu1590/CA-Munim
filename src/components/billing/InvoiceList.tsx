@@ -5,6 +5,8 @@ import { Invoice } from "@/data/Billing";
 import { Eye, Download, MessageCircle, CreditCard } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { downloadHtmlDocument, formatDateIN, formatINR, openHtmlDocument, slugifyFileName } from "@/lib/downloads";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/common/PaginationControls";
 
 interface InvoiceListProps {
   invoices: Invoice[];
@@ -86,7 +88,12 @@ function buildInvoiceHtml(inv: Invoice) {
   `;
 }
 
+// M27, ISSUES.md — desktop table and mobile cards share one page of
+// results (both trees render the same `invoices` prop, CSS-hidden not
+// unmounted), same approach as Clients.tsx.
 export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
+  const { paginated, page, setPage, totalPages, totalItems, pageSize } = usePagination(invoices, 25);
+
   if (invoices.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -127,7 +134,7 @@ export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
   return (
     <>
       {/* Desktop table */}
-      <div className="hidden md:block">
+      <div className="hidden md:block" data-testid="desktop-invoices">
         <div className="rounded-lg border overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -143,7 +150,7 @@ export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
               </tr>
             </thead>
             <tbody>
-              {invoices.map((inv) => {
+              {paginated.map((inv) => {
                 const gstAmount = inv.isSameState ? inv.cgst + inv.sgst : inv.igst;
                 return (
                   <tr key={inv.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
@@ -209,8 +216,8 @@ export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
       </div>
 
       {/* Mobile cards */}
-      <div className="md:hidden space-y-3">
-        {invoices.map((inv) => (
+      <div className="md:hidden space-y-3" data-testid="mobile-invoices">
+        {paginated.map((inv) => (
           <Card key={inv.id}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between mb-2">
@@ -267,6 +274,7 @@ export function InvoiceList({ invoices, onRecordPayment }: InvoiceListProps) {
           </Card>
         ))}
       </div>
+      <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} pageSize={pageSize} />
     </>
   );
 }
