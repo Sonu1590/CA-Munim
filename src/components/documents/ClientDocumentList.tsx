@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Search, FolderOpen, ChevronRight, Loader2 } from "lucide-react";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/common/PaginationControls";
 
 interface Props {
   onSelectClient: (clientId: string) => void;
@@ -48,6 +50,8 @@ export function ClientDocumentList({ onSelectClient }: Props) {
     c.name.toLowerCase().includes(deferredSearch.toLowerCase()) ||
     c.pan.toLowerCase().includes(deferredSearch.toLowerCase())
   );
+  // M27, ISSUES.md
+  const { paginated, page, setPage, totalPages, totalItems, pageSize } = usePagination(filtered, 25);
 
   if (loading) {
     return (
@@ -79,7 +83,7 @@ export function ClientDocumentList({ onSelectClient }: Props) {
       </div>
 
       <div className="grid gap-3">
-        {filtered.map((client) => (
+        {paginated.map((client) => (
           <Card
             key={client.id}
             className="cursor-pointer hover:border-primary/40 transition-colors"
@@ -108,6 +112,7 @@ export function ClientDocumentList({ onSelectClient }: Props) {
           <p className="text-sm text-muted-foreground text-center py-8">No clients found</p>
         )}
       </div>
+      <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} pageSize={pageSize} />
     </div>
   );
 }

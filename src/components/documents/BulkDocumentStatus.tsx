@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/common/PaginationControls";
 
 const statusColors: Record<string, string> = {
   pending: "bg-accent/20 text-accent border-accent/30",
@@ -22,6 +24,8 @@ export function BulkDocumentStatus() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [remindingId, setRemindingId] = useState<string | null>(null);
+  // M27, ISSUES.md — desktop table and mobile cards share one page.
+  const { paginated, page, setPage, totalPages, totalItems, pageSize } = usePagination(requests, 25);
 
   useEffect(() => {
     const loadRequests = async () => {
@@ -91,7 +95,7 @@ export function BulkDocumentStatus() {
       </CardHeader>
       <CardContent className="p-0">
         {/* Desktop table */}
-        <div className="hidden md:block">
+        <div className="hidden md:block" data-testid="desktop-doc-requests">
           <Table>
             <TableHeader>
               <TableRow>
@@ -103,7 +107,7 @@ export function BulkDocumentStatus() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests.map((req) => (
+              {paginated.map((req) => (
                 <TableRow key={req.id}>
                   <TableCell className="font-medium text-sm">{req.clientName}</TableCell>
                   <TableCell className="text-sm">{req.documentType}</TableCell>
@@ -134,8 +138,8 @@ export function BulkDocumentStatus() {
         </div>
 
         {/* Mobile cards */}
-        <div className="md:hidden space-y-2 p-4">
-          {requests.map((req) => (
+        <div className="md:hidden space-y-2 p-4" data-testid="mobile-doc-requests">
+          {paginated.map((req) => (
             <div key={req.id} className="rounded-xl border p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">{req.clientName}</p>
@@ -158,6 +162,9 @@ export function BulkDocumentStatus() {
               )}
             </div>
           ))}
+        </div>
+        <div className="px-4 pb-4">
+          <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} pageSize={pageSize} />
         </div>
       </CardContent>
     </Card>

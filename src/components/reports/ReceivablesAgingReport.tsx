@@ -7,6 +7,8 @@ import { Download, Loader2, IndianRupee, AlertTriangle } from "lucide-react";
 import { getReceivablesAging, type ReceivablesAging, type AgingBucketLabel } from "@/data/Reports";
 import { downloadHtmlReport, formatINR, slugifyFileName } from "@/lib/downloads";
 import { toast } from "sonner";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/common/PaginationControls";
 
 const chartConfig = {
   amount: { label: "Outstanding", color: "hsl(var(--accent))" },
@@ -42,6 +44,9 @@ export function ReceivablesAgingReport() {
   }, []);
 
   const overdue90Plus = aging?.bucketTotals.find((b) => b.label === "90+ days")?.amount ?? 0;
+  // M27, ISSUES.md — desktop table and mobile cards share one page.
+  // Download still exports the full aging.byClient, not just this page.
+  const { paginated, page, setPage, totalPages, totalItems, pageSize } = usePagination(aging?.byClient ?? [], 25);
 
   const downloadReport = () => {
     if (!aging) return;
@@ -125,7 +130,7 @@ export function ReceivablesAgingReport() {
             <div>
               <p className="text-sm font-medium mb-3">By Client</p>
               {/* Desktop */}
-              <div className="hidden md:block overflow-x-auto">
+              <div className="hidden md:block overflow-x-auto" data-testid="desktop-receivables">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/50">
@@ -139,7 +144,7 @@ export function ReceivablesAgingReport() {
                     </tr>
                   </thead>
                   <tbody>
-                    {aging.byClient.map((row) => (
+                    {paginated.map((row) => (
                       <tr key={row.clientId} className="border-b border-border/50">
                         <td className="p-3 truncate max-w-[200px]">{row.clientName}</td>
                         {(["Current", "1-30 days", "31-60 days", "61-90 days", "90+ days"] as AgingBucketLabel[]).map((bucket) => (
@@ -154,8 +159,8 @@ export function ReceivablesAgingReport() {
                 </table>
               </div>
               {/* Mobile */}
-              <div className="md:hidden space-y-3">
-                {aging.byClient.map((row) => (
+              <div className="md:hidden space-y-3" data-testid="mobile-receivables">
+                {paginated.map((row) => (
                   <div key={row.clientId} className="border border-border rounded-xl p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm">{row.clientName}</span>
@@ -173,6 +178,7 @@ export function ReceivablesAgingReport() {
                   </div>
                 ))}
               </div>
+              <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} pageSize={pageSize} />
             </div>
           </>
         ) : (
