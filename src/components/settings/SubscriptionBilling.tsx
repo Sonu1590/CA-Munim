@@ -116,7 +116,16 @@ export function SubscriptionBilling() {
                     {isCurrent && <Badge className="bg-primary text-primary-foreground">Current</Badge>}
                     {isFounding && !isCurrent && (
                       <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-                        {soldOut ? "Sold out" : `${foundingSlotsLeft ?? "—"} of 50 left`}
+                        {/* M39, ISSUES.md — "50 of 50 left" (the actual
+                            starting state, before any real signups) reads
+                            as "nobody has bought this" rather than
+                            scarcity. Once slots start moving, the real
+                            countdown is genuine social proof and stays. */}
+                        {soldOut
+                          ? "Sold out"
+                          : foundingSlotsLeft === 50
+                            ? "Limited to first 50 firms"
+                            : `${foundingSlotsLeft ?? "—"} of 50 left`}
                       </Badge>
                     )}
                   </div>

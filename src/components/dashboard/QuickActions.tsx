@@ -28,12 +28,19 @@ export function QuickActions() {
         Quick Actions
       </h2>
 
+      {/* M37, ISSUES.md — all 4 buttons used a different color with no
+          hierarchy, which also diluted orange (accent) as the app's
+          action color elsewhere. Add New Client (the most common action —
+          it's first in MobileFAB.tsx too) is now the sole accent/primary
+          button; Create Task and Generate Invoice are secondary/outline so
+          the eye lands on one action first; WhatsApp green stays reserved
+          for WhatsApp-specific actions only, as it already was. */}
       <div className="grid grid-cols-2 gap-3">
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
           onClick={() => setClientOpen(true)}
-          className="bg-primary text-primary-foreground rounded-lg p-4 flex flex-col items-center gap-2 text-center card-shadow hover:opacity-90 transition-opacity"
+          className="bg-accent text-accent-foreground rounded-lg p-4 flex flex-col items-center gap-2 text-center card-shadow hover:opacity-90 transition-opacity"
         >
           <UserPlus className="h-6 w-6" />
           <span className="text-sm font-medium">
@@ -57,9 +64,9 @@ export function QuickActions() {
           type="button"
           whileTap={{ scale: 0.97 }}
           onClick={() => setTaskOpen(true)}
-          className="bg-accent text-accent-foreground rounded-lg p-4 flex flex-col items-center gap-2 text-center card-shadow hover:opacity-90 transition-opacity"
+          className="bg-card border border-border text-foreground rounded-lg p-4 flex flex-col items-center gap-2 text-center card-shadow hover:bg-muted/50 transition-colors"
         >
-          <FileText className="h-6 w-6" />
+          <FileText className="h-6 w-6 text-accent" />
           <span className="text-sm font-medium">
             Create Task
           </span>
@@ -69,9 +76,9 @@ export function QuickActions() {
           type="button"
           whileTap={{ scale: 0.97 }}
           onClick={() => setInvoiceOpen(true)}
-          className="bg-primary text-primary-foreground rounded-lg p-4 flex flex-col items-center gap-2 text-center card-shadow hover:opacity-90 transition-opacity"
+          className="bg-card border border-border text-foreground rounded-lg p-4 flex flex-col items-center gap-2 text-center card-shadow hover:bg-muted/50 transition-colors"
         >
-          <Receipt className="h-6 w-6" />
+          <Receipt className="h-6 w-6 text-accent" />
           <span className="text-sm font-medium">
             Generate Invoice
           </span>

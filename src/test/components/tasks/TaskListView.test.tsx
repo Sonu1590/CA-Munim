@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TaskListView } from "@/components/tasks/TaskListView";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import type { Task } from "@/data/Tasks";
 
 // M27, ISSUES.md — same "fixed object + overrides, generalized to also
@@ -25,7 +26,9 @@ function buildTasks(n: number): Task[] {
 describe("TaskListView", () => {
   it("bounds a firm-scale (60 task) list to one page of 25 with working pagination", () => {
     render(
-      <TaskListView tasks={buildTasks(60)} onStatusChange={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />,
+      <TooltipProvider>
+        <TaskListView tasks={buildTasks(60)} onStatusChange={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />
+      </TooltipProvider>,
     );
 
     expect(screen.getByText("Bulk Client 000")).toBeInTheDocument();
@@ -43,7 +46,9 @@ describe("TaskListView", () => {
 
   it("renders without pagination controls for a small list", () => {
     render(
-      <TaskListView tasks={buildTasks(3)} onStatusChange={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />,
+      <TooltipProvider>
+        <TaskListView tasks={buildTasks(3)} onStatusChange={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />
+      </TooltipProvider>,
     );
 
     expect(screen.getByText("Bulk Client 000")).toBeInTheDocument();

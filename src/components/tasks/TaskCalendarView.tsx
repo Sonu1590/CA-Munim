@@ -18,6 +18,24 @@ function getDotColor(dueDate: string, status: string) {
   return "bg-green-500";
 }
 
+// M42, ISSUES.md — the same red/orange/green severity scheme as
+// getDueDateBadgeClasses (lib/taskDisplay.ts), so a day's count pill uses
+// the same colors as the due-date badges shown everywhere else in Tasks.
+const severityRank: Record<string, number> = { "bg-red-500": 3, "bg-orange-500": 2, "bg-green-500": 1 };
+
+function getDayBadgeClasses(dayTasks: Task[]) {
+  const worst = dayTasks.reduce(
+    (acc, t) => {
+      const dot = getDotColor(t.dueDate, t.status);
+      return severityRank[dot] > severityRank[acc] ? dot : acc;
+    },
+    "bg-green-500",
+  );
+  if (worst === "bg-red-500") return "bg-red-100 text-red-700";
+  if (worst === "bg-orange-500") return "bg-orange-100 text-orange-700";
+  return "bg-green-100 text-green-700";
+}
+
 const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function TaskCalendarView({ tasks }: Props) {
@@ -57,20 +75,33 @@ export function TaskCalendarView({ tasks }: Props) {
             <Popover key={day.toISOString()}>
               <PopoverTrigger asChild>
                 <button
-                  className={`relative flex flex-col items-center justify-start p-1.5 rounded-lg min-h-[52px] text-sm transition-colors hover:bg-muted ${
-                    isToday ? "bg-primary/10 font-bold text-primary" : ""
+                  className={`relative flex flex-col items-center justify-start gap-1 p-1.5 rounded-lg min-h-[52px] text-sm transition-colors hover:bg-muted ${
+                    isToday ? "ring-2 ring-primary bg-primary/5" : ""
                   } ${!isSameMonth(day, currentMonth) ? "text-muted-foreground" : ""}`}
                 >
-                  <span className="text-xs">{format(day, "d")}</span>
+                  {/* M42, ISSUES.md — today was only a light bg-primary/10
+                      tint, easy to miss; a solid circle around the date
+                      number (plus the ring above) is a much stronger,
+                      more conventional "today" marker. */}
+                  <span
+                    className={
+                      isToday
+                        ? "flex items-center justify-center h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs font-bold"
+                        : "text-xs"
+                    }
+                  >
+                    {format(day, "d")}
+                  </span>
+                  {/* M42, ISSUES.md — was up to 3 dots + a "+N" overflow
+                      label, which made a busy day (e.g. "+74") barely
+                      readable. A single count pill, tinted by the day's
+                      worst severity, is legible at any task count. */}
                   {dayTasks.length > 0 && (
-                    <div className="flex gap-0.5 mt-1 flex-wrap justify-center">
-                      {dayTasks.slice(0, 3).map((t) => (
-                        <div key={t.id} className={`h-1.5 w-1.5 rounded-full ${getDotColor(t.dueDate, t.status)}`} />
-                      ))}
-                      {dayTasks.length > 3 && (
-                        <span className="text-[8px] text-muted-foreground">+{dayTasks.length - 3}</span>
-                      )}
-                    </div>
+                    <span
+                      className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-semibold ${getDayBadgeClasses(dayTasks)}`}
+                    >
+                      {dayTasks.length}
+                    </span>
                   )}
                 </button>
               </PopoverTrigger>

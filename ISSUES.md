@@ -428,10 +428,12 @@ Two-pass review (`CA-Munim-UX-Review.md` code-only, then `CA-Munim-UX-Review-v2.
 **Problem:** Desktop: white background, navy sidebar, orange accent, sans-serif. Mobile: cream/beige background, orange serif wordmark, warm peach cards — different typography and spacing entirely. Largest brand-consistency gap in the app; also doubles design-maintenance surface going forward.
 **Not fixed here — this is a real design decision, not a mechanical bug.** The review's own recommendation: keep the desktop palette (white/navy/orange) as canonical since it reads more credible for a compliance product, restyle mobile to match while keeping mobile's *layout* patterns (cards, bottom nav, larger touch targets), and consolidate colors into shared design tokens so it can't drift again. Flagging for explicit sign-off before a redesign pass this size gets scoped.
 
-### M37. Dashboard Quick Actions: four buttons, four different colors, no visual hierarchy
+### M37. Dashboard Quick Actions: four buttons, four different colors, no visual hierarchy — FIXED (2026-07-29)
 **Where:** Dashboard Quick Actions grid — Add New Client (navy), Bulk WhatsApp Reminder (green), Create Task (orange), Generate Invoice (navy).
 **Problem:** Nothing reads as primary; color is used decoratively rather than semantically, which also weakens orange as the app's action color elsewhere.
 **Fix:** One primary (orange) for the most common action, the rest secondary/outline. Reserve green for WhatsApp-specific actions only, so it consistently signals "this sends a WhatsApp message."
+**Fixed:** `QuickActions.tsx` — Add New Client (the action already listed first in `MobileFAB.tsx`, treated as primary there) is now the sole `bg-accent` (orange) button. Create Task and Generate Invoice are now `bg-card border` outline buttons with an accent-tinted icon instead of their own solid color, so they read as secondary without losing the accent-color association entirely. Bulk WhatsApp Reminder is unchanged — it was already correctly using `bg-whatsapp` green.
+**Verified:** `npx tsc --noEmit` clean. Not live-verified in-browser — the only reachable dev server on port 8080 turned out to be a separate (stale) worktree checkout, confirmed via `document.querySelectorAll('button')` still showing the pre-fix classNames; a pure Tailwind class change with no logic, so relied on code review of the class names against the existing `--accent`/`--primary`/`--whatsapp` tokens in `index.css` instead. No existing test coverage for this component to extend.
 
 ### M38. Pricing cards compare ₹/year against ₹/month under the same toggle — FIXED (2026-07-29)
 **Where:** Settings → Plans (`SubscriptionBilling.tsx`) — Founding Member shows ₹2,999/year, Professional shows ₹417/month, side by side under a Monthly/Annual toggle that doesn't apply to both.
@@ -442,25 +444,33 @@ Two-pass review (`CA-Munim-UX-Review.md` code-only, then `CA-Munim-UX-Review-v2.
 **Not fixed — scoped out:** an explicit "Save ₹X vs [tier]" callout on Founding Member, since that requires a product decision about which tier it's meant to be compared against (the review's own worked example implicitly compares it to Professional's monthly rate × 12, but that's an assumption about intent, not something in the data) — a wrong number on a real pricing page is worse than no number, so left for whoever owns that call.
 **Verified:** `npx tsc --noEmit` clean, full unit suite (125/125) passing (no existing test coverage for this component to extend). Not live-verified in-browser this pass — port 8080 was still occupied by a concurrent background agent's dev server; relied on `tsc` + code review, same as H14/H15/M39 onward.
 
-### M39. "50 of 50 left" scarcity badge reads as "nobody has bought this"
+### M39. "50 of 50 left" scarcity badge reads as "nobody has bought this" — FIXED (2026-07-29)
 **Where:** Settings → Plans, Founding Member badge.
 **Fix:** Either omit the counter until there's meaningful traction, or reframe as "Limited to first 50 firms" — showing the full remaining inventory undercuts the urgency it's meant to create.
+**Fixed:** `SubscriptionBilling.tsx` — kept the live `N of 50 left` countdown (real social proof once slots actually start moving), but specifically when `foundingSlotsLeft === 50` (the literal zero-sold starting state, which is what actually reads as "nobody bought this") the badge now reads "Limited to first 50 firms" instead. "Sold out" is unchanged.
+**Verified:** `npx tsc --noEmit` clean. Not live-verified in-browser — same stale-worktree-on-8080 issue as M37; a one-line string/conditional change, verified by code review. No existing test coverage for this component to extend.
 
 ### M40. Settings has 9 tabs in a single row — will overflow on tablet/mobile
 **Where:** Settings — Firm Profile, Staff, WhatsApp, Compliance, Invoice, Updates, Plans, Export, Audit Trail.
 **Fix:** Group into 3–4 sections (Firm, Team & Access, Integrations, Billing & Data) with a vertical sub-nav on desktop and an accordion/list on mobile.
 
-### M41. Dashboard bar chart renders near-zero values as invisible flat lines
+### M41. Dashboard bar chart renders near-zero values as invisible flat lines — FIXED (2026-07-29)
 **Where:** Dashboard "This Month's Work" chart — GST bar is tall; ITR, Other, TDS render as thin lines indistinguishable from the axis or each other.
 **Fix:** Set a minimum visible bar height and print the value above each bar. Consider a horizontal bar chart with labels for readability with only 4 categories.
+**Fixed:** `MonthlyWork.tsx` — switched to Recharts' horizontal layout (category axis vertical, only 4 categories so labels stay readable) with `minPointSize={3}` on the `Bar` so a small nonzero value still renders a visible bar instead of a sliver, plus a `LabelList` printing the exact count at the end of every bar — so the number is legible regardless of how short the bar is.
+**Verified:** `npx tsc --noEmit` clean; `Index.test.tsx` (which renders this component with real chart data) still passes, 4/4. Not live-verified in-browser — same stale-worktree-on-8080 issue as M37/M39.
 
-### M42. Tasks Calendar view is low-density with hard-to-read overflow dots
+### M42. Tasks Calendar view is low-density with hard-to-read overflow dots — FIXED (2026-07-29)
 **Where:** Tasks → Calendar — large mostly-empty cells, tiny colored dots, one observed cell showing "+74" with 3 dots for what should be a highly visible overdue signal.
 **Fix:** Show a count badge per day (e.g. a small pill "74" tinted by worst severity that day) instead of dots-plus-overflow. Strengthen today's highlight beyond a light gray box. Confirm legend colors match badge colors used elsewhere.
+**Fixed:** `TaskCalendarView.tsx` — each day cell now shows one count pill (`getDayBadgeClasses`) tinted by the worst severity among that day's tasks (red > orange > green, same ranking as the existing per-task dot color), replacing the 3-dots-plus-"+N" pattern. Today's cell gets a `ring-2 ring-primary` border plus a solid primary-colored circle around the date number, replacing the previous `bg-primary/10` tint alone.
+**Verified:** legend colors already matched — cross-checked against `getDueDateBadgeClasses` in `lib/taskDisplay.ts` (the shared helper used by TaskCard/TaskListView/mobile Tasks), which uses the identical red-600/orange-600/green-600 family for the same overdue/due-soon/filed states, so no legend color change was needed. `npx tsc --noEmit` clean; `Tasks.test.tsx` 8/8 passing. No existing dedicated test file for this component. Not live-verified in-browser — same stale-worktree-on-8080 issue as M37/M39/M41.
 
-### M43. Long client names wrap awkwardly and break table/list layout
+### M43. Long client names wrap awkwardly and break table/list layout — FIXED (2026-07-29)
 **Where:** Clients table, Tasks list Client column — a company name with a "Private Ltd" suffix wraps to two lines with the type badge wrapping mid-word; raw seed-data IDs (`PW client-1785234752399-djrz`) demonstrate the same gap when a name is unexpectedly long.
 **Fix:** Truncate with ellipsis at a sensible max-width plus a tooltip showing the full name; keep type badges on one line via `whitespace-nowrap`.
+**Fixed:** `ClientListTable.tsx` — name cell now `truncate max-w-[14rem]` wrapped in a shadcn `Tooltip` showing the full name on hover; the type badge got `shrink-0 whitespace-nowrap` so it can no longer be pushed into wrapping. `TaskListView.tsx`'s Client column got the same truncate+tooltip treatment (`max-w-[12rem]`). Both reuse the app's existing `TooltipProvider`, already mounted at `App.tsx` root (and redundantly inside `ui/sidebar.tsx`'s `SidebarProvider`, which is why `Clients.tsx`/`Tasks.tsx`'s own tests didn't need any change) — only `TaskListView.test.tsx`, which renders the component directly without `AppLayout`, needed an explicit `<TooltipProvider>` wrapper added to keep passing.
+**Verified:** `npx tsc --noEmit` clean; full unit suite 133/133 passing. Not live-verified in-browser — same stale-worktree-on-8080 issue as the other polish items this pass.
 
 ---
 

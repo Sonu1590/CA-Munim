@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { MessageCircle, Pencil, Eye } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ClientListTableProps {
   clients: Client[];
@@ -58,10 +59,20 @@ export function ClientListTable({ clients, onEdit, onView }: ClientListTableProp
           {clients.map((client) => (
             <TableRow key={client.id} className="group cursor-pointer" onClick={() => onView(client)}>
               <TableCell>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{client.name}</span>
+                {/* M43, ISSUES.md — a long name (e.g. with a "Private Ltd"
+                    suffix, or a raw seed-data id) used to wrap to two
+                    lines and wrap the type badge mid-word with it.
+                    Truncate the name with a tooltip for the full value;
+                    the badge stays on one line and never shrinks. */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="font-medium truncate max-w-[14rem]">{client.name}</span>
+                    </TooltipTrigger>
+                    <TooltipContent>{client.name}</TooltipContent>
+                  </Tooltip>
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
+                    className={`shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
                       typeBadgeColor[client.type] || "bg-muted text-muted-foreground"
                     }`}
                   >

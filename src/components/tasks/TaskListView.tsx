@@ -11,6 +11,7 @@ import { MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TaskTypeIcon } from "./TaskTypeIcon";
 import { getDueDateTextClass, getStatusBadge } from "@/lib/taskDisplay";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/common/PaginationControls";
 
@@ -57,8 +58,17 @@ export function TaskListView({ tasks, onStatusChange, onEdit, onDelete }: Props)
                     <span className="font-medium text-sm">{task.taskType}</span>
                   </div>
                 </TableCell>
-                <TableCell className="text-sm font-medium text-primary cursor-pointer hover:underline">
-                  {task.clientName}
+                <TableCell className="text-sm font-medium text-primary max-w-[12rem]">
+                  {/* M43, ISSUES.md — same truncate+tooltip pattern as
+                      ClientListTable.tsx, since a long client name (or a
+                      raw seed-data id) wrapped and broke row height here
+                      too. */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="block truncate cursor-pointer hover:underline">{task.clientName}</span>
+                    </TooltipTrigger>
+                    <TooltipContent>{task.clientName}</TooltipContent>
+                  </Tooltip>
                 </TableCell>
                 <TableCell className={`text-sm ${dateColor}`}>
                   {format(parseISO(task.dueDate), "dd/MM/yyyy")}

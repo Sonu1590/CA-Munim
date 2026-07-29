@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, LabelList } from "recharts";
 
 interface MonthlyWorkData {
   completed: number;
@@ -36,18 +36,26 @@ export function MonthlyWork({ data }: MonthlyWorkProps) {
           </div>
         </div>
 
-        {/* Chart */}
+        {/* Chart — M41, ISSUES.md: was a vertical bar chart with a linear
+            Y axis, so a category like GST (e.g. 60) made ITR/Other/TDS
+            (e.g. 1-3 each) render as invisible slivers. Horizontal layout
+            (only 4 categories, so labels stay readable) plus minPointSize
+            so a small nonzero value still renders a visible bar, plus a
+            LabelList printing the exact count at the end of each bar so
+            the number is legible regardless of bar length. */}
         {chartData.length > 0 ? (
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <XAxis
+              <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, bottom: 4, left: 0 }}>
+                <XAxis type="number" hide allowDecimals={false} />
+                <YAxis
+                  type="category"
                   dataKey="name"
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12 }}
+                  width={50}
                 />
-                <YAxis hide />
                 <Tooltip
                   contentStyle={{
                     borderRadius: 8,
@@ -58,8 +66,11 @@ export function MonthlyWork({ data }: MonthlyWorkProps) {
                 <Bar
                   dataKey="count"
                   fill="hsl(211, 54%, 24%)"
-                  radius={[6, 6, 0, 0]}
-                />
+                  radius={[0, 6, 6, 0]}
+                  minPointSize={3}
+                >
+                  <LabelList dataKey="count" position="right" style={{ fontSize: 12, fill: "hsl(var(--foreground))" }} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
