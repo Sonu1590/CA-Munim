@@ -17,16 +17,43 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 
-const settingsTabs = [
-  { value: "firm", label: "Firm Profile", icon: Building2 },
-  { value: "staff", label: "Staff", icon: Users },
-  { value: "whatsapp", label: "WhatsApp", icon: MessageCircle },
-  { value: "compliance", label: "Compliance", icon: CalendarClock },
-  { value: "invoice", label: "Invoice", icon: Receipt },
-  { value: "updates", label: "Updates", icon: Newspaper },
-  { value: "subscription", label: "Plans", icon: CreditCard },
-  { value: "export", label: "Export", icon: FileSpreadsheet },
-  { value: "audit", label: "Audit Trail", icon: History, adminOnly: true },
+// M40, ISSUES.md — was 9 tabs (8 for non-admins) crammed into one
+// horizontally-scrolling row, which overflowed on tablet/mobile. Grouped
+// into the review's own 4 named sections; each tab keeps its real
+// TabsTrigger (same `value`/role="tab"/data-state semantics e2e already
+// relies on via getByRole('tab', ...)) so nothing downstream changes —
+// only the layout they're arranged in does. One shared nav (not a
+// separate desktop/mobile copy) reflows via CSS Grid: a single column
+// (list) above the content on mobile, a narrow sticky side column
+// (vertical sub-nav) beside the content at md+.
+const settingsGroups = [
+  {
+    label: "Firm",
+    tabs: [
+      { value: "firm", label: "Firm Profile", icon: Building2 },
+      { value: "compliance", label: "Compliance", icon: CalendarClock },
+      { value: "updates", label: "Updates", icon: Newspaper },
+    ],
+  },
+  {
+    label: "Team & Access",
+    tabs: [
+      { value: "staff", label: "Staff", icon: Users },
+      { value: "audit", label: "Audit Trail", icon: History, adminOnly: true },
+    ],
+  },
+  {
+    label: "Integrations",
+    tabs: [{ value: "whatsapp", label: "WhatsApp", icon: MessageCircle }],
+  },
+  {
+    label: "Billing & Data",
+    tabs: [
+      { value: "invoice", label: "Invoice", icon: Receipt },
+      { value: "subscription", label: "Plans", icon: CreditCard },
+      { value: "export", label: "Export", icon: FileSpreadsheet },
+    ],
+  },
 ];
 
 class SettingsTabErrorBoundary extends Component<
@@ -53,7 +80,10 @@ export default function Settings() {
   const { signOut } = useAuth();
   const { isAdmin } = useUserRole();
   const [signingOut, setSigningOut] = useState(false);
-  const visibleTabs = settingsTabs.filter((tab) => !tab.adminOnly || isAdmin);
+  const [activeTab, setActiveTab] = useState("firm");
+  const visibleGroups = settingsGroups
+    .map((group) => ({ ...group, tabs: group.tabs.filter((tab) => !tab.adminOnly || isAdmin) }))
+    .filter((group) => group.tabs.length > 0);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -86,31 +116,45 @@ export default function Settings() {
           </Button>
         </div>
 
-        <Tabs defaultValue="firm" className="space-y-6">
-          <div className="overflow-x-auto -mx-4 px-4">
-            <TabsList className="inline-flex h-auto p-1 gap-1 bg-muted/50">
-              {visibleTabs.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value} aria-label={tab.label} className="gap-1.5 text-xs sm:text-sm px-2.5 py-2 data-[state=active]:bg-background">
-                  <tab.icon className="h-4 w-4 shrink-0" />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="grid gap-6 md:grid-cols-[200px_1fr] md:items-start">
+          <nav className="space-y-5 md:sticky md:top-6">
+            {visibleGroups.map((group) => (
+              <div key={group.label}>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2.5 mb-1.5">
+                  {group.label}
+                </p>
+                <TabsList className="flex flex-col h-auto w-full gap-0.5 bg-transparent p-0">
+                  {group.tabs.map((tab) => (
+                    <TabsTrigger
+                      key={tab.value}
+                      value={tab.value}
+                      aria-label={tab.label}
+                      className="w-full justify-start gap-2 px-2.5 py-2 text-sm data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                    >
+                      <tab.icon className="h-4 w-4 shrink-0" />
+                      {tab.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
+            ))}
+          </nav>
 
-          <TabsContent value="firm"><FirmProfileSettings /></TabsContent>
-          <TabsContent value="staff">
-            <SettingsTabErrorBoundary fallback={<div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">Failed to load staff settings.</div>}>
-              <StaffManagement />
-            </SettingsTabErrorBoundary>
-          </TabsContent>
-          <TabsContent value="whatsapp"><WhatsAppConfig /></TabsContent>
-          <TabsContent value="compliance"><ComplianceCalendarSettings /></TabsContent>
-          <TabsContent value="invoice"><InvoiceSettingsPanel /></TabsContent>
-          <TabsContent value="updates"><ComplianceUpdatesFeed /></TabsContent>
-          <TabsContent value="subscription"><SubscriptionBilling /></TabsContent>
-          <TabsContent value="export"><DataExport /></TabsContent>
-          <TabsContent value="audit"><AuditTrail /></TabsContent>
+          <div className="min-w-0">
+            <TabsContent value="firm"><FirmProfileSettings /></TabsContent>
+            <TabsContent value="staff">
+              <SettingsTabErrorBoundary fallback={<div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">Failed to load staff settings.</div>}>
+                <StaffManagement />
+              </SettingsTabErrorBoundary>
+            </TabsContent>
+            <TabsContent value="whatsapp"><WhatsAppConfig /></TabsContent>
+            <TabsContent value="compliance"><ComplianceCalendarSettings /></TabsContent>
+            <TabsContent value="invoice"><InvoiceSettingsPanel /></TabsContent>
+            <TabsContent value="updates"><ComplianceUpdatesFeed /></TabsContent>
+            <TabsContent value="subscription"><SubscriptionBilling /></TabsContent>
+            <TabsContent value="export"><DataExport /></TabsContent>
+            <TabsContent value="audit"><AuditTrail /></TabsContent>
+          </div>
         </Tabs>
       </div>
     </AppLayout>
