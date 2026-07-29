@@ -253,6 +253,7 @@ export default function Tasks() {
                 onStatusChange={handleStatusChange}
                 onEdit={handleEditTask}
                 onDelete={handleDeleteTask}
+                onViewAll={() => setView("list")}
                 onChecklistUpdate={async (taskId, items) => {
                   const success = await updateTask(taskId, { document_checklist: items });
                   if (!success) toast.error("Failed to update checklist. Please try again.");

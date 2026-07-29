@@ -2,6 +2,8 @@ import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import { Check } from "lucide-react";
 import { getDueDateBadgeClasses, getPriorityBadge } from "@/lib/taskDisplay";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/common/PaginationControls";
 
 interface MobileTask {
   id: string;
@@ -30,6 +32,9 @@ export function MobileTasksScreen({ tasks, stats, onStatusChange }: MobileTasksS
   const [statusFilter, setStatusFilter] = useState<(typeof segments)[number]["value"]>("pending");
 
   const visibleTasks = tasks.filter((t) => t.status === statusFilter);
+  // M27, ISSUES.md — paginated within the active status tab, not across
+  // all tasks, since only one status is ever shown at a time here.
+  const { paginated, page, setPage, totalPages, totalItems, pageSize } = usePagination(visibleTasks, 25);
 
   return (
     <div className="bg-mobile-bg font-mobile-body text-mobile-text -mx-4 -mt-4 px-4 pt-6 pb-8 min-h-[calc(100vh-8rem)]">
@@ -42,7 +47,10 @@ export function MobileTasksScreen({ tasks, stats, onStatusChange }: MobileTasksS
         {segments.map((seg) => (
           <button
             key={seg.value}
-            onClick={() => setStatusFilter(seg.value)}
+            onClick={() => {
+              setStatusFilter(seg.value);
+              setPage(1);
+            }}
             className={`flex-1 rounded-full py-2 text-xs font-bold ${
               statusFilter === seg.value ? "bg-mobile-accent text-white shadow-mobile-sm" : "text-mobile-neutral-700"
             }`}
@@ -53,7 +61,7 @@ export function MobileTasksScreen({ tasks, stats, onStatusChange }: MobileTasksS
       </div>
 
       <div className="flex flex-col gap-2.5">
-        {visibleTasks.map((task) => {
+        {paginated.map((task) => {
           const priority = getPriorityBadge(task.priority);
           const checked = task.status === "completed";
           return (
@@ -91,6 +99,7 @@ export function MobileTasksScreen({ tasks, stats, onStatusChange }: MobileTasksS
           <div className="bg-mobile-neutral-100 rounded-mobile-md p-6 text-center text-sm text-mobile-neutral-600">Nothing here.</div>
         )}
       </div>
+      <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} pageSize={pageSize} />
     </div>
   );
 }

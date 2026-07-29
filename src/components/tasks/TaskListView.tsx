@@ -11,6 +11,8 @@ import { MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TaskTypeIcon } from "./TaskTypeIcon";
 import { getDueDateTextClass, getStatusBadge } from "@/lib/taskDisplay";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/common/PaginationControls";
 
 interface Props {
   tasks: Task[];
@@ -19,8 +21,16 @@ interface Props {
   onDelete?: (task: Task) => void;
 }
 
+// M27, ISSUES.md — paginated locally (not by the parent Tasks.tsx) because
+// Tasks.tsx's filteredTasks also feeds TaskKanbanBoard (needs the full set
+// to bucket into status columns) and TaskCalendarView (needs the full set
+// to bucket into days) — only this flat list actually wants one page at a
+// time. Sorted by urgency already (H13), so page 1 is the most overdue work.
 export function TaskListView({ tasks, onStatusChange, onEdit, onDelete }: Props) {
+  const { paginated, page, setPage, totalPages, totalItems, pageSize } = usePagination(tasks, 25);
+
   return (
+    <div className="space-y-3">
     <div className="border border-border rounded-xl overflow-hidden bg-card">
       <Table>
         <TableHeader>
@@ -36,7 +46,7 @@ export function TaskListView({ tasks, onStatusChange, onEdit, onDelete }: Props)
           </TableRow>
         </TableHeader>
         <TableBody>
-          {tasks.map((task) => {
+          {paginated.map((task) => {
             const statusBadge = getStatusBadge(task.status);
             const dateColor = getDueDateTextClass(task.dueDate, task.status);
             return (
@@ -97,6 +107,8 @@ export function TaskListView({ tasks, onStatusChange, onEdit, onDelete }: Props)
           })}
         </TableBody>
       </Table>
+    </div>
+    <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} pageSize={pageSize} />
     </div>
   );
 }
