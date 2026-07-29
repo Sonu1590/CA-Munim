@@ -394,7 +394,16 @@ export function AddClientModal({ open, onOpenChange, onSave, client }: AddClient
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0">
+      {/* M35, ISSUES.md — `p-0` alone is silently overridden at every
+          breakpoint: dialog.tsx's own `max-sm:p-5`/`sm:p-6` share no
+          variant modifier with a bare `p-0`, so tailwind-merge (cn) keeps
+          both instead of deduping, and Tailwind's CSS layer ordering
+          means the responsive class wins the cascade regardless of
+          intent. DialogHeader/section-nav/ScrollArea below all manage
+          their own padding precisely because this was meant to be zero
+          padding at any width — spelling it out per-breakpoint is what
+          actually achieves that. */}
+      <DialogContent className="max-w-2xl max-h-[90vh] p-0 max-sm:p-0 sm:p-0">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="text-lg font-heading">{client ? "Edit Client" : "Add New Client"}</DialogTitle>
           <DialogDescription className="sr-only">Enter the client's KYC, tax, and billing details.</DialogDescription>

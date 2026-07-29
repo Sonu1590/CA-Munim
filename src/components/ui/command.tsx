@@ -26,7 +26,11 @@ interface CommandDialogProps extends DialogProps {}
 const CommandDialog = ({ children, ...props }: CommandDialogProps) => {
   return (
     <Dialog {...props}>
-      <DialogContent className="overflow-hidden p-0 shadow-lg">
+      {/* M35, ISSUES.md — see the identical note in AddClientModal.tsx:
+          bare `p-0` is silently overridden by dialog.tsx's own
+          `max-sm:p-5`/`sm:p-6` at every breakpoint, since they share no
+          variant modifier for tailwind-merge to dedupe against. */}
+      <DialogContent className="overflow-hidden p-0 max-sm:p-0 sm:p-0 shadow-lg">
         <DialogTitle className="sr-only">Search</DialogTitle>
         <DialogDescription className="sr-only">Search clients, tasks, invoices, and more across the app.</DialogDescription>
         <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
