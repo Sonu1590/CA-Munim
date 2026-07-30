@@ -19,7 +19,18 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      // M35, ISSUES.md — confirmed via live DevTools inspection this is
+      // not a rendering bug: on mobile, DialogContent is a bottom sheet
+      // at `max-h-[92vh]`, intentionally leaving ~8% of the viewport
+      // visible above it as this overlay's dimmed backdrop. At 80%
+      // opacity, high-contrast page content behind it (e.g. a bold
+      // task-list row) stayed legible enough through the tint to read
+      // as a broken/leftover header rather than an intentional dim —
+      // confirmed via computed-style probes showing the "dark strip"
+      // was this overlay, with the modal card itself starting below it
+      // at its expected `bg-background` (near-white) color. Darkened so
+      // it reads unambiguously as a backdrop.
+      "fixed inset-0 z-50 bg-black/95 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className,
     )}
     {...props}
