@@ -92,6 +92,38 @@
   }
 }
 
+/* M36, ISSUES.md — desktop-page pilot of mobile's "Organic" palette
+   (cream/terracotta), per explicit user preference, tried one page at a
+   time rather than a repo-wide retheme. Overrides the exact same token
+   names shadcn components already consume (bg-background, bg-card,
+   bg-primary, bg-accent, etc.), converted from the mobile hex values to
+   this file's H S% L% format:
+     bg     #f5ead8 -> 37 59% 90%     accent     #c67139 -> 24 55% 50%
+     surface #ebddc5 -> 38 49% 85%    accent-600 #b2622d -> 24 60% 44%
+     text   #201e1d -> 20 5% 12%      accent-100 #fff2eb -> 21 100% 96%
+   Scoped to a wrapper class (not :root) so it only affects whatever
+   page opts in — nothing else changes. Not applied anywhere yet; see
+   pages/Index.tsx for the pilot. */
+@layer base {
+  .theme-organic {
+    --background: 37 59% 90%;
+    --foreground: 20 5% 12%;
+    --card: 38 49% 85%;
+    --card-foreground: 20 5% 12%;
+    --primary: 24 60% 44%;
+    --primary-foreground: 21 100% 96%;
+    --secondary: 38 49% 85%;
+    --secondary-foreground: 20 5% 12%;
+    --muted: 37 35% 88%;
+    --muted-foreground: 20 8% 40%;
+    --accent: 24 55% 50%;
+    --accent-foreground: 21 100% 96%;
+    --border: 20 15% 85%;
+    --input: 20 15% 85%;
+    --ring: 24 60% 44%;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
