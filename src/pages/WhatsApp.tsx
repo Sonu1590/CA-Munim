@@ -47,7 +47,7 @@ export default function WhatsApp() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl md:text-2xl font-heading font-bold">WhatsApp Center</h1>
+              <h1 className="text-xl md:text-2xl font-display font-bold">WhatsApp Center</h1>
               <Badge variant="secondary" className="text-[10px]">Beta</Badge>
             </div>
             <p className="text-sm text-muted-foreground">Manage templates, send bulk messages & track delivery</p>

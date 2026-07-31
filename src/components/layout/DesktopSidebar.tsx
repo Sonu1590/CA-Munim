@@ -117,7 +117,7 @@ export function DesktopSidebar() {
     <aside className="hidden md:flex flex-col w-64 border-r border-border bg-card min-h-screen">
       {/* Firm branding */}
       <div className="p-5 border-b border-border">
-        <h1 className="text-xl font-heading font-bold text-primary">CA Munim</h1>
+        <h1 className="text-xl font-display font-bold text-primary">CA Munim</h1>
         <p className="text-sm text-muted-foreground mt-0.5 truncate">
           {loaded ? (firm.firmName || firm.caName || "Your practice") : "Loading..."}
         </p>
@@ -149,15 +149,7 @@ export function DesktopSidebar() {
               cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 isActive
-                  ? // M36, ISSUES.md — the Dashboard page pilots the mobile
-                    // Organic palette (see theme-organic in index.css), so
-                    // its own nav item picks up the matching terracotta
-                    // instead of the navy bg-primary every other item still
-                    // uses — the navy pill otherwise clashed with the
-                    // cream/terracotta content it points at.
-                    item.path === "/"
-                    ? "bg-mobile-accent-600 text-white"
-                    : "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )
             }

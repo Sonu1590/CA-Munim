@@ -27,7 +27,7 @@ export default function Reports() {
     <AppLayout>
       <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4">
         <div>
-          <h1 className="text-2xl font-heading font-bold">Reports</h1>
+          <h1 className="text-2xl font-display font-bold">Reports</h1>
           <p className="text-sm text-muted-foreground">Generate & export practice reports</p>
         </div>
 

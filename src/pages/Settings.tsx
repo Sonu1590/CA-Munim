@@ -101,7 +101,7 @@ export default function Settings() {
       <div className="p-4 md:p-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-heading font-bold">Settings</h1>
+            <h1 className="text-2xl font-display font-bold">Settings</h1>
             <p className="text-muted-foreground text-sm mt-1">Manage your firm profile, staff, integrations, and preferences</p>
           </div>
           {/* md:hidden (L8, ISSUES.md) — DesktopSidebar (hidden md:flex,

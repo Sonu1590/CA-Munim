@@ -17,6 +17,14 @@ export default {
         heading: ['"Plus Jakarta Sans"', 'sans-serif'],
         body: ['"DM Sans"', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
+        // M36, ISSUES.md — same font as mobile's "mobile-heading" token
+        // (Caprasimo), given a shared, non-mobile-specific name since
+        // desktop now also uses it (for the wordmark + page h1s only —
+        // see index.css's h1 base-layer rule). Kept as a second alias
+        // rather than renaming mobile-heading everywhere it's already
+        // used, to avoid touching working, tested mobile screens for a
+        // change that has no visual effect (same font either name).
+        display: ['"Caprasimo"', 'serif'],
         "mobile-heading": ['"Caprasimo"', 'serif'],
         "mobile-body": ['"Figtree"', 'sans-serif'],
       },

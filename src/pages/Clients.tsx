@@ -125,7 +125,7 @@ export default function Clients() {
         {/* Header — desktop only; mobile screen owns its own header */}
         <div className="hidden md:flex md:items-center justify-between gap-3" data-testid="desktop-clients-header">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl md:text-2xl font-heading font-bold">Clients</h1>
+            <h1 className="text-xl md:text-2xl font-display font-bold">Clients</h1>
             <Badge className="bg-primary text-primary-foreground text-xs">
               {clients.length}
             </Badge>

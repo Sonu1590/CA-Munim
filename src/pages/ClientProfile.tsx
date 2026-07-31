@@ -61,6 +61,12 @@ export default function ClientProfile() {
 
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
+            {/* M36, ISSUES.md — kept on the sans font-heading deliberately,
+                unlike other page h1s: this renders an arbitrary client
+                name (data), not a brand/page title, and a decorative
+                display serif on unpredictable business-name text (long
+                names, numerals, seed-data ids) is exactly the legibility
+                risk the desktop system exists to avoid. */}
             <h1 className="text-2xl font-heading font-bold">{client.name}</h1>
             <div className="mt-2 flex flex-wrap gap-2">
               <Badge>{client.type}</Badge>

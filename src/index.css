@@ -7,31 +7,45 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
+    /* M36, ISSUES.md — design-system refresh per the Opus 5 review
+       (2026-07-30): keep the desktop system as the app's one brand
+       (data-heavy screens need a neutral-reading ground; the earlier
+       cream-page-pilot on Dashboard is reverted), but warm the ground
+       away from the generic cool blue-gray shadcn default, since the
+       mobile app's warmth was the right instinct even though putting it
+       directly behind data wasn't. --background/--card/--secondary/
+       --muted/--border/--input all shift from a ~210-220° cool hue to a
+       ~30° warm neutral; --primary (navy) and --success/--whatsapp
+       greens are unchanged — none of those were flagged as a problem. */
+    --background: 30 20% 97%;
     --foreground: 222 47% 11%;
 
-    --card: 0 0% 100%;
+    --card: 30 15% 99%;
     --card-foreground: 222 47% 11%;
 
-    --popover: 0 0% 100%;
+    --popover: 30 15% 99%;
     --popover-foreground: 222 47% 11%;
 
     --primary: 211 54% 24%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96%;
+    --secondary: 30 15% 94%;
     --secondary-foreground: 222 47% 11%;
 
-    --muted: 210 20% 95%;
-    /* L11, ISSUES.md — was 215 16% 47%, measured at ~4.49:1 against
-       --background (210 40% 98%) — under the WCAG AA 4.5:1 threshold for
-       normal text (marginally more, ~4.70:1, against white --card, but
-       still too close to the line). Darkened to 42% lightness for
-       ~5.4-5.7:1 against both, with real margin instead of sitting on
-       the boundary. */
-    --muted-foreground: 215 16% 42%;
+    --muted: 30 15% 93%;
+    /* L11, ISSUES.md established the contrast-measurement method (WCAG
+       relative luminance, ≥4.5:1 with real margin, not sitting on the
+       boundary); reapplied here after the M36 hue shift. HSL(25 10% 40%)
+       ≈ rgb(112,100,92) → ~5.36:1 against the new --background (rgb
+       249,247,246) and higher still against --card — comfortably clear. */
+    --muted-foreground: 25 10% 40%;
 
-    --accent: 24 95% 53%;
+    /* M36 — was 24 95% 53%: white text on it measured ~2.85:1, well
+       under WCAG AA (fails even the 3:1 large-text floor). Darkened to
+       42% lightness and shifted a few degrees redder (24→20) for real
+       separation from --warning below; rgb(198,77,16) with white text
+       ≈ 4.7:1, verified via the same relative-luminance method as L11. */
+    --accent: 20 85% 42%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
@@ -40,14 +54,25 @@
     --success: 142 72% 29%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 48 96% 53%;
+    /* M36 — was 48 96% 53%, only 24° from the old accent's hue (48 vs
+       24) so the two read as near-duplicate oranges wherever a warning
+       badge sat next to an accent button (e.g. mobile's FAB/"Mark
+       filed"/overdue-badge cluster the review called out). Shifted
+       further toward true gold (48→50) against the now-darker,
+       redder accent (20°) for real hue separation, not just a lightness
+       difference. */
+    --warning: 50 92% 55%;
     --warning-foreground: 222 47% 11%;
 
+    /* Reserved exclusively for WhatsApp actions (M37, ISSUES.md already
+       scoped Quick Actions' green to the Bulk WhatsApp button only) —
+       distinct from --success, which is a status-badge color (Filed/
+       Completed), not an action color; the two aren't the same "green". */
     --whatsapp: 142 70% 49%;
     --whatsapp-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
+    --border: 30 15% 88%;
+    --input: 30 15% 88%;
     --ring: 211 54% 24%;
 
     --radius: 0.75rem;
@@ -92,38 +117,6 @@
   }
 }
 
-/* M36, ISSUES.md — desktop-page pilot of mobile's "Organic" palette
-   (cream/terracotta), per explicit user preference, tried one page at a
-   time rather than a repo-wide retheme. Overrides the exact same token
-   names shadcn components already consume (bg-background, bg-card,
-   bg-primary, bg-accent, etc.), converted from the mobile hex values to
-   this file's H S% L% format:
-     bg     #f5ead8 -> 37 59% 90%     accent     #c67139 -> 24 55% 50%
-     surface #ebddc5 -> 38 49% 85%    accent-600 #b2622d -> 24 60% 44%
-     text   #201e1d -> 20 5% 12%      accent-100 #fff2eb -> 21 100% 96%
-   Scoped to a wrapper class (not :root) so it only affects whatever
-   page opts in — nothing else changes. Not applied anywhere yet; see
-   pages/Index.tsx for the pilot. */
-@layer base {
-  .theme-organic {
-    --background: 37 59% 90%;
-    --foreground: 20 5% 12%;
-    --card: 38 49% 85%;
-    --card-foreground: 20 5% 12%;
-    --primary: 24 60% 44%;
-    --primary-foreground: 21 100% 96%;
-    --secondary: 38 49% 85%;
-    --secondary-foreground: 20 5% 12%;
-    --muted: 37 35% 88%;
-    --muted-foreground: 20 8% 40%;
-    --accent: 24 55% 50%;
-    --accent-foreground: 21 100% 96%;
-    --border: 20 15% 85%;
-    --input: 20 15% 85%;
-    --ring: 24 60% 44%;
-  }
-}
-
 @layer base {
   * {
     @apply border-border;
@@ -131,7 +124,18 @@
   body {
     @apply bg-background text-foreground font-body antialiased;
   }
-  h1, h2, h3, h4, h5, h6 {
+  /* M36, ISSUES.md — Opus 5 review: import the mobile app's serif
+     personality into the wordmark and major (page-title) headings only,
+     not every heading — a heavy display serif at the density of a
+     288-row table or a modal title would cost the legibility the
+     desktop system exists to protect. h1 is reserved in this app for
+     page titles ("Dashboard", "Clients", "Settings") and the "CA Munim"
+     wordmark; modal/section titles render as h2+ (Radix's DialogTitle
+     defaults to h2) and keep the sans. */
+  h1 {
+    @apply font-display font-bold;
+  }
+  h2, h3, h4, h5, h6 {
     @apply font-heading font-semibold;
   }
 }

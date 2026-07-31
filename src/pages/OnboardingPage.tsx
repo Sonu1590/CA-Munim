@@ -197,7 +197,7 @@ export default function OnboardingPage({ onComplete }: OnboardingPageProps) {
           <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-primary mb-4">
             <Building2 className="h-7 w-7 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-heading font-bold">Welcome to CA Munim</h1>
+          <h1 className="text-2xl font-display font-bold">Welcome to CA Munim</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Set up your practice profile — takes 2 minutes
           </p>

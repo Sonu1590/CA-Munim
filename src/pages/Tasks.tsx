@@ -178,7 +178,7 @@ export default function Tasks() {
         {/* Header — desktop only; mobile screen owns its own header */}
         <div className="hidden md:flex md:items-center justify-between gap-3" data-testid="desktop-tasks-header">
           <div>
-            <h1 className="text-xl md:text-2xl font-heading font-bold text-foreground">
+            <h1 className="text-xl md:text-2xl font-display font-bold text-foreground">
               Tasks & Deadlines
             </h1>
             <p className="text-sm text-muted-foreground">

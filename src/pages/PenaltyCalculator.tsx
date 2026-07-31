@@ -55,7 +55,7 @@ export default function PenaltyCalculator() {
     <AppLayout>
       <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-5">
         <div>
-          <h1 className="text-xl md:text-2xl font-heading font-bold">Penalty Calculator</h1>
+          <h1 className="text-xl md:text-2xl font-display font-bold">Penalty Calculator</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Estimate late filing penalties under Indian tax & company law (illustrative).
           </p>
