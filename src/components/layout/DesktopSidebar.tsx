@@ -149,7 +149,15 @@ export function DesktopSidebar() {
               cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-primary text-primary-foreground"
+                  ? // M36, ISSUES.md — the Dashboard page pilots the mobile
+                    // Organic palette (see theme-organic in index.css), so
+                    // its own nav item picks up the matching terracotta
+                    // instead of the navy bg-primary every other item still
+                    // uses — the navy pill otherwise clashed with the
+                    // cream/terracotta content it points at.
+                    item.path === "/"
+                    ? "bg-mobile-accent-600 text-white"
+                    : "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )
             }
