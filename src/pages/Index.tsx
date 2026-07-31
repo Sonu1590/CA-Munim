@@ -31,7 +31,7 @@ const Dashboard = () => {
       <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
         {/* Desktop header — mobile has its own header inside MobileHomeScreen */}
         <div className="hidden md:block">
-          <h1 className="text-2xl font-display font-bold">Dashboard</h1>
+          <h1 className="text-2xl font-heading font-medium">Dashboard</h1>
           <p className="text-muted-foreground">
             Welcome back, {displayName}
           </p>

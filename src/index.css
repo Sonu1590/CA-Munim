@@ -121,21 +121,29 @@
   * {
     @apply border-border;
   }
+  /* M36, ISSUES.md — tabular-nums app-wide rather than hunting down
+     every currency/count cell individually: without it, proportional
+     digits mean e.g. ₹1,770 and ₹0 don't align down a column, which is
+     immediately visible in a fees table. Digits are the same width
+     either way for a financial app, so this is safe as a blanket
+     default rather than something to apply selectively. */
   body {
-    @apply bg-background text-foreground font-body antialiased;
+    @apply bg-background text-foreground font-body antialiased tabular-nums;
   }
-  /* M36, ISSUES.md — Opus 5 review: import the mobile app's serif
-     personality into the wordmark and major (page-title) headings only,
-     not every heading — a heavy display serif at the density of a
-     288-row table or a modal title would cost the legibility the
-     desktop system exists to protect. h1 is reserved in this app for
-     page titles ("Dashboard", "Clients", "Settings") and the "CA Munim"
-     wordmark; modal/section titles render as h2+ (Radix's DialogTitle
-     defaults to h2) and keep the sans. */
-  h1 {
-    @apply font-display font-bold;
-  }
-  h2, h3, h4, h5, h6 {
+  /* M36, ISSUES.md — round 2 of the Opus 5 review corrected round 1's
+     mistake here: Caprasimo is a heavy single-weight (400) display
+     face, and font-bold synthesizes extra weight on top of an already-
+     bold-looking letterform, so applying it to every page h1 read as
+     editorial/vintage rather than a compliance instrument — "Dashboard"
+     visually outranked the overdue-filing count under it. Reserved for
+     the literal "CA Munim" wordmark only now (explicit font-display
+     font-bold on those few instances — DesktopSidebar/AuthPage/
+     ResetPasswordPage); every other heading, including page titles like
+     "Dashboard"/"Clients", is back on the plain sans base rule below
+     (page titles additionally set font-medium explicitly at their own
+     call sites, one step lighter than this h2-h6 default, so the brand
+     mark and a page title don't share one treatment). */
+  h1, h2, h3, h4, h5, h6 {
     @apply font-heading font-semibold;
   }
 }

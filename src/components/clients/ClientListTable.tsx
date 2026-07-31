@@ -43,16 +43,26 @@ function waLink(phone: string) {
 export function ClientListTable({ clients, onEdit, onView }: ClientListTableProps) {
   return (
     <div className="hidden md:block overflow-x-auto rounded-md border">
-      <Table>
+      {/* M43/M36, ISSUES.md — the table's default auto layout, combined
+          with `w-full` capping it at the container's width, meant 7
+          columns fighting over a fixed width negotiated by squeezing
+          whichever cell had the least resistance — first Phone (fixed
+          separately), then Last Activity ("24/07/" — a clipped date is
+          worse than a hidden one, since it reads as data rather than an
+          error). table-fixed + explicit per-column widths stops that
+          negotiation entirely; min-w on the table means a narrow
+          viewport gets a real horizontal scrollbar (the wrapper above
+          is already overflow-x-auto) instead of compression. */}
+      <Table className="table-fixed min-w-[1040px]">
         <TableHeader>
           <TableRow>
-            <TableHead>Client Name</TableHead>
-            <TableHead>PAN</TableHead>
-            <TableHead className="min-w-[9rem]">Phone</TableHead>
-            <TableHead className="text-center">Active Tasks</TableHead>
-            <TableHead className="text-right">Pending Fees</TableHead>
-            <TableHead>Last Activity</TableHead>
-            <TableHead className="sticky right-0 z-10 bg-background text-right shadow-[-8px_0_12px_-12px_rgba(0,0,0,0.45)]">Actions</TableHead>
+            <TableHead className="w-[260px]">Client Name</TableHead>
+            <TableHead className="w-[130px]">PAN</TableHead>
+            <TableHead className="w-[140px]">Phone</TableHead>
+            <TableHead className="w-[110px] text-center">Active Tasks</TableHead>
+            <TableHead className="w-[130px] text-right">Pending Fees</TableHead>
+            <TableHead className="w-[120px]">Last Activity</TableHead>
+            <TableHead className="w-[140px] sticky right-0 z-10 bg-background text-right shadow-[-8px_0_12px_-12px_rgba(0,0,0,0.45)]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

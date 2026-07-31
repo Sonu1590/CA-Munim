@@ -119,7 +119,7 @@ export default function Billing() {
       <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
         <div className="hidden md:flex md:items-center justify-between gap-3" data-testid="desktop-billing-header">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl md:text-2xl font-display font-bold">Billing & Fees</h1>
+            <h1 className="text-xl md:text-2xl font-heading font-medium">Billing & Fees</h1>
             <Badge className="bg-primary text-primary-foreground text-xs">{invoices.length}</Badge>
           </div>
           <Button
