@@ -109,7 +109,14 @@ export function MobileHomeScreen({ metrics, complianceAlerts, digest, caName, re
   ];
 
   return (
-    <div className="bg-mobile-bg font-mobile-body text-mobile-text -mx-4 -mt-4 px-4 pt-6 pb-8 min-h-[calc(100vh-8rem)]">
+    // M36, ISSUES.md — pb-24 (was pb-8): the fixed FAB sits at bottom-24
+    // (right-4, 56px circle) regardless of scroll position. Measured live
+    // at 375x667, the Quick Actions grid — the last section on this page —
+    // had its bottom-right button only 8px above the FAB's top edge at max
+    // scroll, no further scrolling possible to add clearance. The extra
+    // pb-24 buys scroll room so the last section can clear the FAB's band
+    // entirely once the user scrolls to the true bottom.
+    <div className="bg-mobile-bg font-mobile-body text-mobile-text -mx-4 -mt-4 px-4 pt-6 pb-24 min-h-[calc(100vh-8rem)]">
       {/* Header */}
       <div className="flex items-center justify-between mb-1">
         <span className="font-mobile-heading font-normal text-2xl text-mobile-accent">CA Munim</span>
@@ -124,19 +131,29 @@ export function MobileHomeScreen({ metrics, complianceAlerts, digest, caName, re
         {greeting()}, {displayName} · {todayLabel}
       </p>
 
-      {/* Metrics grid */}
+      {/* Metrics grid — M36, ISSUES.md: color here used to be purely
+          decorative (Overdue in the brand accent, Due This Week in a
+          success-adjacent olive), unrelated to the actual Overdue/
+          Pending/Filed severity these numbers represent — the same
+          red/amber/green system desktop's getDueDateBadgeClasses
+          already gets right. A CA should be able to triage this grid
+          in one glance: Overdue is always red (the number meant to
+          worry them), Due This Week is always amber (pending, not an
+          achievement — a "0" here is not good news, it just means
+          nothing's imminent), and the two count-only cards (clients,
+          fees) stay neutral since they're not a status at all. */}
       <div className="grid grid-cols-2 gap-2.5 mb-5">
         <div className="bg-mobile-neutral-100 rounded-mobile-md p-3.5 shadow-mobile-sm">
           <div className="text-2xl font-bold">{metrics.totalClients}</div>
           <div className="text-xs text-mobile-neutral-600">Active clients</div>
         </div>
-        <div className="bg-mobile-accent-100 rounded-mobile-md p-3.5 shadow-mobile-sm">
-          <div className="text-2xl font-bold text-mobile-accent-700">{metrics.overdueTasks}</div>
-          <div className="text-xs text-mobile-accent-700">Overdue filings</div>
+        <div className="bg-red-50 rounded-mobile-md p-3.5 shadow-mobile-sm">
+          <div className="text-2xl font-bold text-red-600">{metrics.overdueTasks}</div>
+          <div className="text-xs text-red-600">Overdue filings</div>
         </div>
-        <div className="bg-mobile-accent-2-200 rounded-mobile-md p-3.5 shadow-mobile-sm">
-          <div className="text-2xl font-bold text-mobile-accent-2-800">{metrics.dueThisWeek}</div>
-          <div className="text-xs text-mobile-accent-2-800">Due this week</div>
+        <div className="bg-orange-50 rounded-mobile-md p-3.5 shadow-mobile-sm">
+          <div className="text-2xl font-bold text-orange-600">{metrics.dueThisWeek}</div>
+          <div className="text-xs text-orange-600">Due this week</div>
         </div>
         <div className="bg-mobile-neutral-100 rounded-mobile-md p-3.5 shadow-mobile-sm">
           <div className="text-xl font-bold pt-0.5">{formatCurrency(metrics.pendingFees)}</div>
@@ -157,15 +174,28 @@ export function MobileHomeScreen({ metrics, complianceAlerts, digest, caName, re
                 <div className="font-bold text-sm">{item.taskType}</div>
                 <div className="text-xs text-mobile-neutral-600">{item.clientName}</div>
               </div>
-              <span className="shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full bg-mobile-accent-200 text-mobile-accent-800">
+              <span
+                className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                  item.daysOverdue > 0 ? "bg-red-50 text-red-600" : "bg-orange-50 text-orange-600"
+                }`}
+              >
                 {item.daysOverdue > 0 ? `${item.daysOverdue}d overdue` : "Due today"}
               </span>
             </div>
-            <div className="flex gap-2">
+            {/* M36, ISSUES.md — pr-14 keeps this row's right edge clear of the
+                FAB's fixed footprint (x 303-359 at a 375px viewport). The
+                FAB is `fixed`, so it can sit over ANY card as the page
+                scrolls, not just the first or last one — measured live,
+                "Mark filed" on the second digest card sat directly under
+                it with no scrolling at all. Reserving this margin on every
+                card's button row is the only fix that holds regardless of
+                scroll position, unlike raising the FAB's offset (which
+                only relocates which card gets hit). */}
+            <div className="flex gap-2 pr-14">
               <button
                 disabled={nudgingId === item.id}
                 onClick={() => handleNudge(item)}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-full py-2 bg-mobile-accent-2-200 text-mobile-accent-2-800 text-xs font-bold disabled:opacity-60"
+                className="flex-[1.3] flex items-center justify-center gap-1.5 rounded-full py-2 bg-mobile-accent-2-200 text-mobile-accent-2-800 text-xs font-bold disabled:opacity-60"
               >
                 <MessageCircle className="h-3.5 w-3.5" />
                 Nudge on WhatsApp
@@ -202,17 +232,22 @@ export function MobileHomeScreen({ metrics, complianceAlerts, digest, caName, re
       <div className="bg-mobile-neutral-100 rounded-mobile-md shadow-mobile-sm overflow-hidden mb-5">
         {complianceAlerts.slice(0, 5).map((alert) => {
           const { day, month } = formatDayMonth(alert.dueDate);
+          // M36, ISSUES.md — same overdue-must-be-red rule as the metric
+          // grid and digest badges above; a deadline that hasn't passed
+          // yet is "pending" (amber), never the brand accent.
+          const isOverdue = alert.daysUntilDue < 0;
+          const statusClasses = isOverdue ? "bg-red-50 text-red-600" : "bg-orange-50 text-orange-600";
           return (
             <div key={alert.id} className="flex items-center gap-3 px-4 py-3 border-b border-mobile-divider last:border-b-0">
-              <div className="shrink-0 w-11 h-11 rounded-full bg-mobile-accent-100 text-mobile-accent-700 flex flex-col items-center justify-center font-bold leading-none">
+              <div className={`shrink-0 w-11 h-11 rounded-full flex flex-col items-center justify-center font-bold leading-none ${statusClasses}`}>
                 <span className="text-sm">{day}</span>
                 <span className="text-[9px] uppercase">{month}</span>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-sm">{alert.filingType}</div>
-                <div className="text-xs text-mobile-neutral-600">
+                <div className={`text-xs ${isOverdue ? "text-red-600 font-semibold" : "text-orange-600"}`}>
                   {alert.clientsAffected} client{alert.clientsAffected === 1 ? "" : "s"} ·{" "}
-                  {alert.daysUntilDue < 0 ? `${Math.abs(alert.daysUntilDue)}d overdue` : `in ${alert.daysUntilDue}d`}
+                  {isOverdue ? `${Math.abs(alert.daysUntilDue)}d overdue` : `in ${alert.daysUntilDue}d`}
                 </div>
               </div>
               <button onClick={() => navigate("/tasks")} className="text-mobile-accent-700 text-xs font-bold px-1.5">

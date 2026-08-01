@@ -40,7 +40,7 @@ export function MobileTasksScreen({ tasks, stats, onStatusChange }: MobileTasksS
     <div className="bg-mobile-bg font-mobile-body text-mobile-text -mx-4 -mt-4 px-4 pt-6 pb-8 min-h-[calc(100vh-8rem)]">
       <span className="font-mobile-heading font-normal text-2xl block mb-1">Tasks</span>
       <p className="text-xs text-mobile-neutral-600 mb-3.5">
-        {stats.total} total · {stats.pending} pending · <span className="text-mobile-accent-700 font-bold">{stats.overdue} overdue</span>
+        {stats.total} total · {stats.pending} pending · <span className="text-red-600 font-bold">{stats.overdue} overdue</span>
       </p>
 
       <div className="flex bg-mobile-surface rounded-full p-1 mb-4">
