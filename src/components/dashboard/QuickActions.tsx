@@ -33,8 +33,15 @@ export function QuickActions() {
           action color elsewhere. Add New Client (the most common action —
           it's first in MobileFAB.tsx too) is now the sole accent/primary
           button; Create Task and Generate Invoice are secondary/outline so
-          the eye lands on one action first; WhatsApp green stays reserved
-          for WhatsApp-specific actions only, as it already was. */}
+          the eye lands on one action first.
+          M36 round 4, ISSUES.md — Bulk WhatsApp Reminder was also filled,
+          so two solid buttons on one screen competed for the same
+          attention Add New Client is supposed to own alone. Moved to the
+          same outline treatment as Create Task/Generate Invoice, but kept
+          in WhatsApp's own green (border + icon + text) rather than the
+          neutral accent-tinted icon those two use — it still needs to
+          read as "the WhatsApp one" at a glance, just without being the
+          one filled block competing with Add New Client. */}
       <div className="grid grid-cols-2 gap-3">
         <motion.button
           type="button"
@@ -52,7 +59,7 @@ export function QuickActions() {
           type="button"
           whileTap={{ scale: 0.97 }}
           onClick={() => setWhatsappOpen(true)}
-          className="bg-whatsapp text-whatsapp-foreground rounded-lg p-4 flex flex-col items-center gap-2 text-center card-shadow hover:opacity-90 transition-opacity"
+          className="bg-card border-2 border-whatsapp text-whatsapp rounded-lg p-4 flex flex-col items-center gap-2 text-center card-shadow hover:bg-whatsapp/10 transition-colors"
         >
           <Send className="h-6 w-6" />
           <span className="text-sm font-medium">

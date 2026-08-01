@@ -1,5 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700&display=swap');
+/* M36 round 4, ISSUES.md — Newsreader replaces Caprasimo for the desktop
+   wordmark only (see the `display` font token below): warm and
+   restrained rather than a heavy bracketed slab that read editorial/
+   vintage at page-title sizes. Mobile's own wordmark keeps Caprasimo
+   (mobile-heading token, untouched) — the two are still on separate
+   design systems, not yet unified. */
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,600;0,700;1,600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -42,13 +49,25 @@
 
     /* M36, round 3 — orange-on-navy-with-a-serif-wordmark turned out to
        be QwikCA's exact look too (the closest direct competitor), so
-       resembling them costs us, not them. Moved off orange entirely to
-       a deep teal, keeping navy --primary. Teal also fully separates
-       from --warning (gold, H50) — 135° apart on the wheel, vs the old
-       orange's 20-30° gap that read as a near-duplicate next to it.
-       HSL(185 75% 28%) ≈ rgb(18,116,125); white text on it ≈ 5.5:1,
-       verified via the same relative-luminance method as L11/round 2. */
-    --accent: 185 75% 28%;
+       resembling them costs us, not them. Moved off orange to teal,
+       keeping navy --primary.
+       Round 4 — the teal above (H185) sat too close to --whatsapp
+       (H142, only 43° apart) to hold "green = sends a WhatsApp
+       message" as a distinct signal; the two read as shades of one
+       idea next to each other (e.g. Quick Actions). Checked switching
+       --whatsapp to WhatsApp's literal brand green (#25D366) instead —
+       converts to ~142° 70% 49%, which is what --whatsapp already is,
+       so that option was already satisfied and not the actual lever.
+       Pushed --accent further, toward a deeper, bluer petrol (H198,
+       darker/less saturated than the original teal) instead: 56° from
+       --whatsapp (up from 43°) and reads as its own moody dark blue
+       rather than a green-adjacent teal, even though it's hue-close to
+       --primary (13°) — the lightness/saturation gap from navy (L30
+       S60 vs navy's L24 S54) keeps them visually distinct as "flat
+       structural navy" vs "vivid accent" rather than identical. HSL(198
+       60% 30%) ≈ rgb(31,95,122); white text on it ≈7:1, verified via
+       the same relative-luminance method as L11. */
+    --accent: 198 60% 30%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
@@ -133,15 +152,15 @@
   body {
     @apply bg-background text-foreground font-body antialiased tabular-nums;
   }
-  /* M36, ISSUES.md — round 2 of the Opus 5 review corrected round 1's
-     mistake here: Caprasimo is a heavy single-weight (400) display
-     face, and font-bold synthesizes extra weight on top of an already-
-     bold-looking letterform, so applying it to every page h1 read as
-     editorial/vintage rather than a compliance instrument — "Dashboard"
-     visually outranked the overdue-filing count under it. Reserved for
-     the literal "CA Munim" wordmark only now (explicit font-display
-     font-bold on those few instances — DesktopSidebar/AuthPage/
-     ResetPasswordPage); every other heading, including page titles like
+  /* M36, ISSUES.md — round 2 corrected round 1's mistake of applying
+     the display serif to every page h1 (it read editorial/vintage at
+     that weight — "Dashboard" visually outranked the overdue-filing
+     count under it). Reserved for the literal "CA Munim" wordmark only
+     (explicit font-display font-bold on those few instances —
+     DesktopSidebar/AuthPage/ResetPasswordPage; round 4 also swapped the
+     face itself, Caprasimo → Newsreader, since even wordmark-scoped
+     the old heavy bracketed slab kept reading as too much for a
+     compliance tool). Every other heading, including page titles like
      "Dashboard"/"Clients", is back on the plain sans base rule below
      (page titles additionally set font-medium explicitly at their own
      call sites, one step lighter than this h2-h6 default, so the brand

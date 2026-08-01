@@ -43,25 +43,29 @@ function waLink(phone: string) {
 export function ClientListTable({ clients, onEdit, onView }: ClientListTableProps) {
   return (
     <div className="hidden md:block overflow-x-auto rounded-md border">
-      {/* M43/M36, ISSUES.md — the table's default auto layout, combined
-          with `w-full` capping it at the container's width, meant 7
-          columns fighting over a fixed width negotiated by squeezing
-          whichever cell had the least resistance — first Phone (fixed
-          separately), then Last Activity ("24/07/" — a clipped date is
-          worse than a hidden one, since it reads as data rather than an
-          error). table-fixed + explicit per-column widths stops that
-          negotiation entirely; min-w on the table means a narrow
-          viewport gets a real horizontal scrollbar (the wrapper above
-          is already overflow-x-auto) instead of compression. */}
-      <Table className="table-fixed min-w-[1040px]">
+      {/* M43/M36, ISSUES.md — round 3: the table-fixed + min-w-[1040px]
+          fix from round 2 wasn't actually a CSS clipping bug — it made
+          the table genuinely wider than a viewport narrower than
+          ~1040px, so whatever column sat at the edge of what was
+          actually visible (without the user scrolling right) rendered
+          as a partial glyph, which read exactly like clipping and kept
+          shifting between rounds as the column widths changed. Fixed
+          for real this time by not requiring horizontal scroll at all
+          below `xl` (1280px): Last Activity — the least-valuable column
+          on this row, PAN/Phone/Pending Fees all earn their space more
+          — is hidden entirely under that width instead of fighting for
+          it, so the table just fits. Client Name is the one column
+          without an explicit width, so it absorbs whatever's left of
+          the table's 100% width per the CSS table-layout:fixed spec. */}
+      <Table className="table-fixed w-full">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[260px]">Client Name</TableHead>
+            <TableHead>Client Name</TableHead>
             <TableHead className="w-[130px]">PAN</TableHead>
             <TableHead className="w-[140px]">Phone</TableHead>
             <TableHead className="w-[110px] text-center">Active Tasks</TableHead>
             <TableHead className="w-[130px] text-right">Pending Fees</TableHead>
-            <TableHead className="w-[120px]">Last Activity</TableHead>
+            <TableHead className="w-[120px] hidden xl:table-cell whitespace-nowrap">Last Activity</TableHead>
             <TableHead className="w-[140px] sticky right-0 z-10 bg-background text-right shadow-[-8px_0_12px_-12px_rgba(0,0,0,0.45)]">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -112,7 +116,7 @@ export function ClientListTable({ clients, onEdit, onView }: ClientListTableProp
                   ₹{client.pendingFees.toLocaleString("en-IN")}
                 </span>
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
+              <TableCell className="w-[120px] hidden xl:table-cell text-sm text-muted-foreground whitespace-nowrap">
                 {new Date(client.lastActivity).toLocaleDateString("en-IN", {
                   day: "2-digit",
                   month: "2-digit",
