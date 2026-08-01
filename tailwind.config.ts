@@ -17,15 +17,15 @@ export default {
         heading: ['"Plus Jakarta Sans"', 'sans-serif'],
         body: ['"DM Sans"', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
-        // M36, ISSUES.md — desktop's own wordmark-only token. Was
-        // Caprasimo (round 1), same face as mobile's "mobile-heading" —
-        // round 4 swapped it to Newsreader (warm, restrained) after
-        // repeated feedback that Caprasimo's heavy bracketed-slab weight
-        // read editorial/vintage rather than fitting a compliance tool,
-        // even scoped to the wordmark alone. mobile-heading keeps
-        // Caprasimo, unchanged — the two systems aren't unified yet.
+        // M36, ISSUES.md — desktop's wordmark-only token. Was Caprasimo
+        // (round 1); round 4 swapped it to Newsreader (warm, restrained)
+        // after repeated feedback that Caprasimo's heavy bracketed-slab
+        // weight read editorial/vintage rather than fitting a compliance
+        // tool, even scoped to the wordmark alone. Round 5 synced
+        // mobile-heading to the same Newsreader, for the same reason —
+        // mobile's own wordmark had the identical weight problem.
         display: ['"Newsreader"', 'serif'],
-        "mobile-heading": ['"Caprasimo"', 'serif'],
+        "mobile-heading": ['"Newsreader"', 'serif'],
         "mobile-body": ['"Figtree"', 'sans-serif'],
       },
       colors: {

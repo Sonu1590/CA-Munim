@@ -1,11 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700&display=swap');
-/* M36 round 4, ISSUES.md — Newsreader replaces Caprasimo for the desktop
-   wordmark only (see the `display` font token below): warm and
-   restrained rather than a heavy bracketed slab that read editorial/
-   vintage at page-title sizes. Mobile's own wordmark keeps Caprasimo
-   (mobile-heading token, untouched) — the two are still on separate
-   design systems, not yet unified. */
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap');
+/* M36 round 4-5, ISSUES.md — Newsreader replaces Caprasimo for both
+   desktop's and mobile's wordmark (the `display` and `mobile-heading`
+   font tokens below both point to it now): warm and restrained rather
+   than a heavy bracketed slab that read editorial/vintage at page-title
+   sizes, on either app. Caprasimo import dropped since nothing
+   references it anymore. */
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,600;0,700;1,600&display=swap');
 
 @tailwind base;
@@ -112,17 +112,27 @@
        above is touched. Used only by components under src/components/mobile
        and the mobile-scoped bits of layout components (bottom nav, FAB) via
        the `mobile-*` Tailwind tokens in tailwind.config.ts. Desktop never
-       references these. */
+       references these. Background/surface/text kept as-is — the cream
+       ground works for mobile's glanceable card UI in a way it doesn't for
+       desktop's data tables (that's the whole reason M36 rejected cream as
+       the desktop ground); only the accent family changed, to sync with
+       desktop's accent decision below. */
     --mobile-color-bg: #f5ead8;
     --mobile-color-surface: #ebddc5;
     --mobile-color-text: #201e1d;
     --mobile-color-divider: rgba(32, 30, 29, 0.16);
-    --mobile-color-accent: #c67139;
-    --mobile-color-accent-100: #fff2eb;
-    --mobile-color-accent-200: #ffe1d0;
-    --mobile-color-accent-600: #b2622d;
-    --mobile-color-accent-700: #8c491a;
-    --mobile-color-accent-800: #643312;
+    /* M36 round 5, ISSUES.md — synced to desktop's --accent (same H198
+       S60% petrol-blue family, just varying L per step): mobile's own
+       orange (#c67139) was the same orange QwikCA and desktop's original
+       accent used, and Opus's own competitive-analysis example ("mobile's
+       orange FAB, orange 'Mark filed,' and amber overdue badge all
+       crowding one screen") was specifically about THIS token. */
+    --mobile-color-accent: #1f5f7a;
+    --mobile-color-accent-100: #e7f3f9;
+    --mobile-color-accent-200: #cee8f3;
+    --mobile-color-accent-600: #184c62;
+    --mobile-color-accent-700: #123949;
+    --mobile-color-accent-800: #0c2631;
     --mobile-color-accent-2: #7a8a5e;
     --mobile-color-accent-2-100: #f0fae1;
     --mobile-color-accent-2-200: #e1eecc;

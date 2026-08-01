@@ -10,27 +10,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { MessageCircle, Pencil, Eye } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ClientListTableProps {
   clients: Client[];
   onEdit: (client: Client) => void;
   onView: (client: Client) => void;
 }
-
-const typeBadgeColor: Record<string, string> = {
-  Individual: "bg-blue-100 text-blue-700",
-  HUF: "bg-violet-100 text-violet-700",
-  "Sole Proprietor": "bg-teal-100 text-teal-700",
-  Partnership: "bg-amber-100 text-amber-800",
-  LLP: "bg-orange-100 text-orange-700",
-  "Private Ltd": "bg-indigo-100 text-indigo-700",
-  "Public Ltd": "bg-purple-100 text-purple-700",
-  Trust: "bg-emerald-100 text-emerald-700",
-  Society: "bg-pink-100 text-pink-700",
-  AOP: "bg-cyan-100 text-cyan-700",
-  BOI: "bg-rose-100 text-rose-700",
-};
 
 // Same wa.me convention as MobileClientsScreen.tsx's waLink() — assumes a
 // 10-digit number is a domestic Indian mobile and prefixes the country code.
@@ -43,55 +28,41 @@ function waLink(phone: string) {
 export function ClientListTable({ clients, onEdit, onView }: ClientListTableProps) {
   return (
     <div className="hidden md:block overflow-x-auto rounded-md border">
-      {/* M43/M36, ISSUES.md — round 3: the table-fixed + min-w-[1040px]
-          fix from round 2 wasn't actually a CSS clipping bug — it made
-          the table genuinely wider than a viewport narrower than
-          ~1040px, so whatever column sat at the edge of what was
-          actually visible (without the user scrolling right) rendered
-          as a partial glyph, which read exactly like clipping and kept
-          shifting between rounds as the column widths changed. Fixed
-          for real this time by not requiring horizontal scroll at all
-          below `xl` (1280px): Last Activity — the least-valuable column
-          on this row, PAN/Phone/Pending Fees all earn their space more
-          — is hidden entirely under that width instead of fighting for
-          it, so the table just fits. Client Name is the one column
-          without an explicit width, so it absorbs whatever's left of
-          the table's 100% width per the CSS table-layout:fixed spec. */}
+      {/* M36, ISSUES.md — round 5: the real bug behind the Client Name
+          column reading "Aarav Tr…" wasn't the column width at all — it
+          was a hardcoded `max-w-[14rem]` (224px) on the name `<span>`
+          itself from the M43 pass, which capped the visible name at a
+          fixed pixel width regardless of how much room the column
+          actually had, badge-beside-name or not. Fixed at the root:
+          dropped that cap, and restructured to match the stacked
+          name/type-sub-label pattern `ComplianceStatusReport.tsx`
+          already uses (type as a plain line under the name, not beside
+          it) — frees the width the badge used to take from the name's
+          own line, and now Name genuinely gets the most space (30%) of
+          any column, PAN/Phone/Pending Fees next, Last Activity (hidden
+          below `xl`) and Actions least, explicit percentages summing to
+          100% so nothing is negotiating or silently absorbing leftover
+          space. `title` gives a native tooltip for the rare name that's
+          still too long for 30% of the table. */}
       <Table className="table-fixed w-full">
         <TableHeader>
           <TableRow>
-            <TableHead>Client Name</TableHead>
-            <TableHead className="w-[130px]">PAN</TableHead>
-            <TableHead className="w-[140px]">Phone</TableHead>
-            <TableHead className="w-[110px] text-center">Active Tasks</TableHead>
-            <TableHead className="w-[130px] text-right">Pending Fees</TableHead>
-            <TableHead className="w-[120px] hidden xl:table-cell whitespace-nowrap">Last Activity</TableHead>
-            <TableHead className="w-[140px] sticky right-0 z-10 bg-background text-right shadow-[-8px_0_12px_-12px_rgba(0,0,0,0.45)]">Actions</TableHead>
+            <TableHead className="w-[30%]">Client Name</TableHead>
+            <TableHead className="w-[15%]">PAN</TableHead>
+            <TableHead className="w-[15%]">Phone</TableHead>
+            <TableHead className="w-[8%] text-center">Active Tasks</TableHead>
+            <TableHead className="w-[12%] text-right">Pending Fees</TableHead>
+            <TableHead className="w-[12%] hidden xl:table-cell whitespace-nowrap">Last Activity</TableHead>
+            <TableHead className="w-[8%] sticky right-0 z-10 bg-background text-right shadow-[-8px_0_12px_-12px_rgba(0,0,0,0.45)]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {clients.map((client) => (
             <TableRow key={client.id} className="group cursor-pointer" onClick={() => onView(client)}>
               <TableCell>
-                {/* M43, ISSUES.md — a long name (e.g. with a "Private Ltd"
-                    suffix, or a raw seed-data id) used to wrap to two
-                    lines and wrap the type badge mid-word with it.
-                    Truncate the name with a tooltip for the full value;
-                    the badge stays on one line and never shrinks. */}
-                <div className="flex items-center gap-2 min-w-0">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="font-medium truncate max-w-[14rem]">{client.name}</span>
-                    </TooltipTrigger>
-                    <TooltipContent>{client.name}</TooltipContent>
-                  </Tooltip>
-                  <span
-                    className={`shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
-                      typeBadgeColor[client.type] || "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {client.type}
-                  </span>
+                <div className="min-w-0" title={client.name}>
+                  <p className="font-medium truncate">{client.name}</p>
+                  <p className="text-xs text-muted-foreground">{client.type}</p>
                 </div>
               </TableCell>
               <TableCell>
@@ -116,7 +87,7 @@ export function ClientListTable({ clients, onEdit, onView }: ClientListTableProp
                   ₹{client.pendingFees.toLocaleString("en-IN")}
                 </span>
               </TableCell>
-              <TableCell className="w-[120px] hidden xl:table-cell text-sm text-muted-foreground whitespace-nowrap">
+              <TableCell className="hidden xl:table-cell text-sm text-muted-foreground whitespace-nowrap">
                 {new Date(client.lastActivity).toLocaleDateString("en-IN", {
                   day: "2-digit",
                   month: "2-digit",
