@@ -40,12 +40,15 @@
        249,247,246) and higher still against --card — comfortably clear. */
     --muted-foreground: 25 10% 40%;
 
-    /* M36 — was 24 95% 53%: white text on it measured ~2.85:1, well
-       under WCAG AA (fails even the 3:1 large-text floor). Darkened to
-       42% lightness and shifted a few degrees redder (24→20) for real
-       separation from --warning below; rgb(198,77,16) with white text
-       ≈ 4.7:1, verified via the same relative-luminance method as L11. */
-    --accent: 20 85% 42%;
+    /* M36, round 3 — orange-on-navy-with-a-serif-wordmark turned out to
+       be QwikCA's exact look too (the closest direct competitor), so
+       resembling them costs us, not them. Moved off orange entirely to
+       a deep teal, keeping navy --primary. Teal also fully separates
+       from --warning (gold, H50) — 135° apart on the wheel, vs the old
+       orange's 20-30° gap that read as a near-duplicate next to it.
+       HSL(185 75% 28%) ≈ rgb(18,116,125); white text on it ≈ 5.5:1,
+       verified via the same relative-luminance method as L11/round 2. */
+    --accent: 185 75% 28%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
