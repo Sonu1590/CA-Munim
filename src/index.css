@@ -112,15 +112,24 @@
        above is touched. Used only by components under src/components/mobile
        and the mobile-scoped bits of layout components (bottom nav, FAB) via
        the `mobile-*` Tailwind tokens in tailwind.config.ts. Desktop never
-       references these. Background/surface/text kept as-is — the cream
-       ground works for mobile's glanceable card UI in a way it doesn't for
-       desktop's data tables (that's the whole reason M36 rejected cream as
-       the desktop ground); only the accent family changed, to sync with
-       desktop's accent decision below. */
-    --mobile-color-bg: #f5ead8;
-    --mobile-color-surface: #ebddc5;
+       references these.
+       M36 round 7, ISSUES.md — ground unified to desktop's warm off-white.
+       The cream ground (#f5ead8 bg / #ebddc5 surface) was the last piece of
+       the mobile/desktop split: desktop settled on a ~30° warm *near-white*
+       (--background 30 20% 97% ≈ rgb 250,248,247), and mobile's much darker,
+       yellower cream read as a different product beside it. Moved bg/surface
+       and the top of the neutral ramp onto the same 30°-hue near-white family
+       (bg ≈ desktop --background, cards a touch lighter still so the glanceable
+       card UI keeps its ground/card layering), while leaving neutral-500..900
+       — the text/dark end — unchanged, since those already clear WCAG on a
+       lighter ground and re-hueing them only risks contrast regressions. This
+       is a token-level change (all mobile screens shift together); there is
+       deliberately no per-screen ground override — that pattern (the reverted
+       .theme-organic pilot) was already rejected. */
+    --mobile-color-bg: #f7f3ef;
+    --mobile-color-surface: #ece6de;
     --mobile-color-text: #201e1d;
-    --mobile-color-divider: rgba(32, 30, 29, 0.16);
+    --mobile-color-divider: rgba(32, 30, 29, 0.12);
     /* M36 round 5, ISSUES.md — synced to desktop's --accent (same H198
        S60% petrol-blue family, just varying L per step): mobile's own
        orange (#c67139) was the same orange QwikCA and desktop's original
@@ -138,10 +147,15 @@
     --mobile-color-accent-2-200: #e1eecc;
     --mobile-color-accent-2-800: #3d472b;
     --mobile-color-accent-2-900: #272e1b;
-    --mobile-color-neutral-100: #f9f4ed;
-    --mobile-color-neutral-200: #eee7db;
-    --mobile-color-neutral-300: #dcd3c4;
-    --mobile-color-neutral-400: #c0b6a5;
+    /* neutral-100/200 lightened to near-white so cards keep sitting *above*
+       the new off-white ground (100 was #f9f4ed, only a hair off the old
+       cream bg); 300/400 slightly desaturated so borders/checkboxes don't
+       read yellow against the cooler ground. 500-900 unchanged — they're the
+       text/dark end and already meet contrast on a lighter ground. */
+    --mobile-color-neutral-100: #fdfbf9;
+    --mobile-color-neutral-200: #f2ede7;
+    --mobile-color-neutral-300: #e4ddd3;
+    --mobile-color-neutral-400: #c7bdae;
     --mobile-color-neutral-500: #a19786;
     --mobile-color-neutral-600: #82796a;
     --mobile-color-neutral-700: #645c50;
