@@ -25,9 +25,16 @@ export const filingTypes: FilingTypeMeta[] = [
   { id: "gstr3b", label: "GSTR-3B (Monthly)", filingType: "GSTR-3B_MONTHLY_ABOVE5CR" },
   { id: "gstr1", label: "GSTR-1 (Outward Supplies)", filingType: "GSTR-1_MONTHLY" },
   { id: "gstr9", label: "GSTR-9 (Annual Return)", filingType: "GSTR-9" },
+  { id: "cmp08", label: "CMP-08 (Composition Quarterly)", filingType: "CMP-08" },
   { id: "itr", label: "ITR (Income Tax Return)", filingType: "ITR_NON_AUDIT" },
+  { id: "taxAudit", label: "Tax Audit Report (Form 3CD)", filingType: "TAX_AUDIT" },
   { id: "tds", label: "TDS Return (24Q / 26Q)", filingType: "TDS_RETURN_24Q_26Q" },
+  { id: "tdsChallan", label: "TDS Challan (Late Deposit)", filingType: "TDS_CHALLAN" },
+  { id: "form16", label: "Form 16 (TDS Certificate)", filingType: "FORM_16" },
   { id: "roc", label: "ROC Annual Filing (AOC-4 / MGT-7)", filingType: "ROC_ANNUAL_FILING" },
+  { id: "adt1", label: "ADT-1 (Auditor Appointment)", filingType: "ADT-1" },
+  { id: "inc20a", label: "INC-20A (Commencement of Business)", filingType: "INC-20A" },
+  { id: "pas3", label: "PAS-3 (Return of Allotment)", filingType: "PAS-3" },
   { id: "advTax", label: "Advance Tax Shortfall", filingType: null },
 ];
 
@@ -35,9 +42,16 @@ const SECTION_LABELS: Record<string, string> = {
   gstr3b: "Section 47 of CGST Act",
   gstr1: "Section 47 of CGST Act",
   gstr9: "Section 47(2) of CGST Act",
+  cmp08: "Section 50 of CGST Act (interest)",
   itr: "Section 234F of Income Tax Act",
+  taxAudit: "Section 271B of Income Tax Act",
   tds: "Section 234E of Income Tax Act",
+  tdsChallan: "Section 201(1A) of Income Tax Act (interest)",
+  form16: "Section 272A(2)(g) of Income Tax Act",
   roc: "Section 403 of Companies Act, 2013",
+  adt1: "Section 139 / MCA additional fee",
+  inc20a: "Section 10A of Companies Act, 2013",
+  pas3: "Section 39 of Companies Act, 2013",
   advTax: "Section 234B/234C of Income Tax Act",
 };
 

@@ -28,6 +28,9 @@ export default function PenaltyCalculator() {
   const [isNilReturn, setIsNilReturn] = useState(false);
   const [incomeBelow5L, setIncomeBelow5L] = useState(false);
   const [actualShortfall, setActualShortfall] = useState("");
+  const [tdsAmount, setTdsAmount] = useState("");
+  const [taxAmount, setTaxAmount] = useState("");
+  const [nominalCapital, setNominalCapital] = useState("");
   const [rules, setRules] = useState<ComplianceRule[]>([]);
   const [rulesError, setRulesError] = useState<string | null>(null);
 
@@ -38,6 +41,13 @@ export default function PenaltyCalculator() {
   }, []);
 
   const isGstFiling = GST_FILING_IDS.includes(filingId);
+  // Turnover feeds two different things: the GST late-fee cap slab, and the
+  // 0.5%-of-turnover base for the Sec 271B tax-audit penalty.
+  const needsTurnover = (isGstFiling && !isNilReturn) || filingId === "taxAudit";
+  // TDS amount caps or is the interest principal for these three.
+  const needsTdsAmount = filingId === "tds" || filingId === "tdsChallan" || filingId === "form16";
+  const needsTaxAmount = filingId === "cmp08";
+  const needsNominalCapital = filingId === "adt1";
 
   const result = useMemo(() => {
     if (!filingId || !dueDate || !actualDate) return null;
@@ -46,8 +56,11 @@ export default function PenaltyCalculator() {
       isNilReturn,
       incomeBelow5L,
       actualShortfall: Number(actualShortfall) || 0,
+      tdsAmount: Number(tdsAmount) || 0,
+      taxAmount: Number(taxAmount) || 0,
+      nominalCapital: Number(nominalCapital) || 0,
     }, rules);
-  }, [filingId, dueDate, actualDate, turnover, isNilReturn, incomeBelow5L, actualShortfall, rules]);
+  }, [filingId, dueDate, actualDate, turnover, isNilReturn, incomeBelow5L, actualShortfall, tdsAmount, taxAmount, nominalCapital, rules]);
 
   const selectedFiling = filingTypes.find((f) => f.id === filingId);
 
@@ -136,18 +149,45 @@ export default function PenaltyCalculator() {
             </div>
 
             {isGstFiling && (
-              <div className="space-y-3 pt-2 border-t">
-                <div className="flex items-center gap-2">
-                  <Checkbox id="nilReturn" checked={isNilReturn} onCheckedChange={(v) => setIsNilReturn(v === true)} />
-                  <Label htmlFor="nilReturn" className="font-normal cursor-pointer">This is a nil return (₹20/day, capped at ₹500)</Label>
-                </div>
-                {!isNilReturn && (
-                  <div>
-                    <Label>Annual Turnover (₹)</Label>
-                    <Input type="number" placeholder="e.g. 8000000" value={turnover} onChange={(e) => setTurnover(e.target.value)} className="mt-1" />
-                    <p className="text-xs text-muted-foreground mt-1">Determines the late-fee cap slab.</p>
-                  </div>
-                )}
+              <div className="flex items-center gap-2 pt-2 border-t">
+                <Checkbox id="nilReturn" checked={isNilReturn} onCheckedChange={(v) => setIsNilReturn(v === true)} />
+                <Label htmlFor="nilReturn" className="font-normal cursor-pointer">This is a nil return (₹20/day, capped at ₹500)</Label>
+              </div>
+            )}
+
+            {needsTurnover && (
+              <div className="pt-2 border-t">
+                <Label>Annual Turnover (₹)</Label>
+                <Input type="number" placeholder="e.g. 8000000" value={turnover} onChange={(e) => setTurnover(e.target.value)} className="mt-1" />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {filingId === "taxAudit" ? "The Sec 271B penalty is 0.5% of turnover, capped at ₹1,50,000." : "Determines the late-fee cap slab."}
+                </p>
+              </div>
+            )}
+
+            {needsTdsAmount && (
+              <div className="pt-2 border-t">
+                <Label>TDS Amount (₹)</Label>
+                <Input type="number" placeholder="e.g. 60000" value={tdsAmount} onChange={(e) => setTdsAmount(e.target.value)} className="mt-1" />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {filingId === "tdsChallan" ? "Interest u/s 201(1A) is charged on this at 1.5% per month." : "The late fee is capped at the total TDS amount."}
+                </p>
+              </div>
+            )}
+
+            {needsTaxAmount && (
+              <div className="pt-2 border-t">
+                <Label>Composition Tax Payable (₹)</Label>
+                <Input type="number" placeholder="e.g. 25000" value={taxAmount} onChange={(e) => setTaxAmount(e.target.value)} className="mt-1" />
+                <p className="text-xs text-muted-foreground mt-1">CMP-08 has no late fee — interest u/s 50 is charged on this at 18% p.a.</p>
+              </div>
+            )}
+
+            {needsNominalCapital && (
+              <div className="pt-2 border-t">
+                <Label>Nominal Share Capital (₹)</Label>
+                <Input type="number" placeholder="e.g. 1000000" value={nominalCapital} onChange={(e) => setNominalCapital(e.target.value)} className="mt-1" />
+                <p className="text-xs text-muted-foreground mt-1">Sets the MCA base fee; the additional fee is that fee × a delay multiplier.</p>
               </div>
             )}
 

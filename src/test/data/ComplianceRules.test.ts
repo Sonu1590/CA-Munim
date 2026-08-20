@@ -188,4 +188,61 @@ describe("computeLateFee", () => {
     const buggy = rule({ lateFeeRule: { flat: true, per_day: 5000 } as any });
     expect(computeLateFee(buggy, 40, {})?.amount).toBe(0);
   });
+
+  // H6 — the 7 previously-null filing types, each by its real statutory basis.
+  it("PAS-3 (Sec 39(5)): ₹1,000/day capped FLAT at ₹1,00,000, no turnover scaling", () => {
+    const r = rule({ lateFeeRule: { per_day: 1000, hard_max: 100000 } });
+    expect(computeLateFee(r, 40, {})?.amount).toBe(40000);
+    // Past the cap, and a huge turnover must NOT scale it (unlike GST `max`).
+    expect(computeLateFee(r, 500, { turnover: 500_000_000 })?.amount).toBe(100000);
+    expect(computeLateFee(r, 0, {})?.amount).toBe(0);
+  });
+
+  it("INC-20A (Sec 10A): flat ₹50,000 company + ₹1,000/day officer capped ₹1,00,000", () => {
+    const r = rule({ lateFeeRule: { company_flat: 50000, officer_per_day: 1000, officer_max: 100000 } });
+    expect(computeLateFee(r, 40, {})?.amount).toBe(90000); // 50000 + 40*1000
+    expect(computeLateFee(r, 500, {})?.amount).toBe(150000); // 50000 + capped 100000
+    expect(computeLateFee(r, 0, {})?.amount).toBe(0);
+  });
+
+  it("Tax audit (Sec 271B): flat 0.5% of turnover capped ₹1,50,000, not per-day", () => {
+    const r = rule({ lateFeeRule: { flat_pct_of_turnover: 0.005, max_amount: 150000 } });
+    expect(computeLateFee(r, 1, { turnover: 10_000_000 })?.amount).toBe(50000); // 0.5% of 1cr
+    // Flat: 200 days late gives the same figure as 1 day — it doesn't accrue.
+    expect(computeLateFee(r, 200, { turnover: 10_000_000 })?.amount).toBe(50000);
+    expect(computeLateFee(r, 40, { turnover: 100_000_000 })?.amount).toBe(150000); // 0.5% of 10cr capped
+    expect(computeLateFee(r, 0, { turnover: 10_000_000 })?.amount).toBe(0);
+  });
+
+  it("CMP-08 (Sec 50): 18% p.a. interest on tax, accrued per day", () => {
+    const r = rule({ lateFeeRule: { interest: { rate: 0.18, period: "annual", on: "tax" } } });
+    expect(computeLateFee(r, 365, { taxAmount: 100000 })?.amount).toBe(18000); // full year = 18%
+    expect(computeLateFee(r, 0, { taxAmount: 100000 })?.amount).toBe(0);
+    // No principal entered → ₹0 with a prompt, not a crash.
+    expect(computeLateFee(r, 30, {})?.amount).toBe(0);
+  });
+
+  it("TDS challan (Sec 201(1A)): 1.5% per month or part on TDS", () => {
+    const r = rule({ lateFeeRule: { interest: { rate: 0.015, period: "monthly", on: "tds" } } });
+    expect(computeLateFee(r, 30, { tdsAmount: 100000 })?.amount).toBe(1500); // 1 month
+    expect(computeLateFee(r, 31, { tdsAmount: 100000 })?.amount).toBe(3000); // part month → 2
+    expect(computeLateFee(r, 0, { tdsAmount: 100000 })?.amount).toBe(0);
+  });
+
+  it("ADT-1 (Sec 139): MCA base fee by nominal capital × delay multiplier", () => {
+    const r = rule({ lateFeeRule: { mca_capital_slab_fee: true } });
+    // ₹10L capital → ₹400 base; 40 days late → 4x.
+    expect(computeLateFee(r, 40, { nominalCapital: 1_000_000 })?.amount).toBe(1600);
+    // ₹2cr capital → ₹600 base; 200 days → 12x.
+    expect(computeLateFee(r, 200, { nominalCapital: 20_000_000 })?.amount).toBe(7200);
+    // <₹1L capital → ₹200 base; 20 days → 2x.
+    expect(computeLateFee(r, 20, { nominalCapital: 50_000 })?.amount).toBe(400);
+    expect(computeLateFee(r, 0, { nominalCapital: 1_000_000 })?.amount).toBe(0);
+  });
+
+  it("Form 16 (Sec 272A(2)(g)): ₹100/day capped at the TDS amount", () => {
+    const r = rule({ lateFeeRule: { per_day: 100, max_equals_tds: true } });
+    expect(computeLateFee(r, 10, { tdsAmount: 60000 })?.amount).toBe(1000);
+    expect(computeLateFee(r, 1000, { tdsAmount: 60000 })?.amount).toBe(60000); // capped at TDS
+  });
 });

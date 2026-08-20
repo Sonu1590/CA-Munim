@@ -92,6 +92,31 @@ interface LateFeeRule {
   // itself changes by turnover slab, not just the cap. turnover_upto: null
   // marks the last (unbounded) slab; slabs must be ascending by turnover_upto.
   slabs?: { turnover_upto: number | null; per_day: number; max_percentage: number }[];
+  // PAS-3 (Sec 39(5)): ₹per_day up to a FLAT hard cap — distinct from `max`
+  // above, which is the GST base cap that scales with turnover. hard_max
+  // never scales.
+  hard_max?: number;
+  // INC-20A (Sec 10A): a flat penalty on the company PLUS a separate per-day
+  // penalty on every officer in default (capped) — compound, not expressible
+  // as any single flat/per-day shape.
+  company_flat?: number;
+  officer_per_day?: number;
+  officer_max?: number;
+  // Tax audit report (Sec 271B): a one-time percentage of turnover with an
+  // absolute cap — a flat penalty on default, NOT a per-day accrual (so
+  // daysLate only gates whether it applies), unlike max_percentage above
+  // which caps a per-day accrual.
+  flat_pct_of_turnover?: number;
+  max_amount?: number;
+  // CMP-08 (Sec 50) / TDS challan (Sec 201(1A)): the real charge is interest
+  // on unpaid tax/TDS, not a filing late fee. `on` selects which PenaltyInput
+  // carries the principal; "annual" accrues per day (×days/365, GST style),
+  // "monthly" per month-or-part (×ceil(days/30), TDS style).
+  interest?: { rate: number; period: "annual" | "monthly"; on: "tax" | "tds" };
+  // ADT-1 (Sec 139): MCA additional fee = a nominal-capital-based normal fee
+  // × a delay multiplier — kept the multiplier structure that AOC-4/MGT-7
+  // dropped for a flat ₹100/day in 2018. Needs inputs.nominalCapital.
+  mca_capital_slab_fee?: boolean;
 }
 
 export async function fetchComplianceRulesFromSupabase(): Promise<ComplianceRule[]> {
@@ -211,6 +236,10 @@ export interface PenaltyInputs {
   incomeBelow5L?: boolean;
   actualShortfall?: number;
   tdsAmount?: number;
+  // Principal for interest-based penalties (CMP-08's unpaid composition tax).
+  taxAmount?: number;
+  // Nominal share capital, for ADT-1's capital-slab MCA additional fee.
+  nominalCapital?: number;
 }
 
 export function computeLateFee(rule: ComplianceRule, daysLate: number, inputs: PenaltyInputs = {}): { amount: number; breakdown: string } | null {
@@ -226,6 +255,61 @@ export function computeLateFee(rule: ComplianceRule, daysLate: number, inputs: P
   if (feeRule.flat) {
     const amount = daysLate > 0 ? (feeRule.amount ?? 0) : 0;
     return { amount, breakdown: `Flat ₹${amount.toLocaleString("en-IN")}` };
+  }
+
+  // INC-20A (Sec 10A): flat ₹50,000 on the company PLUS ₹1,000/day on each
+  // officer in default, the officer portion capped at ₹1,00,000.
+  if (feeRule.company_flat != null) {
+    if (daysLate <= 0) return { amount: 0, breakdown: "Filed on time — no penalty" };
+    const officer = Math.min(daysLate * (feeRule.officer_per_day ?? 0), feeRule.officer_max ?? Infinity);
+    const amount = feeRule.company_flat + officer;
+    return {
+      amount,
+      breakdown: `Company ₹${feeRule.company_flat.toLocaleString("en-IN")} + officer ₹${(feeRule.officer_per_day ?? 0).toLocaleString("en-IN")}/day × ${daysLate} days${feeRule.officer_max ? ` (capped ₹${feeRule.officer_max.toLocaleString("en-IN")})` : ""}`,
+    };
+  }
+
+  // Tax audit (Sec 271B): flat 0.5% of turnover once in default, capped at
+  // ₹1.5L — daysLate only gates whether it applies, it doesn't accrue.
+  if (feeRule.flat_pct_of_turnover != null) {
+    if (daysLate <= 0) return { amount: 0, breakdown: "Filed on time — no penalty" };
+    const turnover = inputs.turnover ?? 0;
+    const raw = Math.round(turnover * feeRule.flat_pct_of_turnover);
+    const amount = Math.min(raw, feeRule.max_amount ?? Infinity);
+    const capped = feeRule.max_amount != null && raw > feeRule.max_amount;
+    return {
+      amount,
+      breakdown: `${(feeRule.flat_pct_of_turnover * 100).toFixed(2)}% of turnover = ₹${raw.toLocaleString("en-IN")}${capped ? ` (capped at ₹${feeRule.max_amount!.toLocaleString("en-IN")})` : ""}`,
+    };
+  }
+
+  // CMP-08 (Sec 50) / TDS challan (Sec 201(1A)): interest on unpaid tax/TDS,
+  // not a filing late fee. "annual" accrues per day (×days/365), "monthly"
+  // per month-or-part (×ceil(days/30)).
+  if (feeRule.interest) {
+    const { rate, period, on } = feeRule.interest;
+    const principal = on === "tds" ? (inputs.tdsAmount ?? 0) : (inputs.taxAmount ?? 0);
+    if (daysLate <= 0) return { amount: 0, breakdown: "Paid on time — no interest" };
+    if (principal <= 0) return { amount: 0, breakdown: `Enter the ${on === "tds" ? "TDS" : "tax"} amount to compute interest` };
+    if (period === "monthly") {
+      const months = Math.ceil(daysLate / 30);
+      const amount = Math.round(principal * rate * months);
+      return { amount, breakdown: `Interest @${(rate * 100).toFixed(1)}%/month × ${months} month(s) on ₹${principal.toLocaleString("en-IN")}` };
+    }
+    const amount = Math.round(principal * rate * (daysLate / 365));
+    return { amount, breakdown: `Interest @${(rate * 100).toFixed(0)}% p.a. × ${daysLate}/365 days on ₹${principal.toLocaleString("en-IN")}` };
+  }
+
+  // ADT-1 (Sec 139): MCA additional fee = a normal fee set by nominal share
+  // capital × a delay multiplier (Companies (Registration Offices and Fees)
+  // Rules) — the multiplier structure AOC-4/MGT-7 left behind in 2018.
+  if (feeRule.mca_capital_slab_fee) {
+    if (daysLate <= 0) return { amount: 0, breakdown: "Filed on time — no additional fee" };
+    const cap = inputs.nominalCapital ?? 0;
+    const baseFee = cap < 100_000 ? 200 : cap < 500_000 ? 300 : cap < 2_500_000 ? 400 : cap < 10_000_000 ? 500 : 600;
+    const mult = daysLate <= 30 ? 2 : daysLate <= 60 ? 4 : daysLate <= 90 ? 6 : daysLate <= 180 ? 10 : 12;
+    const amount = baseFee * mult;
+    return { amount, breakdown: `Normal fee ₹${baseFee} (by nominal capital) × ${mult}× additional fee (${daysLate} days late)` };
   }
 
   if (feeRule.nil_per_day != null && inputs.isNilReturn) {
@@ -253,6 +337,14 @@ export function computeLateFee(rule: ComplianceRule, daysLate: number, inputs: P
     const perDay = feeRule.per_day ?? 0;
     const amount = Math.min(daysLate * perDay, inputs.tdsAmount ?? Infinity);
     return { amount, breakdown: `₹${perDay}/day × ${daysLate} days u/s ${rule.interestSection ?? ""} (capped at TDS amount)` };
+  }
+
+  // PAS-3 (Sec 39(5)): ₹per_day up to a FLAT ₹1,00,000 cap — no turnover
+  // scaling, unlike the GST `max` branch just below. Must come first: a rule
+  // with hard_max never wants the GST scaling.
+  if (feeRule.per_day != null && feeRule.hard_max != null) {
+    const amount = Math.min(daysLate * feeRule.per_day, feeRule.hard_max);
+    return { amount, breakdown: `₹${feeRule.per_day.toLocaleString("en-IN")}/day × ${daysLate} days (capped at ₹${feeRule.hard_max.toLocaleString("en-IN")})` };
   }
 
   if (feeRule.per_day != null && feeRule.max != null) {
