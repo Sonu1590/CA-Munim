@@ -170,4 +170,22 @@ describe("computeLateFee", () => {
     expect(computeLateFee(r, 5, {})?.amount).toBe(5000);
     expect(computeLateFee(r, 0, {})?.amount).toBe(0);
   });
+
+  // H6 (ISSUES.md): DIR-3 KYC is a one-time flat ₹5,000 (Rule 12A), encoded as
+  // {flat:true, amount:5000}. The live row briefly stored {flat:true,
+  // per_day:5000}, which this branch ignores (it reads `amount`), silently
+  // yielding ₹0 — the exact bug the 20260801120000 migration fixed. These
+  // cases lock the flat shape to the live values so a regression to `per_day`
+  // can't pass unnoticed again.
+  it("applies a flat one-time late fee (DIR-3 KYC, Rule 12A)", () => {
+    const r = rule({ lateFeeRule: { flat: true, amount: 5000 } });
+    expect(computeLateFee(r, 40, {})?.amount).toBe(5000); // any lateness → full flat fee
+    expect(computeLateFee(r, 1, {})?.amount).toBe(5000);
+    expect(computeLateFee(r, 0, {})?.amount).toBe(0); // not late → nothing
+  });
+
+  it("yields ₹0 for a flat rule mis-encoded with per_day instead of amount — documents the DIR-3 KYC bug", () => {
+    const buggy = rule({ lateFeeRule: { flat: true, per_day: 5000 } as any });
+    expect(computeLateFee(buggy, 40, {})?.amount).toBe(0);
+  });
 });
