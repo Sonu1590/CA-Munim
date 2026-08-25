@@ -1,5 +1,5 @@
 import { useState } from "react";
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
