@@ -13,7 +13,7 @@ const navItems = [
   { label: "Clients", icon: Users, path: "/clients" },
   { label: "Tasks & Deadlines", icon: ClipboardList, path: "/tasks" },
   { label: "Documents", icon: FolderOpen, path: "/documents" },
-  { label: "WhatsApp Center", icon: MessageCircle, path: "/whatsapp", beta: true },
+  { label: "WhatsApp Center", icon: MessageCircle, path: "/whatsapp" },
   { label: "Billing & Fees", icon: Receipt, path: "/billing", adminOnly: true },
   { label: "Reports", icon: BarChart3, path: "/reports" },
   { label: "Penalty Calculator", icon: Calculator, path: "/penalty-calculator" },
@@ -155,14 +155,7 @@ export function DesktopSidebar() {
             }
           >
             <item.icon className="h-5 w-5 shrink-0" />
-            <span className="flex items-center gap-2">
-              {item.label}
-              {item.beta ? (
-                <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-                  Beta
-                </span>
-              ) : null}
-            </span>
+            <span>{item.label}</span>
           </NavLink>
         ))}
       </nav>
