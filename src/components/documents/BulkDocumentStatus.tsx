@@ -48,10 +48,18 @@ export function BulkDocumentStatus() {
     try {
       const { data: client, error: clientErr } = await supabase.from("clients").select("phone").eq("id", req.clientId).single();
       if (clientErr || !client) throw new Error("Could not look up this client's phone number.");
+      // Rebuild the same upload link the original request carried, so the
+      // reminder's {{upload_link}} isn't sent as "N/A" (compileTemplateForClient's
+      // default). Also pass the request's real due date. Fall back gracefully
+      // if an older request has no token.
+      const overrides: Record<string, string> = {};
+      if (req.uploadToken) overrides.upload_link = `${window.location.origin}/upload/${req.uploadToken}`;
+      if (req.dueDate) overrides.due_date = new Date(req.dueDate).toLocaleDateString("en-IN");
       await sendQuickReminder(
         { id: req.clientId, name: req.clientName, phone: client.phone, servicesSubscribed: [req.documentType] },
         "Documents Pending",
-        selectedFY
+        selectedFY,
+        overrides
       );
       toast.success(`Reminder sent to ${req.clientName}`);
     } catch (err: any) {

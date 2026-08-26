@@ -24,6 +24,10 @@ export interface DocumentRequest {
   dueDate: string;
   status: "pending" | "submitted" | "overdue";
   requestedOn: string;
+  // The per-request upload token, so a "Send Reminder" can rebuild the same
+  // /upload/<token> link the original request used (otherwise the reminder's
+  // {{upload_link}} falls back to "N/A" — the bug this fixes).
+  uploadToken?: string;
 }
 
 export const documentCategories: DocumentCategory[] = [
@@ -115,6 +119,7 @@ export async function fetchDocumentRequestsFromSupabase(): Promise<DocumentReque
       due_date,
       status,
       created_at,
+      upload_token,
       clients(name)
     `)
     .order('created_at', { ascending: false })
@@ -130,5 +135,6 @@ export async function fetchDocumentRequestsFromSupabase(): Promise<DocumentReque
     dueDate: row.due_date ?? '',
     status: row.status as "pending" | "submitted" | "overdue",
     requestedOn: row.created_at?.split('T')[0] ?? '',
+    uploadToken: row.upload_token ?? undefined,
   }))
 }

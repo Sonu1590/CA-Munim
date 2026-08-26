@@ -89,6 +89,36 @@ describe("BulkDocumentStatus", () => {
     await waitFor(() => expect(mockToast.success).toHaveBeenCalledWith("Reminder sent to Amit Traders"));
   });
 
+  // Regression guard: the reminder must rebuild the request's /upload/<token>
+  // link and pass it as the upload_link override — otherwise the template's
+  // {{upload_link}} is sent as "N/A" (the bug where the WhatsApp message had no
+  // upload link). The New-Request modal already did this; the reminder path
+  // didn't until now.
+  it("passes the rebuilt upload link (not N/A) as an override when the request has a token", async () => {
+    primePhoneLookup("919876543210");
+    mockSend.mockResolvedValue(undefined as never);
+    const desktop = await renderStatus([request({ id: "r1", clientId: "c1", uploadToken: "abctoken123", dueDate: "2026-06-20" })]);
+
+    fireEvent.click(desktop.getByRole("button", { name: /Remind/ }));
+
+    await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
+    const overrides = mockSend.mock.calls[0][3] as Record<string, string>;
+    expect(overrides.upload_link).toEqual(expect.stringContaining("/upload/abctoken123"));
+    expect(overrides.upload_link).not.toBe("N/A");
+  });
+
+  it("omits the upload link override (falls back gracefully) when a legacy request has no token", async () => {
+    primePhoneLookup("919876543210");
+    mockSend.mockResolvedValue(undefined as never);
+    const desktop = await renderStatus([request({ id: "r1", clientId: "c1", uploadToken: undefined })]);
+
+    fireEvent.click(desktop.getByRole("button", { name: /Remind/ }));
+
+    await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
+    const overrides = (mockSend.mock.calls[0][3] ?? {}) as Record<string, string>;
+    expect(overrides.upload_link).toBeUndefined();
+  });
+
   it("surfaces a send failure honestly instead of a fake success", async () => {
     primePhoneLookup();
     mockSend.mockRejectedValue(new Error("no template found"));
