@@ -9,6 +9,7 @@ import { documentRequestTypes } from "@/data/Documents";
 import { supabase } from "@/lib/supabase";
 import { sendQuickReminder } from "@/data/WhatsappApi";
 import { useFinancialYear } from "@/context/financialYear";
+import { useFirm } from "@/hooks/useFirm";
 import { MessageCircle, Link2, Copy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -20,6 +21,8 @@ interface Props {
 
 export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }: Props) {
   const { selectedFY } = useFinancialYear();
+  const { firmName, loading: firmLoading } = useFirm();
+  const previewFirmName = firmLoading ? "…" : firmName || "Your CA";
   const [selectedClientId, setSelectedClientId] = useState(preselectedClientId || "");
   const [docType, setDocType] = useState("");
   const [customLabel, setCustomLabel] = useState("");
@@ -196,7 +199,7 @@ export function DocumentRequestModal({ open, onOpenChange, preselectedClientId }
             <div className="space-y-2">
               <div className="rounded-xl bg-[#dcf8c6] p-3 text-sm text-foreground border border-[#25D366]/20">
                 <p className="font-medium text-xs text-[#25D366] mb-1">WhatsApp Preview</p>
-                <p>Hello {selectedClient?.name}, Sharma & Associates requires your {isCustom ? customLabel : docType} by {new Date(dueDate).toLocaleDateString("en-IN")}. Please upload here: {uploadLink}</p>
+                <p>Hello {selectedClient?.name}, {previewFirmName} requires your {isCustom ? customLabel : docType} by {new Date(dueDate).toLocaleDateString("en-IN")}. Please upload here: {uploadLink}</p>
               </div>
               <div className="rounded-lg bg-muted/50 p-2.5 text-xs flex items-center gap-2">
                 <Link2 className="h-3.5 w-3.5 text-primary shrink-0" />

@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageCircle, Loader2 } from "lucide-react";
+import { MessageCircle, Loader2, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/common/PaginationControls";
@@ -102,75 +102,85 @@ export function BulkDocumentStatus() {
         <CardTitle className="text-base font-heading">Pending Document Requests</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        {/* Desktop table */}
-        <div className="hidden md:block" data-testid="desktop-doc-requests">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Client</TableHead>
-                <TableHead>Document</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        {paginated.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
+            <ClipboardList className="h-8 w-8" />
+            <p className="text-sm font-medium text-foreground">No pending document requests</p>
+            <p className="text-xs">Use "Request Document" above to ask a client for a file.</p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block" data-testid="desktop-doc-requests">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Document</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginated.map((req) => (
+                    <TableRow key={req.id}>
+                      <TableCell className="font-medium text-sm">{req.clientName}</TableCell>
+                      <TableCell className="text-sm">{req.documentType}</TableCell>
+                      <TableCell className="text-sm">{new Date(req.dueDate).toLocaleDateString("en-IN")}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={statusColors[req.status]}>
+                          {req.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {req.status !== "submitted" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-[#25D366] border-[#25D366]/30 hover:bg-[#25D366]/10 gap-1"
+                            disabled={remindingId === req.id}
+                            onClick={() => handleSendReminder(req)}
+                          >
+                            {remindingId === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
+                            Remind
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-2 p-4" data-testid="mobile-doc-requests">
               {paginated.map((req) => (
-                <TableRow key={req.id}>
-                  <TableCell className="font-medium text-sm">{req.clientName}</TableCell>
-                  <TableCell className="text-sm">{req.documentType}</TableCell>
-                  <TableCell className="text-sm">{new Date(req.dueDate).toLocaleDateString("en-IN")}</TableCell>
-                  <TableCell>
+                <div key={req.id} className="rounded-xl border p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">{req.clientName}</p>
                     <Badge variant="outline" className={statusColors[req.status]}>
                       {req.status}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {req.status !== "submitted" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-[#25D366] border-[#25D366]/30 hover:bg-[#25D366]/10 gap-1"
-                        disabled={remindingId === req.id}
-                        onClick={() => handleSendReminder(req)}
-                      >
-                        {remindingId === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
-                        Remind
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{req.documentType} • Due: {new Date(req.dueDate).toLocaleDateString("en-IN")}</p>
+                  {req.status !== "submitted" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-[#25D366] border-[#25D366]/30 hover:bg-[#25D366]/10 gap-1"
+                      disabled={remindingId === req.id}
+                      onClick={() => handleSendReminder(req)}
+                    >
+                      {remindingId === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
+                      Send Reminder
+                    </Button>
+                  )}
+                </div>
               ))}
-            </TableBody>
-          </Table>
-        </div>
-
-        {/* Mobile cards */}
-        <div className="md:hidden space-y-2 p-4" data-testid="mobile-doc-requests">
-          {paginated.map((req) => (
-            <div key={req.id} className="rounded-xl border p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">{req.clientName}</p>
-                <Badge variant="outline" className={statusColors[req.status]}>
-                  {req.status}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">{req.documentType} • Due: {new Date(req.dueDate).toLocaleDateString("en-IN")}</p>
-              {req.status !== "submitted" && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full text-[#25D366] border-[#25D366]/30 hover:bg-[#25D366]/10 gap-1"
-                  disabled={remindingId === req.id}
-                  onClick={() => handleSendReminder(req)}
-                >
-                  {remindingId === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
-                  Send Reminder
-                </Button>
-              )}
             </div>
-          ))}
-        </div>
+          </>
+        )}
         <div className="px-4 pb-4">
           <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} pageSize={pageSize} />
         </div>
