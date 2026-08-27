@@ -87,9 +87,18 @@ export function ClientDocumentFolder({ clientId, onBack }: Props) {
       return rawUrl;
     }
 
+    // The real bucket is "ca-munim-documents" (was hardcoded to a nonexistent
+    // "documents" bucket — literal "Bucket not found"), and it's private, so a
+    // signed URL is required; getPublicUrl would 400 on a private bucket even
+    // with the right name. 10 minutes is enough to preview/download without
+    // handing out a long-lived link.
     const path = rawUrl.replace(/^\/+/, "");
-    const { data } = supabase.storage.from("documents").getPublicUrl(path);
-    return data.publicUrl;
+    const { data, error } = await supabase.storage.from("ca-munim-documents").createSignedUrl(path, 600);
+    if (error || !data?.signedUrl) {
+      toast.error("Could not generate a link for this file. It may have been moved or deleted.");
+      return null;
+    }
+    return data.signedUrl;
   };
 
   const handlePreview = async (doc: Document) => {

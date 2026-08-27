@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { compileTemplateForClient, defaultTemplates, fetchMessageTemplatesFromSupabase, MessageTemplate, sendBulkWhatsAppMessages,TemplateCategory } from "@/data/WhatsappApi";
 import { fetchClientsFromSupabase, type Client } from "@/data/Clients";
 import { fetchInvoicesFromSupabase, type Invoice } from "@/data/Billing";
+import { fetchDocumentRequestsFromSupabase, type DocumentRequest } from "@/data/Documents";
 import { fetchFirmProfileFromSupabase, type FirmProfile } from "@/data/Settings";
-import { Send, ChevronRight, ChevronLeft, Search, CheckCircle2, Loader2, AlertCircle, ReceiptText } from "lucide-react";
+import { Send, ChevronRight, ChevronLeft, Search, CheckCircle2, Loader2, AlertCircle, ReceiptText, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useFinancialYear } from "@/context/financialYear";
@@ -35,6 +36,7 @@ export function BulkSender() {
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [documentRequests, setDocumentRequests] = useState<DocumentRequest[]>([]);
   const [firmProfile, setFirmProfile] = useState<FirmProfile | null>(null);
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [clientsLoading, setClientsLoading] = useState(true);
@@ -53,6 +55,14 @@ export function BulkSender() {
   // "N/A"/₹0 — see ISSUES.md).
   const needsInvoice = template?.variables.includes("invoice_number") ?? false;
 
+  // Same problem, same shape: a template referencing {{upload_link}} (e.g.
+  // "Documents Pending") is meaningless without a real per-client upload
+  // token — Bulk Sender has no document-type/due-date inputs of its own, so
+  // it can only offer a real link for a client who already has a pending
+  // document_requests row. Without this gate, upload_link silently fell back
+  // to compileTemplateForClient's "N/A" default for every bulk send.
+  const needsUploadLink = template?.variables.includes("upload_link") ?? false;
+
   // Same "billed, unpaid, not cancelled/draft" filter FeesDashboard.tsx and
   // MobileBillingScreen.tsx already use — kept identical so this flow only
   // ever offers to send about an invoice that's genuinely due, not a draft
@@ -65,6 +75,19 @@ export function BulkSender() {
     .forEach((i) => {
       if (!invoiceByClientId.has(i.clientId)) invoiceByClientId.set(i.clientId, i);
     });
+
+  // Earliest-due-first tie-break, same convention as invoiceByClientId above.
+  const documentRequestByClientId = new Map<string, DocumentRequest>();
+  documentRequests
+    .filter((r) => r.status === "pending" && r.uploadToken)
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+    .forEach((r) => {
+      if (!documentRequestByClientId.has(r.clientId)) documentRequestByClientId.set(r.clientId, r);
+    });
+
+  const isSendable = (clientId: string) =>
+    (!needsInvoice || invoiceByClientId.has(clientId)) &&
+    (!needsUploadLink || documentRequestByClientId.has(clientId));
 
   useEffect(() => {
     const loadTemplates = async () => {
@@ -119,10 +142,22 @@ export function BulkSender() {
       }
     };
 
+    const loadDocumentRequests = async () => {
+      try {
+        const data = await fetchDocumentRequestsFromSupabase();
+        setDocumentRequests(data);
+      } catch {
+        // Non-fatal, same reasoning as loadInvoices — only upload_link-tied
+        // templates need this.
+        setDocumentRequests([]);
+      }
+    };
+
     loadTemplates();
     loadClients();
     loadFirmProfile();
     loadInvoices();
+    loadDocumentRequests();
   }, []);
 
   const getFilteredClients = () => {
@@ -136,12 +171,10 @@ export function BulkSender() {
 
   const filteredClients = getFilteredClients();
   const searchedClients = filteredClients.filter((c) => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
-  const sendableSearchedClients = needsInvoice
-    ? searchedClients.filter((c) => invoiceByClientId.has(c.id))
-    : searchedClients;
+  const sendableSearchedClients = searchedClients.filter((c) => isSendable(c.id));
 
   const toggleClient = (id: string) => {
-    if (needsInvoice && !invoiceByClientId.has(id)) return; // no real invoice to send about
+    if (!isSendable(id)) return; // no real invoice/upload link to send about
     setSelectedClients((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   };
 
@@ -156,9 +189,24 @@ export function BulkSender() {
   };
 
   const overridesFor = (client: Client): Record<string, string> | undefined => {
-    if (!needsInvoice) return undefined;
-    const inv = invoiceByClientId.get(client.id);
-    return inv ? { invoice_number: inv.invoiceNumber, amount: inv.amountDue.toLocaleString("en-IN") } : undefined;
+    if (!needsInvoice && !needsUploadLink) return undefined;
+    const overrides: Record<string, string> = {};
+    if (needsInvoice) {
+      const inv = invoiceByClientId.get(client.id);
+      if (inv) {
+        overrides.invoice_number = inv.invoiceNumber;
+        overrides.amount = inv.amountDue.toLocaleString("en-IN");
+      }
+    }
+    if (needsUploadLink) {
+      const req = documentRequestByClientId.get(client.id);
+      if (req?.uploadToken) {
+        overrides.upload_link = `${window.location.origin}/upload/${req.uploadToken}`;
+        overrides.due_date = new Date(req.dueDate).toLocaleDateString("en-IN");
+        overrides.filing_type = req.documentType;
+      }
+    }
+    return overrides;
   };
 
   const renderPreview = (client: Client) => {
@@ -264,12 +312,15 @@ export function BulkSender() {
                   key={t.id}
                   onClick={() => {
                     setSelectedTemplate(t.id);
-                    // Switching to an invoice-tied template can strand
-                    // previously-selected clients who have no real invoice —
-                    // drop them rather than silently sending them a broken
-                    // ("N/A"/₹0-parameter) message.
+                    // Switching to an invoice- or upload-link-tied template can
+                    // strand previously-selected clients who don't have a real
+                    // invoice/pending document request — drop them rather than
+                    // silently sending them a broken ("N/A"-parameter) message.
                     if (t.variables.includes("invoice_number")) {
                       setSelectedClients((prev) => prev.filter((id) => invoiceByClientId.has(id)));
+                    }
+                    if (t.variables.includes("upload_link")) {
+                      setSelectedClients((prev) => prev.filter((id) => documentRequestByClientId.has(id)));
                     }
                   }}
                   className={`p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -309,6 +360,15 @@ export function BulkSender() {
               </div>
             )}
 
+            {needsUploadLink && (
+              <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+                <Link2 className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>
+                  "{template?.name}" needs a real pending document request (for the upload link) — clients without one are grayed out below and can't be selected. Create a request from Documents → Pending Requests first.
+                </span>
+              </div>
+            )}
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder="Search clients..." className="pl-9" value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} />
@@ -328,14 +388,14 @@ export function BulkSender() {
                 <div className="flex items-center gap-2 pb-2 border-b border-border">
                   <Checkbox checked={sendableSearchedClients.length > 0 && sendableSearchedClients.every((c) => selectedClients.includes(c.id))} onCheckedChange={toggleAll} />
                   <span className="text-sm font-medium">
-                    Select All ({sendableSearchedClients.length}{needsInvoice && sendableSearchedClients.length !== searchedClients.length ? ` of ${searchedClients.length}` : ""})
+                    Select All ({sendableSearchedClients.length}{(needsInvoice || needsUploadLink) && sendableSearchedClients.length !== searchedClients.length ? ` of ${searchedClients.length}` : ""})
                   </span>
                   <Badge className="ml-auto">{selectedClients.length} selected</Badge>
                 </div>
 
                 <div className="max-h-64 overflow-y-auto space-y-1">
                   {searchedClients.length > 0 ? searchedClients.map((c) => {
-                    const sendable = !needsInvoice || invoiceByClientId.has(c.id);
+                    const sendable = isSendable(c.id);
                     return (
                       <div
                         key={c.id}
@@ -353,7 +413,9 @@ export function BulkSender() {
                         {sendable ? (
                           <Badge variant="outline" className="text-[10px] shrink-0">{c.type}</Badge>
                         ) : (
-                          <Badge variant="outline" className="text-[10px] shrink-0 text-muted-foreground">No pending invoice</Badge>
+                          <Badge variant="outline" className="text-[10px] shrink-0 text-muted-foreground">
+                            {needsInvoice && !invoiceByClientId.has(c.id) ? "No pending invoice" : "No pending request"}
+                          </Badge>
                         )}
                       </div>
                     );
